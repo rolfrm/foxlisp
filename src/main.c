@@ -499,7 +499,7 @@ int main(int argc, char ** argv){
   lisp_register_native("print", 1, print);
   lisp_register_native("car", 1, car);
   lisp_register_native("cdr", 1, cdr);
-  lisp_register_native("cons", 1, new_cons);
+  lisp_register_native("cons", 2, new_cons);
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
   
@@ -521,6 +521,7 @@ int main(int argc, char ** argv){
   print(ret2);printf("<-- eval\n");
   lisp_eval_string("(print (if 1 (+ 2 3.5) 3))");printf("<-- eval\n");
   lisp_eval_string("(print (quote (1 2 3)))");printf("<-- eval\n");
+  lisp_eval_string("(print (cons 1 2))");printf("<-- eval\n");
   
   return 0;
 }
