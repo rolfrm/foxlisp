@@ -625,7 +625,7 @@ lisp_value lisp_eval_stream(io_reader * rd){
 	 var off = rd->offset;
 	 var code = lisp_read_stream(rd);
 	 if(off == rd->offset || code.type == LISP_NIL) break;
-	 //code = lisp_macro_expand(current_context->globals, code);
+	 code = lisp_macro_expand(current_context->globals, code);
 	 result = lisp_eval(current_context->globals, code);
   }
   return result;
