@@ -6,9 +6,9 @@ CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 LDFLAGS= -L. $(OPT)
-LIBS= -lpthread -ldl libmicroio.a 
+LIBS= -lpthread -ldl libmicroio.a -lgc
 ALL= $(TARGET)
-CFLAGS = -Isrc/ -I. -Iinclude/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall
+CFLAGS = -Isrc/ -I. -Iinclude/ -I../../Desktop/gc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall
 
 all: libmicroio.a
 all: $(TARGET)

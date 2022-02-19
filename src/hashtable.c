@@ -21,6 +21,19 @@ typedef uint64_t u64;
 typedef float f32;
 typedef double f64;
 
+void * (* ht_mem_malloc)(size_t s);
+void (* ht_mem_free)(void *);
+static void * alloc(size_t s){
+  void * d;
+  if(ht_mem_malloc != NULL) d = ht_mem_malloc(s);
+  else d = malloc(s);
+  memset(d, 0, s);
+  return d;
+}
+static void dealloc(void * d){
+  if(ht_mem_free != NULL) ht_mem_free(d);
+  else free(d);
+}
 
 u32 djb2_hash(const char  * str, size_t count)
 {
@@ -125,14 +138,14 @@ bool default_compare(const void * key_a, const void * key_b, size_t size, void *
 }
 
 hash_table * ht_create2(size_t capacity, size_t key_size, size_t elem_size){
-  hash_table * ht = malloc(sizeof(*ht));
+  hash_table * ht = alloc(sizeof(*ht));
   ht->capacity = capacity;
   ht->key_size = key_size;
   ht->elem_size = elem_size;
   ht->userdata = ht;
-  ht->keys = calloc(capacity * key_size, 1);
-  ht->elems = calloc(capacity * elem_size, 1);
-  ht->occupied = calloc(capacity * sizeof(ht_state), 1);
+  ht->keys = alloc(capacity * key_size);
+  ht->elems = alloc(capacity * elem_size);
+  ht->occupied = alloc(capacity * sizeof(ht_state));
   return ht;
 }
 
@@ -142,11 +155,11 @@ hash_table * ht_create(size_t key_size, size_t elem_size){
 
 
 void ht_free(hash_table *ht){
-  free(ht->keys);
-  free(ht->elems);
-  free(ht->occupied);
+  dealloc(ht->keys);
+  dealloc(ht->elems);
+  dealloc(ht->occupied);
   memset(ht, 0, sizeof(ht[0]));
-  free(ht);
+  dealloc(ht);
 }
 
 bool ht_set(hash_table * ht, const void * key, const void * nelem);
