@@ -130,21 +130,9 @@ lisp_value scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value)
   return scope_set_value(scope->super, sym, value);
 }
 
-void scope_free(void * object, void * data){
-  lisp_scope * scope = object;
-  printf("Free scope\n");
-  if(scope->values != NULL){
-	 ht_free(scope->values);
-  }
-  
-}
-
 lisp_value scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
-  if(scope->values == NULL){
+  if(scope->values == NULL)
 	 scope->values = ht_create(sizeof(size_t), sizeof(lisp_value));
-	 //GC_register_finalizer(scope, scope_free, NULL, 0, 0);
-	 
-  }
   
   ht_set(scope->values,&sym.integer,&value);
   return nil;
@@ -162,6 +150,8 @@ lisp_context * lisp_context_new(){
   current_context = ctx;
   rest_sym = get_symbol("&rest");
   if_sym = get_symbol("if");
+  scope_create_value(current_context->globals, get_symbol("nil"), nil);
+  scope_create_value(current_context->globals, get_symbol("t"), t);
   current_context = prev_ctx;
   
   return ctx;
@@ -192,26 +182,11 @@ lisp_value cdr(lisp_value v){
 #define caddddddr(x) car(cddddddr(x))
 #define cadddddddr(x) car(cdddddddr(x))
 
-lisp_value _free_cons = nil;
-void imfreed(void * object, void * data){
-  printf("Free!\n");
-}
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
-  
-  if(_free_cons.type != LISP_NIL){
-	 lisp_value v = _free_cons;
-	 _free_cons = cdr(_free_cons);
-	 v.cons->car = _car;
-	 v.cons->cdr = _cdr;
-	 return v;
-  }
-  
   lisp_value v = {.type = LISP_CONS, .cons = GC_MALLOC(sizeof(cons))};
   v.cons->car = _car;
   v.cons->cdr = _cdr;
-  //GC_register_finalizer(v.cons, imfreed, NULL, 0, 0);
   return v;
-  return nil;
 }
 
 void free_cons(lisp_value cons){
@@ -273,7 +248,6 @@ int64_t get_symbol_id(const char * s){
   id = current_context->next_symbol++;
   ht_set(current_context->symbols, &s, &id);
   ht_set(current_context->symbols_reverse, &id, &s);
-  //printf("get symbol: %s %i %i\n", s, id, count);
   return id;
 }
 
@@ -290,7 +264,7 @@ const char * symbol_name(int64_t id){
 }
 
 lisp_value parse_token(const char * x, int count){
-  //printf("parse token '%s'\n", x);
+
   char * tp= NULL;
   double o = strtold(x, &tp);
   if(tp == x + count){
@@ -746,6 +720,37 @@ lisp_value lisp_sub(lisp_value a, lisp_value b){
   return a;
 }
 
+lisp_value lisp_mul(lisp_value a, lisp_value b){
+  if(a.type == LISP_RATIONAL)
+	 a.rational *= b.rational;
+  else if(a.type == LISP_INTEGER)
+	 a.integer *= b.integer;
+  return a;
+}
+lisp_value lisp_div(lisp_value a, lisp_value b){
+  if(a.type == LISP_RATIONAL)
+	 a.rational /= b.rational;
+  else if(a.type == LISP_INTEGER)
+	 a.integer /= b.integer;
+  return a;
+}
+
+lisp_value lisp_less(lisp_value a, lisp_value b){
+  if(a.type == LISP_RATIONAL && a.rational < b.rational)
+	 return t;
+  if(a.type == LISP_INTEGER && a.integer < b.integer)
+	 return t;
+  return nil;
+}
+lisp_value lisp_greater(lisp_value a, lisp_value b){
+  if(a.type == LISP_RATIONAL && a.rational > b.rational)
+	 return t;
+  if(a.type == LISP_INTEGER && a.integer > b.integer)
+	 return t;
+  return nil;
+}
+
+
 lisp_value lisp_eq(lisp_value a, lisp_value b){
   if(a.type == b.type && a.integer == b.integer)
 	 return t;
@@ -766,14 +771,24 @@ lisp_value println(lisp_value v){
   printf("\n");
   return v;
 }
-
+lisp_value integer(int64_t v){
+  return (lisp_value){.type = LISP_INTEGER, .integer = v};
+}
+lisp_value gc_heap(){
+  return integer(GC_get_heap_size());
+}
 
 int main(int argc, char ** argv){
   ht_mem_malloc = GC_malloc;
   ht_mem_free = GC_free;
   current_context = lisp_context_new();
+  lisp_register_native("gc-heap", 0, gc_heap);
   lisp_register_native("+", 2, lisp_add);
   lisp_register_native("-", 2, lisp_sub);
+  lisp_register_native("*", 2, lisp_mul);
+  lisp_register_native("/", 2, lisp_div);
+  lisp_register_native("<", 2, lisp_less);
+  lisp_register_native(">", 2, lisp_greater);
   lisp_register_native("print", 1, print);
   lisp_register_native("println", 1, println);
   lisp_register_native("car", 1, car);
@@ -816,18 +831,6 @@ int main(int argc, char ** argv){
   lisp_eval_string("((lambda (x y) (print (+ x y))) 5 50)");
   lisp_eval_string("(define add (lambda (x y) (+ x y)))");
   lisp_eval_string("(println (add 123 321))");
-  
-  int it = 0;
-  if(false){
-	 // test GC
-	 while(true){
-		it += 1;
-		lisp_eval_string("(let ((a 6.2) (b 0.1)) (+ a b))");
-		if((it % 10000) == 0)
-		  printf("Heap size = %lu bytes\n",
-					(unsigned long)GC_get_heap_size());
-	 }
-  }
   lisp_eval_file("fox1.lisp");
   
   return 0;
