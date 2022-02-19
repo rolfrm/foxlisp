@@ -6,20 +6,23 @@ CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 LDFLAGS= -L. $(OPT)
-LIBS= -lpthread -ldl libmicroio.a -lgc
+LIBS= -lpthread -ldl libmicroio.a
 ALL= $(TARGET)
-CFLAGS = -Isrc/ -I. -Iinclude/ -I../../Desktop/gc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall
+CFLAGS = -Isrc/ -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall
 
 all: libmicroio.a
 all: $(TARGET)
 
-$(TARGET): $(LIB_OBJECTS) 
-	$(CC) $(LDFLAGS)   $(LIB_OBJECTS) $(LIBS)  -o $(TARGET)
+$(TARGET): $(LIB_OBJECTS) gc.o
+	$(CC) $(LDFLAGS)   $(LIB_OBJECTS) gc.o $(LIBS)  -o $(TARGET)
 
 .PHONY: iron/libiron.a
 
 libmicroio/libmicroio.a:
 	make -C libmicroio
+
+gc.o: gc/bdwgc/extra/gc.c
+	gcc -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .
