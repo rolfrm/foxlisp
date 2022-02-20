@@ -17,7 +17,6 @@ void error(){
     raise(SIGINT);
 }
 
-
 void * gc_clone(void * mem, size_t s){
   void * d = GC_MALLOC(s);
   memcpy(d, mem, s);
@@ -166,6 +165,7 @@ lisp_value read_token_string(io_reader * rd){
 		break;// incomplete string.
 	 io_write_u8(&wd, c);
   }
+  io_write_u8(&wd, 0);
   lisp_value v = {.type = LISP_STRING, .string = gc_clone(wd.data, strlen(wd.data) + 1) };
   io_writer_clear(&wd);
   return v;
