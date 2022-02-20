@@ -73,6 +73,7 @@ const lisp_value nil = {0};
 const lisp_value t = {.type = LISP_T};
 lisp_value rest_sym = {.type = LISP_SYMBOL};
 lisp_value if_sym = {.type = LISP_SYMBOL};
+lisp_value quote_sym = {.type = LISP_SYMBOL};
 
 void * gc_clone(void * mem, size_t s){
   void * d = GC_MALLOC(s);
@@ -150,6 +151,7 @@ lisp_context * lisp_context_new(){
   current_context = ctx;
   rest_sym = get_symbol("&rest");
   if_sym = get_symbol("if");
+  quote_sym = get_symbol("quote");
   scope_create_value(current_context->globals, get_symbol("nil"), nil);
   scope_create_value(current_context->globals, get_symbol("t"), t);
   current_context = prev_ctx;
@@ -334,32 +336,44 @@ lisp_value lisp_read_stream(io_reader * rd){
 
 lisp_value lisp_read_string(const char * str){
 
-  io_reader w =io_reader_from_bytes((void *)str, strlen(str) + 1);
+  io_reader w = io_reader_from_bytes((void *)str, strlen(str) + 1);
   w.offset = 0;
   return lisp_read_stream(&w);
 }
 
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value);
-
+bool lisp_value_eq(lisp_value a, lisp_value b){
+  if(a.type != b.type) return false;
+  return a.integer == b.integer;
+}
 lisp_value lisp_sub_macro_expand(lisp_scope * scope, lisp_value c){
   if(c.type == LISP_NIL) return nil;
+  var current = car(c);
   var next = cdr(c);
+  var value = lisp_macro_expand(scope, current);
   if(next.type != LISP_NIL){
-	 var value = lisp_macro_expand(scope, car(c));
 	 var nextr = lisp_sub_macro_expand(scope, next);
+	 if(lisp_value_eq(current, value) && lisp_value_eq(next, nextr))
+		return c;
 	 return new_cons(value, nextr);
+  }else{
+	 if(lisp_value_eq(current, value))
+		return c;
+	 return new_cons(value, nil);
   }
-  return new_cons(lisp_macro_expand(scope, car(c)), nil);
 }
 
 lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
-  if(value.type != LISP_CONS){
+  if(value.type != LISP_CONS)
 	 return value;
-  }
-  value = lisp_sub_macro_expand(scope, value);
+  if(lisp_value_eq(car(value), quote_sym)) return value;
+  var value_new = lisp_sub_macro_expand(scope, value);
+  if(!lisp_value_eq(value_new, value))
+	 return value_new;
   lisp_value head = car(value);
   if(head.type != LISP_SYMBOL) return value;
+  if(head.symbol == quote_sym.symbol) return value;
   lisp_value head_value = scope_get_value(scope, head);
   if(head_value.type != LISP_FUNCTION_MACRO) return value;
   lisp_function * f = head_value.function;
@@ -369,9 +383,14 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   while(args.type != LISP_NIL && args2.type != LISP_NIL){
 	 var arg = car(args);
 	 var argv = car(args2);
+	 
 	 if(arg.type != LISP_SYMBOL){
 		// error
-		printf("arg name must be a symbol");
+		println(value);
+		println(args);
+		println(args2);
+		printf("arg name must be a symbol\n");
+		error();
 		return nil;
 	 }
 	 if(arg.symbol == rest_sym.symbol){
@@ -379,7 +398,8 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		arg = car(args);
 		if(arg.type != LISP_SYMBOL){
 		  // error
-		  printf("(2) arg name must be a symbol");
+		  printf("(2) arg name must be a symbol\n");
+		  error();
 		  return nil;
 		}
 		scope_create_value(function_scope, arg, args2);
@@ -391,7 +411,14 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 	 args2 = cdr(args2);
 	 
   }
-  return lisp_eval(function_scope, f->code);
+  var it = f->code;
+  lisp_value ret = nil;
+  while(it.type != LISP_NIL){
+	 ret = lisp_eval(function_scope, car(it));
+	 it = cdr(it);
+  }
+		  
+  return ret;
 }
 
 
@@ -452,16 +479,6 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				}
 				return result;
 			 }
-		  case LISP_LAMBDA:
-			 {
-				var args = cadr(value);
-				var body = caddr(value);
-				lisp_function * f = GC_MALLOC(sizeof(*f));
-				f->code = body;
-				f->args = args;
-				f->closure = scope;
-				return (lisp_value){.type = LISP_FUNCTION, .function = f};
-			 }
 		  case LISP_LOOP:
 			 {
 				var cond = cadr(value);
@@ -476,15 +493,19 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				}
 				return result;
 			 }
+		  case LISP_LAMBDA:
 		  case LISP_MACRO:
 			 {
 				var args = cadr(value);
-				var body = caddr(value);
+				var body = cddr(value);
 				lisp_function * f = GC_MALLOC(sizeof(*f));
 				f->code = body;
 				f->args = args;
 				f->closure = scope;
-				return (lisp_value){.type = LISP_FUNCTION_MACRO, .function = f};
+				if(first_value.builtin == LISP_LAMBDA)
+				  return (lisp_value){.type = LISP_FUNCTION, .function = f};
+				else
+				  return (lisp_value){.type = LISP_FUNCTION_MACRO, .function = f};
 			 }
 		  case LISP_SET:
 			 {
@@ -573,13 +594,22 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 
 			 args = cdr(args);
 			 args2 = cdr(args2);
-			 
 		  }
-		  return lisp_eval(function_scope, f->code);
+
+		  var it = f->code;
+		  lisp_value ret = nil;
+		  while(it.type != LISP_NIL){
+			 //printf("-->");println(car(it));
+			 ret = lisp_eval(function_scope, car(it));
+			 it = cdr(it);
+		  }
+		  
+		  return ret;
 		 
 		}else{
 		  printf("not a function :");
-		  print(value);
+		  println(value);
+		  error();
 		  return nil;
 		}
 	 }
@@ -599,7 +629,14 @@ lisp_value lisp_eval_stream(io_reader * rd){
 	 var off = rd->offset;
 	 var code = lisp_read_stream(rd);
 	 if(off == rd->offset || code.type == LISP_NIL) break;
-	 code = lisp_macro_expand(current_context->globals, code);
+	 while(true){
+
+		var next_code = lisp_macro_expand(current_context->globals, code);
+		if(lisp_value_eq(next_code, code))
+		  break;
+		code = next_code;
+	 }
+		 
 	 result = lisp_eval(current_context->globals, code);
   }
   return result;
@@ -645,10 +682,10 @@ lisp_value print(lisp_value v){
 	 printf("%f", v.rational);
 	 break;
   case LISP_STRING:
-	 printf("%s", v.string);
+	 printf("\"%s\"", v.string);
 	 break;
   case LISP_SYMBOL:
-	 printf("'%s' %i", symbol_name(v.integer), v.integer);
+	 printf("%s", symbol_name(v.integer));
 	 break;
   case LISP_FUNCTION:
 	 printf("FUNCTION");
@@ -766,6 +803,12 @@ lisp_value lisp_len(lisp_value a){
   return (lisp_value){.type = LISP_INTEGER, .integer = i};
 }
 
+lisp_value lisp_error(lisp_value a){
+  println(a);
+  error();
+  return nil;
+}
+
 lisp_value println(lisp_value v){
   print(v);
   printf("\n");
@@ -776,6 +819,11 @@ lisp_value integer(int64_t v){
 }
 lisp_value gc_heap(){
   return integer(GC_get_heap_size());
+}
+
+lisp_value load_lib(lisp_value str){
+  // undefined
+  return t;
 }
 
 int main(int argc, char ** argv){
@@ -795,6 +843,10 @@ int main(int argc, char ** argv){
   lisp_register_native("cdr", 1, cdr);
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("=", 2, lisp_eq);
+  lisp_register_native("panic", 1, lisp_error);
+  lisp_register_native("load-lib", 1, load_lib);
+
+
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
   lisp_register_macro("let", LISP_LET);
@@ -804,7 +856,7 @@ int main(int argc, char ** argv){
   lisp_register_macro("macro", LISP_MACRO);
   lisp_register_macro("set", LISP_SET);
   lisp_register_macro("define", LISP_DEFINE);
-  
+    
   const char * data = "(+ 123 321)";
   io_reader w = io_reader_from_bytes((void *)data, strlen(data) + 1);
   w.offset = 0;
