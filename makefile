@@ -5,7 +5,7 @@ LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
-LDFLAGS= -L. $(OPT)
+LDFLAGS= -L. $(OPT) 
 LIBS= -lpthread -ldl libmicroio.a -lm
 ALL= $(TARGET)
 CFLAGS = -Isrc/ -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall
@@ -22,7 +22,7 @@ libmicroio/libmicroio.a:
 	make -C libmicroio
 
 foxgl.so: src/foxgl.c
-	gcc src/foxgl.c -L. -liron -fPIC -shared -o foxgl.so
+	gcc src/foxgl.c -L. -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
 	gcc -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include

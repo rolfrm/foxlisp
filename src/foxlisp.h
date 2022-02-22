@@ -24,7 +24,9 @@ typedef enum {
 				  LISP_LOOP = 6,
 				  LISP_MACRO = 7,
 				  LISP_SET = 8,
-				  LISP_DEFINE = 9
+				  LISP_DEFINE = 9,
+				  LISP_EVAL = 10
+
 }lisp_builtin;
 
 typedef int64_t lisp_symbol;
@@ -44,6 +46,7 @@ typedef struct{
 	 native_function * nfunction;
 	 alien_function * alien_func;
 	 lisp_builtin builtin;
+	 void * native_pointer;
   };
 }lisp_value;
 

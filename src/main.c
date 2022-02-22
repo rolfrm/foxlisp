@@ -459,6 +459,10 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				scope_create_value(scope, sym, value);
 				return value;
 			 }
+		  case LISP_EVAL:
+			 {
+				return lisp_eval(scope, lisp_eval(scope, cadr(value)));
+			 }
 		  }
 		}
 		lisp_value things = lisp_sub_eval(scope, cdr(value));
@@ -597,9 +601,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  var ret = func->return_example;
 		  ret.integer = r;
 		  return ret;
-		  
-
-		  
+		  		  
 		}else{
 		  printf("not a function :");
 		  println(value);
@@ -833,9 +835,17 @@ lisp_value lisp_integer(lisp_value v){
   v.type = LISP_INTEGER;
   return v;
 }
+
+lisp_value lisp_panic(lisp_value v){
+  printf("Panic: ");print(v);printf("\n");
+  error();
+  return nil;
+}
+
 lisp_value integer(int64_t v){
   return (lisp_value){.type = LISP_INTEGER, .integer = v};
 }
+
 lisp_value gc_heap(){
   return integer(GC_get_heap_size());
 }
@@ -897,7 +907,36 @@ lisp_value lisp_sin(lisp_value v){
   var p = lisp_rational(v);
   p.rational = sin(p.rational);
   return p;
-  
+}
+
+lisp_value lisp_read(lisp_value v){
+  if(v.type != LISP_STRING)
+	 return v;
+  return lisp_read_string(v.string);
+}
+
+const char * lisp_type_to_string(lisp_type t){
+  switch(t){
+  case LISP_NIL: return "NIL";
+  case LISP_T: return "T";
+  case LISP_CONS: return "CONS";
+  case LISP_INTEGER: return "INTEGER";
+  case LISP_RATIONAL: return "RATIONAL";
+  case LISP_STRING: return "STRING";
+  case LISP_SYMBOL: return "SYMBOL";
+  case LISP_FUNCTION: return "FUNCTION";
+  case LISP_FUNCTION_MACRO: return "MACRO";
+  case LISP_FUNCTION_NATIVE: return "NATIVE_FUNCTION";
+  case LISP_MACRO_BUILTIN: return "MACRO_BUILTIN";
+  case LISP_NATIVE_POINTER: return "NATIVE_POINTER";
+  case LISP_ALIEN_FUNCTION: return "ALIEN_FUNCTION";
+  }
+  error();
+  return NULL;
+}
+
+lisp_value lisp_type_of(lisp_value v){
+  return get_symbol(lisp_type_to_string(v.type));
 }
 
 int main(int argc, char ** argv){
@@ -921,11 +960,13 @@ int main(int argc, char ** argv){
   lisp_register_native("integer", 1, lisp_integer);
   lisp_register_native("rational", 1, lisp_rational);
   lisp_register_native("sin", 1, lisp_sin);
+  lisp_register_native("type-of", 1, lisp_type_of);
   
   lisp_register_native("load-lib", 1, load_lib);
   lisp_register_native("load-alien", 4, lisp_alien_func);
   lisp_register_native("load-wrap", 3, lisp_wrap_func);
-
+  lisp_register_native("read-string", 1, lisp_read);
+  lisp_register_native("panic", 1, lisp_panic);
 
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
@@ -936,6 +977,7 @@ int main(int argc, char ** argv){
   lisp_register_macro("macro", LISP_MACRO);
   lisp_register_macro("set", LISP_SET);
   lisp_register_macro("define", LISP_DEFINE);
+  lisp_register_macro("eval", LISP_EVAL);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
   const char * data = "(+ 123 321)";
