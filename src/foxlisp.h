@@ -25,7 +25,9 @@ typedef enum {
 				  LISP_MACRO = 7,
 				  LISP_SET = 8,
 				  LISP_DEFINE = 9,
-				  LISP_EVAL = 10
+				  LISP_EVAL = 10,
+				  LISP_QUASIQUOTE = 11,
+				  LISP_UNQUOTE = 12
 
 }lisp_builtin;
 
@@ -62,9 +64,12 @@ struct _cons {
 const char * symbol_name(int64_t id);
 const lisp_value nil = {0};
 const lisp_value t = {.type = LISP_T};
+
 lisp_value rest_sym = {.type = LISP_SYMBOL};
 lisp_value if_sym = {.type = LISP_SYMBOL};
 lisp_value quote_sym = {.type = LISP_SYMBOL};
+lisp_value quasiquote_sym = {.type = LISP_SYMBOL};
+lisp_value unquote_sym = {.type = LISP_SYMBOL};
 
 typedef struct __lisp_scope lisp_scope;
 typedef struct{
@@ -96,3 +101,4 @@ lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
 lisp_value lisp_len(lisp_value lst);
+const char * lisp_type_to_string(lisp_type t);
