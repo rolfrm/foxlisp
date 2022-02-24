@@ -5,10 +5,10 @@ LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
-LDFLAGS= -L. $(OPT) 
+LDFLAGS= -L. $(OPT) -rdynamic
 LIBS= -lpthread -ldl libmicroio.a -lm
 ALL= $(TARGET)
-CFLAGS = -Isrc/ -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall
+CFLAGS = -Isrc/ -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall -shared -fPIC
 
 all: libmicroio.a
 all: $(TARGET)

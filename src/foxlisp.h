@@ -102,3 +102,10 @@ lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
 lisp_value lisp_len(lisp_value lst);
 const char * lisp_type_to_string(lisp_type t);
+
+lisp_value car(lisp_value v);
+lisp_value cdr(lisp_value v);
+void * lisp_malloc(size_t s);
+
+lisp_value get_symbol(const char * s);
+bool eq(lisp_value a, lisp_value b);

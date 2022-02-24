@@ -45,3 +45,8 @@
  (println x))
 
 (assert (cons? (cons 1 2 )))
+
+(define df '(color
+  :rgb (1 0 1)
+				 (sphere :center (1 1 1) :radius 1.0)))
+(println df)

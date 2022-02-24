@@ -865,6 +865,10 @@ lisp_value lisp_eq(lisp_value a, lisp_value b){
   return _lisp_eq(a,b) ? t : nil;
 }
 
+bool eq(lisp_value a, lisp_value b){
+  return _lisp_eq(a, b);
+}
+
 lisp_value lisp_len(lisp_value a){
   int64_t i = 0;
   while(a.type == LISP_CONS){
@@ -971,6 +975,10 @@ lisp_value lisp_read(lisp_value v){
   if(v.type != LISP_STRING)
 	 return v;
   return lisp_read_string(v.string);
+}
+
+void * lisp_malloc(size_t v){
+  return GC_malloc(v);
 }
 
 const char * lisp_type_to_string(lisp_type t){
