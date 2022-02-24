@@ -27,7 +27,8 @@ typedef enum {
 				  LISP_DEFINE = 9,
 				  LISP_EVAL = 10,
 				  LISP_QUASIQUOTE = 11,
-				  LISP_UNQUOTE = 12
+				  LISP_UNQUOTE = 12,
+				  LISP_UNQUOTE_SPLICE = 13
 
 }lisp_builtin;
 
@@ -70,6 +71,7 @@ lisp_value if_sym = {.type = LISP_SYMBOL};
 lisp_value quote_sym = {.type = LISP_SYMBOL};
 lisp_value quasiquote_sym = {.type = LISP_SYMBOL};
 lisp_value unquote_sym = {.type = LISP_SYMBOL};
+lisp_value unquote_splice_sym = {.type = LISP_SYMBOL};
 
 typedef struct __lisp_scope lisp_scope;
 typedef struct{

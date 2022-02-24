@@ -91,6 +91,7 @@ lisp_context * lisp_context_new(){
   quote_sym = get_symbol("quote");
   quasiquote_sym = get_symbol("quasiquote");
   unquote_sym = get_symbol("unquote");
+  unquote_splice_sym = get_symbol("unquote-splicing");
   scope_create_value(current_context->globals, get_symbol("nil"), nil);
   scope_create_value(current_context->globals, get_symbol("t"), t);
   current_context = prev_ctx;
@@ -253,6 +254,10 @@ lisp_value tokenize_stream(io_reader * rd){
   }
   if(c == ','){
 	 io_read_u8(rd);
+	 if(io_peek_u8(rd) == '@'){
+		io_read_u8(rd);
+		return new_cons(unquote_splice_sym, new_cons(tokenize_stream(rd), nil));
+	 }
 	 return new_cons(unquote_sym, new_cons(tokenize_stream(rd), nil));
   }
   if(c == '('){
@@ -411,6 +416,11 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
 		var fst = car(value);
 		if(_lisp_eq(fst, unquote_sym))
 		  return lisp_eval(scope, cadr(value));
+		if(_lisp_eq(fst, unquote_splice_sym)){
+		  var to_splice = lisp_eval(scope, cadr(value));
+		  return car(to_splice);
+		}
+		  
 		return lisp_eval_quasiquoted_sub(scope, value);
 	 }
   default:
@@ -439,7 +449,8 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 if(first_value.builtin == LISP_QUOTE)
 				return cadr(value);
 		  case LISP_QUASIQUOTE:
-			 return lisp_eval_quasiquoted(scope, cadr(value));	
+			 return lisp_eval_quasiquoted(scope, cadr(value));
+		  case LISP_UNQUOTE_SPLICE:
 		  case LISP_UNQUOTE:
 			 printf("Unexpected unquote!\n");
 			 error();
