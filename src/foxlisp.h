@@ -11,7 +11,8 @@ typedef enum {
 		LISP_FUNCTION_NATIVE = 9,
 		LISP_MACRO_BUILTIN = 10,
 		LISP_NATIVE_POINTER = 11,
-		LISP_ALIEN_FUNCTION = 12
+		LISP_ALIEN_FUNCTION = 12,
+		LISP_VECTOR = 13
 		
 }lisp_type;
 
@@ -37,6 +38,7 @@ typedef struct _cons cons;
 typedef struct __lisp_function lisp_function;
 typedef struct __native_function native_function;
 typedef struct __alien_function alien_function;
+typedef struct __lisp_vector lisp_vector;
 typedef struct{
   lisp_type type;
   union{
@@ -50,6 +52,7 @@ typedef struct{
 	 alien_function * alien_func;
 	 lisp_builtin builtin;
 	 void * native_pointer;
+	 lisp_vector * vector;
   };
 }lisp_value;
 
@@ -99,6 +102,13 @@ struct __alien_function {
   lisp_value arg_example;
 };
 
+struct __lisp_vector{
+  void * data;
+  size_t count;
+  size_t elem_size;
+  lisp_value default_value;
+};
+
 lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
@@ -111,3 +121,10 @@ void * lisp_malloc(size_t s);
 
 lisp_value get_symbol(const char * s);
 bool eq(lisp_value a, lisp_value b);
+
+lisp_context * lisp_context_new();
+lisp_value vector_length(lisp_value v);
+lisp_value vector_ref(lisp_value _vector, lisp_value k);
+lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
+
+lisp_value integer(int64_t v);

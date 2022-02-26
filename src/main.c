@@ -21,6 +21,10 @@ bool is_nil(lisp_value v){
   return v.type == LISP_NIL;
 }
 
+bool is_integer(lisp_value v){
+  return v.type == LISP_INTEGER;
+}
+
 bool  _lisp_eq(lisp_value a, lisp_value b){
   if(a.type != b.type) return false;
   if(a.type == LISP_RATIONAL) return a.rational == b.rational;
@@ -170,7 +174,10 @@ lisp_value read_token_string(io_reader * rd){
 	 io_write_u8(&wd, c);
   }
   io_write_u8(&wd, 0);
-  lisp_value v = {.type = LISP_STRING, .string = gc_clone(wd.data, strlen(wd.data) + 1) };
+  lisp_value v = {
+						.type = LISP_STRING,
+						.string = gc_clone(wd.data, strlen(wd.data) + 1)
+  };
   io_writer_clear(&wd);
   return v;
 }
@@ -205,15 +212,24 @@ void type_assert(lisp_value val, lisp_type type){
 			  lisp_type_to_string(val.type));
 	 error();
   }
-	 
 }
 
 lisp_value parse_token(const char * x, int count){
 
   char * tp= NULL;
-  double o = strtold(x, &tp);
-  if(tp == x + count){
-	 return (lisp_value) {.type = LISP_RATIONAL, .rational = o }; 
+
+  {
+	 int64_t o = strtoll(x, &tp, 10);
+	 if(tp == x + count){
+		return (lisp_value) {.type = LISP_INTEGER, .integer = o }; 
+	 }
+  }
+
+  {
+	 double o = strtold(x, &tp);
+	 if(tp == x + count){
+		return (lisp_value) {.type = LISP_RATIONAL, .rational = o }; 
+	 }
   }
   // otherwise it is a symbol
   lisp_value r = {.type = LISP_SYMBOL, .integer = get_symbol_id(x)};
@@ -640,8 +656,17 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 case 0:
 				r = f.n0();
 				break;
+			 case 1:
+				r = f.n1(car(things).integer);
+				break;
 			 case 2:
 				r = f.n2(car(things).integer, cadr(things).integer);
+				break;
+			 case 3:
+				r = f.n3(car(things).integer, cadr(things).integer, caddr(things).integer);
+				break;
+			 case 4:
+				r = f.n4(car(things).integer, cadr(things).integer, caddr(things).integer, cadddr(things).integer);
 				break;
 			 default:
 				
@@ -738,7 +763,6 @@ lisp_value lisp_eval_file(const char * filepath){
   return r;
 }
 
-
 lisp_value print(lisp_value v){
   lisp_value iv = v;
   switch(v.type){
@@ -750,6 +774,19 @@ lisp_value print(lisp_value v){
 	 break;
   case LISP_INTEGER:
 	 printf("%i", v.integer);
+	 break;
+  case LISP_VECTOR:
+	 {
+		printf("#(");
+		var vector = v.vector;
+		for(size_t i = 0; i < vector->count; i++){
+		  var elem = vector_ref(v, integer(i));
+		  if(i != 0) printf(" ");
+		  print(elem);
+		}
+		printf(")");
+		
+	 }
 	 break;
   case LISP_NATIVE_POINTER:
 	 if(v.integer == 0)
@@ -1007,7 +1044,9 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_MACRO_BUILTIN: return "MACRO_BUILTIN";
   case LISP_NATIVE_POINTER: return "NATIVE_POINTER";
   case LISP_ALIEN_FUNCTION: return "ALIEN_FUNCTION";
+  case LISP_VECTOR: return "VECTOR";
   }
+  printf("Unknown type: %i\n", t);
   error();
   return NULL;
 }
@@ -1019,6 +1058,98 @@ lisp_value lisp_type_of(lisp_value v){
 lisp_value lisp_load(lisp_value v){
   type_assert(v, LISP_STRING);
   return lisp_eval_file(v.string);
+}
+
+lisp_value make_vector(lisp_value len, lisp_value _default){
+  type_assert(len, LISP_INTEGER);
+  size_t l = (size_t)len.integer;
+  size_t elem_size;
+  if(_default.type == LISP_NIL){
+	 elem_size = sizeof(lisp_value);
+  }else{
+	 elem_size = sizeof(double);
+  }
+  void * data = GC_malloc(l * elem_size);
+
+  lisp_vector * vector = GC_malloc(sizeof(*vector));
+  vector->data = data;
+  vector->count = l;
+  vector->elem_size = elem_size;
+  vector->default_value = _default;
+  memset(data, 0, l * elem_size);
+  lisp_value v = {.type = LISP_VECTOR, .vector = vector};
+  return v;
+}
+
+lisp_value vector_length(lisp_value v){
+  type_assert(v, LISP_VECTOR);
+  return integer(v.vector->count);
+}
+
+lisp_value vector_ref(lisp_value _vector, lisp_value k){
+  type_assert(_vector, LISP_VECTOR);
+  type_assert(k, LISP_INTEGER);
+  var vector = _vector.vector;
+  var v = vector->default_value;
+  void * src = vector->data + k.integer * vector->elem_size;
+  void * dst;
+  if(v.type == LISP_NIL){
+	 return ((lisp_value *) vector->data)[k.integer];
+  }else
+	 dst = &v.integer;
+  memcpy(dst, src, vector->elem_size);
+  
+  return v;
+}
+lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
+  type_assert(_vector, LISP_VECTOR);
+  type_assert(k, LISP_INTEGER);
+  
+  var vector = _vector.vector;
+  var v = value;
+  void * dst = vector->data + k.integer * vector->elem_size;
+  void * src;
+  if(vector->default_value.type == LISP_NIL)
+	 ((lisp_value *) vector->data)[k.integer] = value;
+  else{
+	 type_assert(value, vector->default_value.type);
+	 src = &v.integer;
+	 memcpy(dst, src, vector->elem_size);
+  }
+  return nil;
+}
+
+lisp_value vector_resize(lisp_value vector, lisp_value k){
+  type_assert(vector, LISP_VECTOR);
+  type_assert(k, LISP_INTEGER);
+
+  size_t l = (size_t)k.integer;
+  size_t elem_size;
+  if(vector.vector->default_value.type == LISP_NIL){
+	 elem_size = sizeof(lisp_value);
+  }else{
+	 elem_size = sizeof(double);
+  }
+  vector.vector->data = GC_realloc(vector.vector->data, l * elem_size);
+  for(size_t i = vector.vector->count; i < l; i++){
+	 vector_set(vector, integer(i), vector.vector->default_value);
+  }
+  vector.vector->count = l;
+  return vector;
+}
+
+lisp_value vector_elem_type(lisp_value vector){
+  type_assert(vector, LISP_VECTOR);
+  return lisp_type_of(vector.vector->default_value);
+}
+
+lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
+  type_assert(vector, LISP_VECTOR);
+  type_assert(k, LISP_INTEGER);
+  
+  void * ptr = vector.vector->data + k.integer * vector.vector->elem_size;
+  
+  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
 }
 
  int main(int argc, char ** argv){
@@ -1050,7 +1181,16 @@ lisp_value lisp_load(lisp_value v){
   lisp_register_native("read-string", 1, lisp_read);
   lisp_register_native("panic", 1, lisp_panic);
   lisp_register_native("load", 1, lisp_load);
-
+  
+  lisp_register_native("make-vector", 2, make_vector);
+  lisp_register_native("vector-length", 1, vector_length);
+  lisp_register_native("vector-ref", 2, vector_ref);
+  lisp_register_native("vector-set!", 3, vector_set);
+  lisp_register_native("vector-element-type", 1, vector_elem_type);
+  lisp_register_native("vector-native-element-pointer", 2, vector_native_element_pointer);
+  lisp_register_native("vector-resize", 2, vector_resize);
+  
+  
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
   lisp_register_macro("let", LISP_LET);
