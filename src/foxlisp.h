@@ -12,7 +12,8 @@ typedef enum {
 		LISP_MACRO_BUILTIN = 10,
 		LISP_NATIVE_POINTER = 11,
 		LISP_ALIEN_FUNCTION = 12,
-		LISP_VECTOR = 13
+		LISP_VECTOR = 13,
+		LISP_BYTE = 14
 		
 }lisp_type;
 
@@ -117,7 +118,9 @@ const char * lisp_type_to_string(lisp_type t);
 
 lisp_value car(lisp_value v);
 lisp_value cdr(lisp_value v);
+lisp_value pop(lisp_value * v);
 void * lisp_malloc(size_t s);
+void * lisp_realloc(void * p, size_t v);
 
 lisp_value get_symbol(const char * s);
 bool eq(lisp_value a, lisp_value b);
@@ -126,5 +129,28 @@ lisp_context * lisp_context_new();
 lisp_value vector_length(lisp_value v);
 lisp_value vector_ref(lisp_value _vector, lisp_value k);
 lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
-
+lisp_value vector_elem_type(lisp_value vector);
 lisp_value integer(int64_t v);
+bool eq(lisp_value a, lisp_value b);
+bool is_nil(lisp_value a);
+
+#define POP(x)pop(&x)
+
+#define cddr(x) cdr(cdr(x))
+#define cdddr(x) cdr(cddr(x))
+#define cddddr(x) cdr(cdddr(x))
+#define cdddddr(x) cdr(cddddr(x))
+#define cddddddr(x) cdr(cdddddr(x))
+#define cdddddddr(x) cdr(cddddddr(x))
+
+#define cadr(x) car(cdr(x))
+#define caddr(x) car(cddr(x))
+#define cadddr(x) car(cdddr(x))
+#define caddddr(x) car(cddddr(x))
+#define cadddddr(x) car(cdddddr(x))
+#define caddddddr(x) car(cddddddr(x))
+#define cadddddddr(x) car(cdddddddr(x))
+
+lisp_value lisp_error(lisp_value v);
+void error_print(const char * str);
+void type_assert(lisp_value val, lisp_type type);

@@ -14,7 +14,11 @@ extern void * (* ht_mem_malloc)(size_t s);
 extern void (* ht_mem_free)(void *);
 
 void error(){
-    raise(SIGINT);
+  raise(SIGINT);
+}
+void error_print(const char * str){
+  printf("%s\n", str);
+  error();
 }
 
 bool is_nil(lisp_value v){
@@ -113,6 +117,15 @@ lisp_value cdr(lisp_value v){
 	 return v.cons->cdr;
   return nil;
 }
+
+lisp_value pop(lisp_value * v){
+  if(v->type != LISP_CONS)
+	 return nil;
+  lisp_value val = car(*v);
+  *v= cdr(*v);
+  return val;
+}
+
 #define cddr(x) cdr(cdr(x))
 #define cdddr(x) cdr(cddr(x))
 #define cddddr(x) cdr(cdddr(x))
@@ -278,7 +291,12 @@ lisp_value tokenize_stream(io_reader * rd){
   }
   if(c == '('){
 	 io_read_u8(rd);
+
 	 skip_comment_and_whitespace(rd);
+	 if(io_peek_u8(rd) == ')'){
+		io_read_u8(rd);
+		return nil;
+	 }
 	 lisp_value head = nil;
 	 var next = head;
 	 while(true){
@@ -364,16 +382,14 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		println(value);
 		println(args);
 		println(args2);
-		printf("arg name must be a symbol\n");
-		error();
+		error_print("arg name must be a symbol\n");
 		return nil;
 	 }
 	 if(arg.symbol == rest_sym.symbol){
 		args = cdr(args);
 		arg = car(args);
 		if(arg.type != LISP_SYMBOL){
-		  printf("(2) arg name must be a symbol\n");
-		  error();
+		  error_print("(2) arg name must be a symbol.");
 		  return nil;
 		}
 		scope_create_value(function_scope, arg, args2);
@@ -595,8 +611,8 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  while(args.type != LISP_NIL){
 			 var arg = car(args);
 			 if(arg.type != LISP_SYMBOL){
-				// error
-				printf("arg name must be a symbol");
+				println(f->args);
+				error_print("(3) arg name must be a symbol");
 				return nil;
 			 }
 			 if(arg.symbol == rest_sym.symbol){
@@ -605,7 +621,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				if(arg.type != LISP_SYMBOL){
 				  // error
 				  println(arg);
-				  printf("(2) arg name must be a symbol");
+				  printf("(4) arg name must be a symbol");
 				  return nil;
 				}
 				scope_create_value(function_scope, arg, args2);
@@ -775,6 +791,9 @@ lisp_value print(lisp_value v){
   case LISP_INTEGER:
 	 printf("%i", v.integer);
 	 break;
+  case LISP_BYTE:
+	 printf("%i", (u8)v.integer);
+	 break;
   case LISP_VECTOR:
 	 {
 		printf("#(");
@@ -939,10 +958,16 @@ lisp_value println(lisp_value v){
 }
 
 lisp_value lisp_integer(lisp_value v){
-  if(v.type == LISP_RATIONAL){
+  if(v.type == LISP_RATIONAL)
 	 v.integer = (int64_t) v.rational;
-  }
   v.type = LISP_INTEGER;
+  return v;
+}
+
+lisp_value lisp_byte(lisp_value v){
+  v = lisp_integer(v);
+  v.integer = (u8)v.integer;
+  v.type = LISP_BYTE;
   return v;
 }
 
@@ -1029,6 +1054,10 @@ void * lisp_malloc(size_t v){
   return GC_malloc(v);
 }
 
+void * lisp_realloc(void * ptr, size_t size){
+  return GC_realloc(ptr, size);
+}
+
 const char * lisp_type_to_string(lisp_type t){
   switch(t){
   case LISP_NIL: return "NIL";
@@ -1045,6 +1074,7 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_NATIVE_POINTER: return "NATIVE_POINTER";
   case LISP_ALIEN_FUNCTION: return "ALIEN_FUNCTION";
   case LISP_VECTOR: return "VECTOR";
+  case LISP_BYTE: return "BYTE";
   }
   printf("Unknown type: %i\n", t);
   error();
@@ -1060,15 +1090,19 @@ lisp_value lisp_load(lisp_value v){
   return lisp_eval_file(v.string);
 }
 
+size_t lisp_type_size(lisp_type type){
+  switch(type){
+  case LISP_NIL: return sizeof(lisp_value);
+  case LISP_BYTE: return sizeof(u8);
+  default:break;
+  }
+  return sizeof(u64);
+}
+
 lisp_value make_vector(lisp_value len, lisp_value _default){
   type_assert(len, LISP_INTEGER);
   size_t l = (size_t)len.integer;
-  size_t elem_size;
-  if(_default.type == LISP_NIL){
-	 elem_size = sizeof(lisp_value);
-  }else{
-	 elem_size = sizeof(double);
-  }
+  size_t elem_size = lisp_type_size(_default.type);
   void * data = GC_malloc(l * elem_size);
 
   lisp_vector * vector = GC_malloc(sizeof(*vector));
@@ -1171,6 +1205,7 @@ lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   lisp_register_native("=", 2, lisp_eq);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
+  lisp_register_native("byte", 1, lisp_byte);
   lisp_register_native("rational", 1, lisp_rational);
   lisp_register_native("sin", 1, lisp_sin);
   lisp_register_native("type-of", 1, lisp_type_of);
