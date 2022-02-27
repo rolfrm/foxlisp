@@ -115,5 +115,23 @@
 (assert-not (or nil nil))
 (assert (or nil 1))
 
+(assert-not (eq '(1 2 ( 3 4)) '(1 2 ( 3 4))))
+
+(assert (equals? '(1 2 ( 3 4)) '(1 2 ( 3 4))))
+
+(define x (cons nil nil))
+(set-cdr! x (cons 2))
+(set-car! x 1)
+
+(assert (eq 0.2 .2))
+
+(println (= 1 (car '(1 . 2))))
+
+(assert (equals? x '(1 2)))
+
+(assert (equals? '(1 . 2) '( 1 . 2)))
+(assert-not (equals? '(1 . 2) '(2 . 1)))
+(println x)
 
 (println "Tests Passed")
+

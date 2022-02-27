@@ -112,10 +112,25 @@ lisp_value car(lisp_value v){
 	 return v.cons->car;
   return nil;
 }
+
 lisp_value cdr(lisp_value v){
   if(v.type == LISP_CONS)
 	 return v.cons->cdr;
   return nil;
+}
+
+lisp_value set_cdr(lisp_value cons, lisp_value value){
+  type_assert(cons, LISP_CONS);
+  var old = cons.cons->cdr;
+  cons.cons->cdr = value;
+  return old;
+}
+
+lisp_value set_car(lisp_value cons, lisp_value value){
+  type_assert(cons, LISP_CONS);
+  var old = cons.cons->car;
+  cons.cons->car = value;
+  return old;
 }
 
 lisp_value pop(lisp_value * v){
@@ -313,6 +328,25 @@ lisp_value tokenize_stream(io_reader * rd){
 		if(c == 0 || c == ')'){
 		  io_read_u8(rd);
 		  break;
+		}
+		if(c == '.'){
+		  var save = *rd;
+		  io_read_u8(rd);
+		  var loc = io_getloc(rd);
+		  skip_comment_and_whitespace(rd);
+		  var nextloc = io_getloc(rd);
+		  if(loc == nextloc){
+			 *rd = save;
+		  }else{
+			 var v = tokenize_stream(rd);
+			 next.cons->cdr = v;
+			 skip_comment_and_whitespace(rd);
+			 if(io_read_u8(rd) != ')'){
+				error_print("Unexpected token");
+			 }
+			 break;
+		  }
+
 		}
 	 }
 	 return head;
@@ -1201,6 +1235,8 @@ lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   lisp_register_native("println", 1, println);
   lisp_register_native("car", 1, car);
   lisp_register_native("cdr", 1, cdr);
+  lisp_register_native("set-car!", 2, set_car);
+  lisp_register_native("set-cdr!", 2, set_cdr);
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("=", 2, lisp_eq);
   lisp_register_native("panic", 1, lisp_error);

@@ -6,6 +6,7 @@
 (define begin progn)
 (define set! set)
 (define display println)
+(define eq =)
 
 (defun not (x) (= x nil))
 (define append2 
@@ -82,8 +83,8 @@
 
 (defun equals? (a b)
   (let ((type (type-of a)))
-	 (when (eq type (type-of b))
-		(if (eq type 'CONS)
+	 (when (= type (type-of b))
+		(if (= type 'CONS)
 			 (and (equals? (car a) (car b))
 					(equals? (cdr a) (cdr b)))
-			 (eq a b)))))
+			 (= a b)))))
