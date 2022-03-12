@@ -18,7 +18,6 @@
     (lambda (&rest lst) 
         (append2 lst)))
 
-
 (defmacro when (test &rest body)
   `(if ,test (progn ,@body)))
 
@@ -80,6 +79,11 @@
 (defmacro assert-not (test text)
   `(when ,test (panic (cons ,(if text text "assertion failed") ',test)))) 
 
+(defmacro while (test &rest body)
+  `(loop ,test ,@body))
+
+(defmacro do (&rest body)
+  `(progn ,@body))
 
 (defun equals? (a b)
   (let ((type (type-of a)))
@@ -88,3 +92,30 @@
 			 (and (equals? (car a) (car b))
 					(equals? (cdr a) (cdr b)))
 			 (= a b)))))
+
+(defun cddr (l)
+  (cdr (cdr l)))
+
+(defun cadr (l)
+  (car (cdr l)))
+
+(defun plookup (lst sym)
+  (let ((r nil))
+	 (while lst
+			(when (eq (car lst) sym)
+			  (set! r (cadr lst))
+			  (set! lst nil))
+
+			(set! lst (cddr lst)))
+	 r))
+
+
+(define libc (load-lib "libc.so.6"))
+(define fopen (load-alien libc "fopen" native-null-pointer (list "pathname" "mode")))
+(define fclose (load-alien libc "fclose" (integer 0) (list native-null-pointer)))
+(define fwrite (load-alien libc "fwrite" (integer 0) (list native-null-pointer (integer 0) (integer 0) native-null-pointer)))
+
+(define fread (load-alien libc "fread" 0 (list native-null-pointer 0 0 native-null-pointer)))
+
+(define malloc (load-alien libc "malloc" native-null-pointer (list (integer 0))))
+(define free (load-alien libc "free" nil (list native-null-pointer)))

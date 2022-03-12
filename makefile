@@ -22,7 +22,7 @@ libmicroio/libmicroio.a:
 	make -C libmicroio
 
 foxgl.so: src/foxgl.c
-	gcc src/foxgl.c -L.  -g3 -O0 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
+	gcc src/foxgl.c -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
 	gcc -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include

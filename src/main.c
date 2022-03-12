@@ -9,6 +9,7 @@
 #include <gc.h>
 #include <dlfcn.h>
 #include "foxlisp.h"
+#undef ASSERT
 void ht_free(hash_table *ht);
 extern void * (* ht_mem_malloc)(size_t s);
 extern void (* ht_mem_free)(void *);
@@ -20,6 +21,8 @@ void error_print(const char * str){
   printf("%s\n", str);
   error();
 }
+#define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
+
 
 bool is_nil(lisp_value v){
   return v.type == LISP_NIL;
@@ -41,29 +44,29 @@ void * gc_clone(void * mem, size_t s){
   return d;
 }
 
-lisp_scope * scope_new(lisp_scope * super){
+lisp_scope * lisp_scope_new(lisp_scope * super){
   lisp_scope * s = GC_MALLOC(sizeof(*super));
   s->super = super;
   s->values = NULL;
   return s;
 }
 
-lisp_value scope_get_value(lisp_scope * scope, lisp_value sym){
+lisp_value lisp_scope_get_value(lisp_scope * scope, lisp_value sym){
   if(scope == NULL) return nil;
   lisp_value r;
   if(scope->values != NULL && ht_get(scope->values,&sym.integer,&r))
 	 return r;
-  return scope_get_value(scope->super, sym);
+  return lisp_scope_get_value(scope->super, sym);
 }
 
-bool scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out){
+bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out){
   if(scope == NULL) return false;
   if(scope->values != NULL && ht_get(scope->values,&sym.integer, out))
 	 return true;
-  return scope_try_get_value(scope->super, sym, out);
+  return lisp_scope_try_get_value(scope->super, sym, out);
 }
 
-lisp_value scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value){
+lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value){
   if(scope == NULL){
 	 printf("Error: variable '%s' not found\n", symbol_name(sym.integer));
 	 error();
@@ -73,10 +76,10 @@ lisp_value scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value)
 	 ht_set(scope->values, &sym.integer, &value);
 	 return t;
   }
-  return scope_set_value(scope->super, sym, value);
+  return lisp_scope_set_value(scope->super, sym, value);
 }
 
-lisp_value scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
+lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
   if(scope->values == NULL)
 	 scope->values = ht_create(sizeof(size_t), sizeof(lisp_value));
   
@@ -91,7 +94,7 @@ lisp_context * lisp_context_new(){
   ctx->next_symbol = 1;
   ctx->symbols = ht_create_strkey(sizeof(size_t));
   ctx->symbols_reverse = ht_create(sizeof(size_t), sizeof(char *));
-  ctx->globals = scope_new(NULL);
+  ctx->globals = lisp_scope_new(NULL);
   var prev_ctx = current_context;
   current_context = ctx;
   rest_sym = get_symbol("&rest");
@@ -100,8 +103,8 @@ lisp_context * lisp_context_new(){
   quasiquote_sym = get_symbol("quasiquote");
   unquote_sym = get_symbol("unquote");
   unquote_splice_sym = get_symbol("unquote-splicing");
-  scope_create_value(current_context->globals, get_symbol("nil"), nil);
-  scope_create_value(current_context->globals, get_symbol("t"), t);
+  lisp_scope_create_value(current_context->globals, get_symbol("nil"), nil);
+  lisp_scope_create_value(current_context->globals, get_symbol("t"), t);
   current_context = prev_ctx;
   
   return ctx;
@@ -139,6 +142,18 @@ lisp_value pop(lisp_value * v){
   lisp_value val = car(*v);
   *v= cdr(*v);
   return val;
+}
+
+lisp_value _lisp_append(lisp_value v1, lisp_value v2){
+  if(is_nil(v1))
+	 return v2;
+  return new_cons(car(v1), _lisp_append(cdr(v1), v2));
+}
+
+lisp_value lisp_append(lisp_value v1, lisp_value v2){
+  if(is_nil(v2))
+	 return v1;
+  return _lisp_append(v1, v2);
 }
 
 #define cddr(x) cdr(cdr(x))
@@ -402,10 +417,10 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   lisp_value head = car(value);
   if(head.type != LISP_SYMBOL) return value;
   if(head.symbol == quote_sym.symbol) return value;
-  lisp_value head_value = scope_get_value(scope, head);
+  lisp_value head_value = lisp_scope_get_value(scope, head);
   if(head_value.type != LISP_FUNCTION_MACRO) return value;
   lisp_function * f = head_value.function;
-  var function_scope = scope_new(f->closure);
+  var function_scope = lisp_scope_new(f->closure);
   var args = f->args;
   var args2 = cdr(value);
   while(args.type != LISP_NIL){
@@ -426,10 +441,10 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		  error_print("(2) arg name must be a symbol.");
 		  return nil;
 		}
-		scope_create_value(function_scope, arg, args2);
+		lisp_scope_create_value(function_scope, arg, args2);
 		break;
 	 }
-	 scope_create_value(function_scope, arg, argv);
+	 lisp_scope_create_value(function_scope, arg, argv);
 	 
 	 args = cdr(args);
 	 args2 = cdr(args2);
@@ -462,15 +477,21 @@ lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
   if(is_nil(value)) return value;
   var current = car(value);
   var next = cdr(value);
+  bool unsplice = _lisp_eq(car(current), unquote_splice_sym);
   var value2 = lisp_eval_quasiquoted(scope, current);
   if(next.type != LISP_NIL){
 	 var nextr = lisp_eval_quasiquoted_sub(scope, next);
 	 if(lisp_value_eq(current, value2) && lisp_value_eq(next, nextr))
 		return value;
+	 if(unsplice){
+		return lisp_append(value2, nextr);
+	 }
 	 return new_cons(value2, nextr);
   }else{
 	 if(lisp_value_eq(current, value))
 		return value;
+	 if(unsplice)
+		return value2;
 	 return new_cons(value2, nil);
   }
 }
@@ -484,7 +505,7 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
 		  return lisp_eval(scope, cadr(value));
 		if(_lisp_eq(fst, unquote_splice_sym)){
 		  var to_splice = lisp_eval(scope, cadr(value));
-		  return car(to_splice);
+		  return to_splice;
 		}
 		  
 		return lisp_eval_quasiquoted_sub(scope, value);
@@ -524,12 +545,12 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  case LISP_LET:
 			 {
 				var argform = cadr(value);
-				scope = scope_new(scope);
+				scope = lisp_scope_new(scope);
 				while(argform.type != LISP_NIL){
 				  var arg = car(argform);
 				  var sym = car(arg);
 				  var value = lisp_eval(scope, cadr(arg));
-				  scope_create_value(scope, sym, value);
+				  lisp_scope_create_value(scope, sym, value);
 				  argform = cdr(argform);
 				}
 				value = cdr(value);
@@ -581,7 +602,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				  return nil; // error
 				}
 				var value = lisp_eval(scope, caddr(value));
-				scope_set_value(scope, sym, value);
+				lisp_scope_set_value(scope, sym, value);
 				return value;
 			 }
 		  case LISP_DEFINE:
@@ -594,7 +615,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				while(scope->super != NULL)
 				  scope = scope->super;
 
-				scope_create_value(scope, sym, value);
+				lisp_scope_create_value(scope, sym, value);
 				return value;
 			 }
 		  case LISP_EVAL:
@@ -639,7 +660,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		}else if(first_value.type == LISP_FUNCTION){
 		  
 		  var f = first_value.function;
-		  var function_scope = scope_new(f->closure);
+		  var function_scope = lisp_scope_new(f->closure);
 		  var args = f->args;
 		  var args2 = things;
 		  while(args.type != LISP_NIL){
@@ -658,11 +679,11 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				  printf("(4) arg name must be a symbol");
 				  return nil;
 				}
-				scope_create_value(function_scope, arg, args2);
+				lisp_scope_create_value(function_scope, arg, args2);
 				break;
 			 }
 			 var argv = car(args2);
-			 scope_create_value(function_scope, arg, argv);
+			 lisp_scope_create_value(function_scope, arg, argv);
 			 
 			 args = cdr(args);
 			 args2 = cdr(args2);
@@ -758,7 +779,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 	 }
 	 break;
   case LISP_SYMBOL:
-	 if(scope_try_get_value(scope, value, &value))
+	 if(lisp_scope_try_get_value(scope, value, &value))
 		return value;
 	 else{
 		printf("Symbol ");print(value); printf(" not found\n");
@@ -778,8 +799,8 @@ lisp_value lisp_eval_stream(io_reader * rd){
 	 var code = lisp_read_stream(rd);
 	 if(off == rd->offset || code.type == LISP_NIL) break;
 	 while(true){
-
 		var next_code = lisp_macro_expand(current_context->globals, code);
+		
 		if(lisp_value_eq(next_code, code))
 		  break;
 		code = next_code;
@@ -823,7 +844,7 @@ lisp_value print(lisp_value v){
 	 printf("t");
 	 break;
   case LISP_INTEGER:
-	 printf("%i", v.integer);
+	 printf("%lli", v.integer);
 	 break;
   case LISP_BYTE:
 	 printf("%i", (u8)v.integer);
@@ -894,7 +915,7 @@ lisp_value print(lisp_value v){
 
 }
 void lisp_register_value(const char * name, lisp_value value){
-  scope_create_value(current_context->globals, get_symbol(name), value);
+  lisp_scope_create_value(current_context->globals, get_symbol(name), value);
 }
 void lisp_register_native(const char * name, int nargs, void * fptr){
   native_function *nf= GC_MALLOC(sizeof(*nf));

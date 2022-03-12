@@ -45,26 +45,6 @@
 
 (assert (cons? (cons 1 2 )))
 
-
-(define libc (load-lib "libc.so.6"))
-(define fopen (load-alien libc "fopen" native-null-pointer (list "pathname" "mode")))
-(define fclose (load-alien libc "fclose" (integer 0) (list native-null-pointer)))
-
-;size_t fread(void *restrict ptr, size_t size, size_t nitems,
-;       FILE *restrict stream);
-;
-;size_t fwrite(const void *ptr, size_t size, size_t nitems,
-;    FILE *stream);
-
-(define fwrite (load-alien libc "fwrite" (integer 0) (list native-null-pointer (integer 0) (integer 0) native-null-pointer)))
-
-(define fread (load-alien libc "fread" 0 (list native-null-pointer 0 0 native-null-pointer)))
-
-(define malloc (load-alien libc "malloc" native-null-pointer (list (integer 0))))
-(define free (load-alien libc "free" nil (list native-null-pointer)))
-
-(println (list fopen fclose))
-
 (let ((file (fopen "./test.x" "w+"))
 		(data (make-vector 100 (byte 0)))
 		)
@@ -131,7 +111,9 @@
 
 (assert (equals? '(1 . 2) '( 1 . 2)))
 (assert-not (equals? '(1 . 2) '(2 . 1)))
-(println x)
+(assert (= 10 (do 1 2 10)))
+(assert (= 3 (plookup '(:a 1 :b 2 :c 3 :d 4) ':c)))
+(assert-not (plookup '(:a 1 :b 2 :c 3 :d 4) ':g))
 
 (println "Tests Passed")
 
