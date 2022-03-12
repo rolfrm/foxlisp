@@ -115,5 +115,16 @@
 (assert (= 3 (plookup '(:a 1 :b 2 :c 3 :d 4) ':c)))
 (assert-not (plookup '(:a 1 :b 2 :c 3 :d 4) ':g))
 
+(assert (symbol? 'test-sym))
+(assert-not (symbol? 1))
+
+(let ((v1 (make-vector 1 (float32 0))))
+  (assert (= (vector-ref v1 0) (float32 0)))
+  (vector-set! v1 0 (float32 1.0))
+  (assert-not (= (float32 1.0) (float32 0.0)))
+  (assert (= (float32 1.0) (float32 1.0)))
+  (assert (= (vector-ref v1 0) (float32 1.0)))
+  )
+
 (println "Tests Passed")
 

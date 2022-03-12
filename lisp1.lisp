@@ -99,14 +99,19 @@
 (defun cadr (l)
   (car (cdr l)))
 
+(defun symbol? (p) (= 'SYMBOL (type-of p))) 
+
 (defun plookup (lst sym)
   (let ((r nil))
 	 (while lst
-			(when (eq (car lst) sym)
-			  (set! r (cadr lst))
-			  (set! lst nil))
-
-			(set! lst (cddr lst)))
+		(let ((fst (car lst)))
+		  (if (symbol? fst)
+				(if (eq fst sym)
+					 (do
+					  (set! r (cadr lst))
+					  (set! lst nil))
+					 (set! lst (cddr lst)))
+				(set! lst (cdr lst)))))
 	 r))
 
 

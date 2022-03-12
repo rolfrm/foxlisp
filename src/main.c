@@ -871,6 +871,7 @@ lisp_value print(lisp_value v){
   case LISP_ALIEN_FUNCTION:
 	 printf("ALIENF %p", v.alien_func->func);
 	 break;
+  case LISP_FLOAT32:
   case LISP_RATIONAL:
 	 printf("%f", v.rational);
 	 break;
@@ -1026,6 +1027,23 @@ lisp_value lisp_byte(lisp_value v){
   return v;
 }
 
+
+lisp_value lisp_rational(lisp_value v){
+  if(v.type != LISP_RATIONAL && v.type != LISP_FLOAT32)
+	 v.rational = (double) v.integer;
+  v.type = LISP_RATIONAL;
+  return v;
+}
+
+
+lisp_value lisp_float32(lisp_value v){
+  if(v.type != LISP_RATIONAL && v.type != LISP_FLOAT32)
+	 v.rational = (double) v.integer;
+  v.type = LISP_FLOAT32;
+  return v;
+}
+
+
 lisp_value lisp_panic(lisp_value v){
   printf("Panic: ");print(v);printf("\n");
   error();
@@ -1085,13 +1103,6 @@ lisp_value lisp_wrap_func(lisp_value lib, lisp_value str, lisp_value argcnt){
 	 return (lisp_value){.type = LISP_FUNCTION_NATIVE, .nfunction = f};
   return nil;
 }
-lisp_value lisp_rational(lisp_value v){
-  if(v.type != LISP_RATIONAL){
-	 v.rational = (double)v.integer;
-  }
-  v.type = LISP_RATIONAL;
-  return v;
-}
 
 lisp_value lisp_sin(lisp_value v){
   var p = lisp_rational(v);
@@ -1130,6 +1141,7 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_ALIEN_FUNCTION: return "ALIEN_FUNCTION";
   case LISP_VECTOR: return "VECTOR";
   case LISP_BYTE: return "BYTE";
+  case LISP_FLOAT32: return "FLOAT32";
   }
   printf("Unknown type: %i\n", t);
   error();
@@ -1149,6 +1161,7 @@ size_t lisp_type_size(lisp_type type){
   switch(type){
   case LISP_NIL: return sizeof(lisp_value);
   case LISP_BYTE: return sizeof(u8);
+  case LISP_FLOAT32: return sizeof(float);
   default:break;
   }
   return sizeof(u64);
@@ -1184,6 +1197,9 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
   void * dst;
   if(v.type == LISP_NIL){
 	 return ((lisp_value *) vector->data)[k.integer];
+  }else if(v.type == LISP_FLOAT32){
+	 v.rational = ((float *) vector->data)[k.integer];
+	 return v;
   }else
 	 dst = &v.integer;
   memcpy(dst, src, vector->elem_size);
@@ -1197,12 +1213,17 @@ lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
   var vector = _vector.vector;
   var v = value;
   void * dst = vector->data + k.integer * vector->elem_size;
+  
   void * src;
   if(vector->default_value.type == LISP_NIL)
 	 ((lisp_value *) vector->data)[k.integer] = value;
   else{
 	 type_assert(value, vector->default_value.type);
 	 src = &v.integer;
+	 if(vector->default_value.type == LISP_FLOAT32){
+		((float *) src)[0] = v.rational;
+	 }
+	
 	 memcpy(dst, src, vector->elem_size);
   }
   return nil;
@@ -1230,6 +1251,13 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
 lisp_value vector_elem_type(lisp_value vector){
   type_assert(vector, LISP_VECTOR);
   return lisp_type_of(vector.vector->default_value);
+}
+
+lisp_value vector_copy(lisp_value vector){
+  type_assert(vector, LISP_VECTOR);
+  let vector2 = make_vector(integer(vector.vector->count), vector.vector->default_value);
+  memcpy(vector2.vector->data, vector.vector->data, vector2.vector->count * vector2.vector->elem_size);
+  return vector2;
 }
 
 lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
@@ -1262,6 +1290,8 @@ lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   lisp_register_native("=", 2, lisp_eq);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
+  lisp_register_native("rational", 1, lisp_rational);
+  lisp_register_native("float32", 1, lisp_float32);
   lisp_register_native("byte", 1, lisp_byte);
   lisp_register_native("rational", 1, lisp_rational);
   lisp_register_native("sin", 1, lisp_sin);

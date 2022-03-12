@@ -14,7 +14,8 @@ typedef enum {
 		LISP_NATIVE_POINTER = 11,
 		LISP_ALIEN_FUNCTION = 12,
 		LISP_VECTOR = 13,
-		LISP_BYTE = 14		
+		LISP_BYTE = 14,
+		LISP_FLOAT32
 }lisp_type;
 
 typedef enum {
@@ -137,6 +138,7 @@ lisp_value vector_length(lisp_value v);
 lisp_value vector_ref(lisp_value _vector, lisp_value k);
 lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
 lisp_value vector_elem_type(lisp_value vector);
+lisp_value vector_copy(lisp_value vector);
 lisp_value integer(int64_t v);
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
