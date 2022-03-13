@@ -37,7 +37,6 @@
 (define x 4)
 (set! x 9)
 
-
 (begin
  (println 1)
  (println 2)
@@ -126,5 +125,32 @@
   (assert (= (vector-ref v1 0) (float32 1.0)))
   )
 
+(let ((l '(3 4 5)))
+  (assert (eq (pop! l) 3))
+  (assert (eq (pop! l) 4))
+  (push! l 6)
+  (push! l 7)
+  (assert (eq (pop! l) 7))
+  (assert (eq (pop! l) 6))
+  
+  )
+
+(let ((ok nil))
+  (match x (plookup '(:a 1 :b 2) ':b)
+			(set! ok (eq x 2)))
+  (assert ok))
+(match x (plookup '(:a 1 :b 2) ':c)
+		 (assert nil))
+
+(let ((ht (make-hashtable nil nil)))
+  (hashtable-set ht 5 10)
+  (assert (eq 10 (hashtable-ref ht 5)))
+  (assert-not (hashtable-ref ht 10))
+  (hashtable-remove ht 5)
+  (assert-not (hashtable-ref ht 5))
+  )
+
 (println "Tests Passed")
 
+
+  

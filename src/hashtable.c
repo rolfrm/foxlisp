@@ -107,6 +107,14 @@ struct _hash_table{
   void * userdata;
   // this is allowed to be null
   compare_t compare;
+
+  void * (* alloc_keys)(size_t size);
+  void * (* alloc_values)(size_t size);
+  void * (* alloc_state)(size_t size);
+  void (* free_keys)(void * ptr);
+  void (* free_values)(void * ptr);
+  void (* free_state)(void * ptr);
+  
   
   void * keys;
   void * elems;
@@ -137,15 +145,36 @@ bool default_compare(const void * key_a, const void * key_b, size_t size, void *
   return 0 == memcmp(key_a, key_b, size);
 }
 
+void ht_init(hash_table * ht){
+  if(ht->keys == NULL){
+	 ht->keys = ht->alloc_keys(ht->capacity * ht->key_size);
+	 ht->elems = ht->alloc_values(ht->capacity * ht->elem_size);
+	 ht->occupied = ht->alloc_state(ht->capacity * sizeof(ht_state));
+  }
+}
+void ht_set_mem_values(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr)){
+  ht->alloc_values = alloc;
+  ht->free_values = free;
+}
+
+void ht_set_mem_keys(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr)){
+  ht->alloc_keys = alloc;
+  ht->free_keys = free;
+}
+
+
 hash_table * ht_create2(size_t capacity, size_t key_size, size_t elem_size){
   hash_table * ht = alloc(sizeof(*ht));
   ht->capacity = capacity;
   ht->key_size = key_size;
   ht->elem_size = elem_size;
   ht->userdata = ht;
-  ht->keys = alloc(capacity * key_size);
-  ht->elems = alloc(capacity * elem_size);
-  ht->occupied = alloc(capacity * sizeof(ht_state));
+  ht->alloc_keys = alloc;
+  ht->alloc_values = alloc;
+  ht->alloc_state = alloc;
+  ht->free_keys = dealloc;
+  ht->free_values = dealloc;
+  ht->free_state = dealloc;
   return ht;
 }
 
@@ -154,10 +183,25 @@ hash_table * ht_create(size_t key_size, size_t elem_size){
 }
 
 
+void ht_empty(hash_table *ht){
+  if(ht->keys != NULL){
+	 if(ht->free_keys != dealloc)
+		ht->free_keys(ht->keys);
+	 if(ht->free_values != dealloc)
+		ht->free_values(ht->elems);
+	 if(ht->free_state != dealloc)
+		ht->free_state(ht->occupied);
+	 ht->keys = NULL;
+	 ht->elems = NULL;
+	 ht->occupied = NULL;
+  }
+}
+
+
 void ht_free(hash_table *ht){
-  dealloc(ht->keys);
-  dealloc(ht->elems);
-  dealloc(ht->occupied);
+  ht->free_keys(ht->keys);
+  ht->free_values(ht->elems);
+  ht->free_state(ht->occupied);
   memset(ht, 0, sizeof(ht[0]));
   dealloc(ht);
 }
@@ -166,7 +210,13 @@ bool ht_set(hash_table * ht, const void * key, const void * nelem);
 
 static void ht_grow(hash_table * ht){
   var ht2 = ht_create2(ht->capacity * 2, ht->key_size, ht->elem_size);
-
+  ht2->free_keys = ht->free_keys;
+  ht2->free_values = ht->free_values;
+  ht2->free_state = ht->free_state;
+  ht2->alloc_keys = ht->alloc_keys;
+  ht2->alloc_values = ht->alloc_values;
+  ht2->alloc_state = ht->alloc_state;
+  
   ht2->hash = ht->hash;
   ht2->compare = ht->compare;
   ht2->userdata = ht->userdata;
@@ -207,6 +257,7 @@ static i64 ht_find_free(const hash_table * ht, const void * key){
 }
 
 bool ht_set(hash_table * ht, const void * key, const void * nelem){
+  ht_init(ht);
   if(ht->count * 2 > ht->capacity)
     ht_grow(ht);
   i64 index = ht_find_free(ht, key);
@@ -225,6 +276,7 @@ bool ht_set(hash_table * ht, const void * key, const void * nelem){
 }
 
 bool ht_get(hash_table * ht, const void *key, void * out_elem){
+  if(ht->keys == NULL) return false;
   i64 index = ht_find_free(ht, key);
   if(ht->occupied[index] == HT_FREE || index == -1)
     return false;
@@ -235,6 +287,7 @@ bool ht_get(hash_table * ht, const void *key, void * out_elem){
 }
 
 void _ht_remove_at(hash_table * ht, size_t index){
+  
   ht->count -= 1;
   size_t key_size = ht->key_size;
   size_t elem_size = ht->elem_size;
@@ -274,11 +327,13 @@ i64 _ht_remove(hash_table * ht, const void * key){
 }
 
 bool ht_remove(hash_table * ht, const void * key){
+  if(ht->keys == NULL) return false;
   i64 index =_ht_remove(ht, key);
   return index != -1;
 }
 
 bool ht_remove2(hash_table * ht, const void * key, void * out_key, void * out_elem){
+  if(ht->keys == NULL) return false;
   i64 index = ht_find_free(ht, key);
   if(index == -1) return false;
   
@@ -291,11 +346,13 @@ bool ht_remove2(hash_table * ht, const void * key, void * out_key, void * out_el
 }
 
 void ht_clear(hash_table * ht){
+  if(ht->keys == NULL) return;
   for(u32 i = 0; i < ht->capacity; i++)
     ht->occupied[i] = HT_FREE;
 }
 
 void ht_iterate(hash_table * ht, void (* it)(void * key, void * elem, void * user_data), void * userdata){
+  if(ht->keys == NULL) return;
   size_t key_size = ht->key_size;
   size_t elem_size = ht->elem_size;
   for(size_t i = 0; i < ht->capacity; i++){

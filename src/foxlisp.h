@@ -140,6 +140,8 @@ lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
 lisp_value vector_elem_type(lisp_value vector);
 lisp_value vector_copy(lisp_value vector);
 lisp_value integer(int64_t v);
+lisp_value native_pointer(void * ptr);
+
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
 lisp_value lisp_error(lisp_value v);

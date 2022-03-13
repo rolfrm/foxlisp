@@ -35,7 +35,7 @@
 	 (loop (< x n)
 		 (set x (+ 1 x))
 		 (f2))))
-
+  
 (defun apply (f args)
   (eval (cons f args)))
 
@@ -62,13 +62,14 @@
   (let ((it items)
 		  (ok nil))
 	 (loop it
-			(if (car it)
+			(let ((fst (car it)))
+			  (if fst
 				 (progn
-				  (set! ok t)
+				  (set! ok fst)
 				  (set! it nil))
 				 (set! it (cdr it))
 				 
-				 ))
+				 )))
 	 ok
 	 ))
 
@@ -99,6 +100,26 @@
 (defun cadr (l)
   (car (cdr l)))
 
+(defun cdddr (l)
+  (cdr (cddr l)))
+
+(defun caddr (l)
+  (car (cddr l)))
+
+
+(defmacro pop! (lst)
+  `(let ((fst (car ,lst)))
+	  (set! ,lst (cdr ,lst))
+	  fst))
+
+(defmacro push! (lst v)
+  `(set! ,lst (cons ,v ,lst)))
+
+(defmacro match (var lookup &rest body)
+  `(let ((,var ,lookup))
+	  (when ,var ,@body)))
+		 
+
 (defun symbol? (p) (= 'SYMBOL (type-of p))) 
 
 (defun plookup (lst sym)
@@ -114,6 +135,16 @@
 				(set! lst (cdr lst)))))
 	 r))
 
+
+(defun list-to-array (list)
+  (let ((i 0)
+		  (v (make-vector (length list) (float32 0.0))))
+	 (while list
+		(vector-set! v i (float32 (car list)))
+		(set! list (cdr list))
+		(set! i (+ i 1)))
+	 v
+	 ))
 
 (define libc (load-lib "libc.so.6"))
 (define fopen (load-alien libc "fopen" native-null-pointer (list "pathname" "mode")))

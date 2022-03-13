@@ -13,6 +13,9 @@
 void ht_free(hash_table *ht);
 extern void * (* ht_mem_malloc)(size_t s);
 extern void (* ht_mem_free)(void *);
+void ht_set_mem_values(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr));
+void ht_set_mem_keys(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr));
+void ht_empty(hash_table *ht);
 
 void error(){
   raise(SIGINT);
@@ -21,8 +24,8 @@ void error_print(const char * str){
   printf("%s\n", str);
   error();
 }
-#define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
 
+#define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
 
 bool is_nil(lisp_value v){
   return v.type == LISP_NIL;
@@ -31,6 +34,8 @@ bool is_nil(lisp_value v){
 bool is_integer(lisp_value v){
   return v.type == LISP_INTEGER;
 }
+
+
 
 bool  _lisp_eq(lisp_value a, lisp_value b){
   if(a.type != b.type) return false;
@@ -136,6 +141,15 @@ lisp_value set_car(lisp_value cons, lisp_value value){
   return old;
 }
 
+lisp_value list_length(lisp_value lst){
+  size_t l = 0;
+  while(lst.type == LISP_CONS){
+	 l += 1;
+	 lst = cdr(lst);
+  }
+  return integer(l);
+}
+
 lisp_value pop(lisp_value * v){
   if(v->type != LISP_CONS)
 	 return nil;
@@ -155,21 +169,6 @@ lisp_value lisp_append(lisp_value v1, lisp_value v2){
 	 return v1;
   return _lisp_append(v1, v2);
 }
-
-#define cddr(x) cdr(cdr(x))
-#define cdddr(x) cdr(cddr(x))
-#define cddddr(x) cdr(cdddr(x))
-#define cdddddr(x) cdr(cddddr(x))
-#define cddddddr(x) cdr(cdddddr(x))
-#define cdddddddr(x) cdr(cddddddr(x))
-
-#define cadr(x) car(cdr(x))
-#define caddr(x) car(cddr(x))
-#define cadddr(x) car(cdddr(x))
-#define caddddr(x) car(cddddr(x))
-#define cadddddr(x) car(cdddddr(x))
-#define caddddddr(x) car(cddddddr(x))
-#define cadddddddr(x) car(cdddddddr(x))
 
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   lisp_value v = {.type = LISP_CONS, .cons = GC_MALLOC(sizeof(cons))};
@@ -1054,6 +1053,11 @@ lisp_value integer(int64_t v){
   return (lisp_value){.type = LISP_INTEGER, .integer = v};
 }
 
+lisp_value native_pointer(void * ptr){
+  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
+  
+}
+
 lisp_value gc_heap(){
   return integer(GC_get_heap_size());
 }
@@ -1269,6 +1273,66 @@ lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
 }
 
+void item_finalizer(void * obj, void * data){
+  lisp_value item = {.type = LISP_CONS, .cons = obj};
+  lisp_value func = {.type = LISP_FUNCTION, .function = data};
+  lisp_value eval = new_cons(func, new_cons(new_cons(quote_sym, new_cons(item, nil)), nil));
+  
+  lisp_eval(current_context->globals, eval);
+}
+
+lisp_value lisp_register_finalizer(lisp_value item, lisp_value func){
+  type_assert(item, LISP_CONS);
+  type_assert(func, LISP_FUNCTION);
+  GC_REGISTER_FINALIZER(item.cons, item_finalizer, func.function, 0, 0);
+  return nil;
+}
+
+lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
+  bool weak_keys = !is_nil(weak_key);
+  bool weak_values = !is_nil(weak_value);
+  hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
+  if(weak_keys)
+	 ht_set_mem_keys(ht, GC_malloc_atomic, GC_free);
+  if(weak_values)
+	 ht_set_mem_values(ht, GC_malloc_atomic, GC_free);
+  return native_pointer(ht);
+}
+
+lisp_value lisp_hashtable_set(lisp_value _ht, lisp_value key, lisp_value value){
+  type_assert(_ht, LISP_NATIVE_POINTER);
+  hash_table * ht = _ht.native_pointer;
+  ht_set(ht, &key, &value);
+  return nil;
+}
+
+lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
+  type_assert(_ht, LISP_NATIVE_POINTER);
+  hash_table * ht = _ht.native_pointer;
+  lisp_value value;
+  if(ht_get(ht, &key, &value))
+	 return value;
+  return nil;
+}
+
+
+lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
+  type_assert(_ht, LISP_NATIVE_POINTER);
+  hash_table * ht = _ht.native_pointer;
+  if(ht_remove(ht, &key))
+	 return t;
+  return nil;
+}
+
+lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
+  type_assert(_ht, LISP_NATIVE_POINTER);
+  hash_table * ht = _ht.native_pointer;
+  lisp_value value;
+  if(ht_get(ht, &key, &value))
+	 return new_cons(t, value);
+  return nil;
+}
+
  int main(int argc, char ** argv){
   ht_mem_malloc = GC_malloc;
   ht_mem_free = GC_free;
@@ -1287,6 +1351,9 @@ lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   lisp_register_native("set-car!", 2, set_car);
   lisp_register_native("set-cdr!", 2, set_cdr);
   lisp_register_native("cons", 2, new_cons);
+  lisp_register_native("length", 1, list_length);
+
+  
   lisp_register_native("=", 2, lisp_eq);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
@@ -1311,7 +1378,14 @@ lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   lisp_register_native("vector-element-type", 1, vector_elem_type);
   lisp_register_native("vector-native-element-pointer", 2, vector_native_element_pointer);
   lisp_register_native("vector-resize", 2, vector_resize);
+
+  lisp_register_native("make-hashtable", 2, lisp_make_hashtable);
+  lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
+  lisp_register_native("hashtable-set", 3, lisp_hashtable_set);
+  lisp_register_native("hashtable-remove", 2, lisp_hashtable_remove);
+  lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
   
+  lisp_register_native("register-finalizer", 2, lisp_register_finalizer);
   
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
