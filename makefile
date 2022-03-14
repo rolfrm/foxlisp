@@ -21,11 +21,11 @@ $(TARGET): $(LIB_OBJECTS) gc.o foxgl.so
 libmicroio/libmicroio.a:
 	make -C libmicroio
 
-foxgl.so: src/foxgl.c
-	gcc src/foxgl.c -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
+foxgl.so: src/foxgl.c src/tcp.c
+	gcc src/foxgl.c src/tcp.c -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
-	gcc -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
+	gcc -DGC_PTHREADS -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .

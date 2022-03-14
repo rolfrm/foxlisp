@@ -150,6 +150,20 @@
   (assert-not (hashtable-ref ht 5))
   )
 
+(defun tcp-listen (port backlog host)
+  '(tcp-listener))
+
+(defun tcp-listener? (object)
+  (eq (car object) 'tcp-listener))
+
+(defun tcp-close (object)
+  ())
+
+
+
+
+
+
 (println "Tests Passed")
 
 

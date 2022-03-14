@@ -103,17 +103,19 @@ struct __lisp_vector{
 };
 
 // globals
-const lisp_value nil = {0};
-const lisp_value t = {.type = LISP_T};
+static lisp_value nil = {0};
+static lisp_value t = {.type = LISP_T};
 
-lisp_value rest_sym = {.type = LISP_SYMBOL};
-lisp_value if_sym = {.type = LISP_SYMBOL};
-lisp_value quote_sym = {.type = LISP_SYMBOL};
-lisp_value quasiquote_sym = {.type = LISP_SYMBOL};
-lisp_value unquote_sym = {.type = LISP_SYMBOL};
-lisp_value unquote_splice_sym = {.type = LISP_SYMBOL};
+extern lisp_value rest_sym;
+extern lisp_value if_sym;
+extern lisp_value quote_sym;
+extern lisp_value quasiquote_sym;
+extern lisp_value unquote_sym;
+extern lisp_value unquote_splice_sym;
 
 // functions
+lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
+
 lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
@@ -141,7 +143,9 @@ lisp_value vector_elem_type(lisp_value vector);
 lisp_value vector_copy(lisp_value vector);
 lisp_value integer(int64_t v);
 lisp_value native_pointer(void * ptr);
+lisp_value lisp_rational(lisp_value value);
 
+size_t lisp_type_size(lisp_type type);
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
 lisp_value lisp_error(lisp_value v);

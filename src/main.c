@@ -8,7 +8,16 @@
 #include <iron/full.h>
 #include <gc.h>
 #include <dlfcn.h>
+
 #include "foxlisp.h"
+
+lisp_value rest_sym = {.type = LISP_SYMBOL};
+lisp_value if_sym = {.type = LISP_SYMBOL};
+lisp_value quote_sym = {.type = LISP_SYMBOL};
+lisp_value quasiquote_sym = {.type = LISP_SYMBOL};
+lisp_value unquote_sym = {.type = LISP_SYMBOL};
+lisp_value unquote_splice_sym = {.type = LISP_SYMBOL};
+
 #undef ASSERT
 void ht_free(hash_table *ht);
 extern void * (* ht_mem_malloc)(size_t s);
@@ -34,8 +43,6 @@ bool is_nil(lisp_value v){
 bool is_integer(lisp_value v){
   return v.type == LISP_INTEGER;
 }
-
-
 
 bool  _lisp_eq(lisp_value a, lisp_value b){
   if(a.type != b.type) return false;
@@ -286,7 +293,7 @@ lisp_value read_token_data(io_reader * rd){
   io_writer wd = {0};
   while(true){
 	 c = io_peek_u8(rd);
-	 if(c == ' ' || c == ')' || c == 0 || c == '\n'){
+	 if(c == ' ' || c == ')' || c == '(' || c == '\t' || c == 0 || c == '\n'){
 		break;
 	 }
 	 io_read_u8(rd);
@@ -383,7 +390,6 @@ lisp_value lisp_read_string(const char * str){
   return lisp_read_stream(&w);
 }
 
-lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value);
 bool lisp_value_eq(lisp_value a, lisp_value b){
   if(a.type != b.type) return false;
@@ -1353,7 +1359,6 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("length", 1, list_length);
 
-  
   lisp_register_native("=", 2, lisp_eq);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
