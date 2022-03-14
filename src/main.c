@@ -487,7 +487,7 @@ lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
 	 }
 	 return new_cons(value2, nextr);
   }else{
-	 if(lisp_value_eq(current, value))
+	 if(lisp_value_eq(current, value2))
 		return value;
 	 if(unsplice)
 		return value2;

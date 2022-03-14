@@ -146,6 +146,10 @@
 	 v
 	 ))
 
+(defmacro incf (var value)
+  `(set! ,var (+ ,var ,value)))
+
+
 (define libc (load-lib "libc.so.6"))
 (define fopen (load-alien libc "fopen" native-null-pointer (list "pathname" "mode")))
 (define fclose (load-alien libc "fclose" (integer 0) (list native-null-pointer)))
