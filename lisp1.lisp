@@ -1,6 +1,7 @@
 (define defun (macro (name args &rest body) `(define ,name (lambda ,args ,@body))))
 
-(define defmacro (macro (name args &rest body) `(define ,name  (macro ,args ,@body))))
+(define defmacro (macro (name args &rest body)
+                        `(define ,name  (macro ,args ,@body))))
 
 (define list (lambda (&rest x) x))
 (define begin progn)
@@ -11,9 +12,10 @@
 (defun not (x) (= x nil))
 (define append2 
     (lambda (lst)
-		(if (not (cdr lst))
-			 (car lst) 
-			 (cons (car lst) (append2 (cdr lst))))))
+      (if (not (cdr lst))
+          (car lst) 
+          (cons (car lst) (append2 (cdr lst))))))
+
 (define append 
     (lambda (&rest lst) 
       (append2 lst)))
@@ -32,9 +34,9 @@
 
 (defun do-times (n f2)
   (let ((x 0))
-	 (loop (< x n)
-		 (set x (+ 1 x))
-		 (f2))))
+    (loop (< x n)
+       (set x (+ 1 x))
+       (f2))))
 
 (defun apply (f args)
   (eval (cons f args)))
@@ -48,30 +50,30 @@
 (defun rational? (v) (= (type-of v) 'RATIONAL))
 (defun and (&rest items)
   (let ((it items)
-		  (ok t))
-	 (loop it
-			(if (car it)
-				 (set! it (cdr it))
-				 (progn
+        (ok t))
+    (loop it
+         (if (car it)
+             (set! it (cdr it))
+             (progn
                (set! ok nil)
                (set! it nil))))
-	 ok
-	 ))
+    ok
+    ))
 
 (defun or (&rest items)
   (let ((it items)
-		  (ok nil))
-	 (loop it
-			(let ((fst (car it)))
-			  (if fst
+        (ok nil))
+    (loop it
+         (let ((fst (car it)))
+           (if fst
                (progn
                  (set! ok fst)
                  (set! it nil))
                (set! it (cdr it))
                
                )))
-	 ok
-	 ))
+    ok
+    ))
 
 
 (defmacro assert (test text)
@@ -88,11 +90,11 @@
 
 (defun equals? (a b)
   (let ((type (type-of a)))
-	 (when (= type (type-of b))
-		(if (= type 'CONS)
-			 (and (equals? (car a) (car b))
-					(equals? (cdr a) (cdr b)))
-			 (= a b)))))
+    (when (= type (type-of b))
+      (if (= type 'CONS)
+          (and (equals? (car a) (car b))
+               (equals? (cdr a) (cdr b)))
+          (= a b)))))
 
 (defun cddr (l)
   (cdr (cdr l)))
@@ -109,42 +111,42 @@
 
 (defmacro pop! (lst)
   `(let ((fst (car ,lst)))
-	  (set! ,lst (cdr ,lst))
-	  fst))
+     (set! ,lst (cdr ,lst))
+     fst))
 
 (defmacro push! (lst v)
   `(set! ,lst (cons ,v ,lst)))
 
 (defmacro match (var lookup &rest body)
   `(let ((,var ,lookup))
-	  (when ,var ,@body)))
+     (when ,var ,@body)))
 
 
 (defun symbol? (p) (= 'SYMBOL (type-of p))) 
 
 (defun plookup (lst sym)
   (let ((r nil))
-	 (while lst
-		(let ((fst (car lst)))
-		  (if (symbol? fst)
-				(if (eq fst sym)
-					 (do
-					  (set! r (cadr lst))
-					  (set! lst nil))
-					 (set! lst (cddr lst)))
-				(set! lst (cdr lst)))))
-	 r))
+    (while lst
+      (let ((fst (car lst)))
+        (if (symbol? fst)
+            (if (eq fst sym)
+                (do
+                 (set! r (cadr lst))
+                 (set! lst nil))
+                (set! lst (cddr lst)))
+            (set! lst (cdr lst)))))
+    r))
 
 
 (defun list-to-array (list)
   (let ((i 0)
-		  (v (make-vector (length list) (float32 0.0))))
-	 (while list
-		(vector-set! v i (float32 (car list)))
-		(set! list (cdr list))
-		(set! i (+ i 1)))
-	 v
-	 ))
+        (v (make-vector (length list) (float32 0.0))))
+    (while list
+      (vector-set! v i (float32 (car list)))
+      (set! list (cdr list))
+      (set! i (+ i 1)))
+    v
+    ))
 
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))

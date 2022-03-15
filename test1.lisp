@@ -159,6 +159,9 @@
 (defun tcp-close (object)
   ())
 
+(defun tcp-accept (listener)
+  
+
 
 
 
