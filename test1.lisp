@@ -150,8 +150,13 @@
   (assert-not (hashtable-ref ht 5))
   )
 
-
-
+(assert (equals? "123" (vector->string (string->vector "123"))))
+(assert-not (= "123" (vector->string (string->vector "123"))))
+(let ((expect '(1 2 3)))
+  (assert (equals? expect (read-string (vector->string (string->vector (value->string expect))))))
+  (assert-not (eq expect (read-string (vector->string (string->vector (value->string expect))))))
+  
+  )
 
 (println "Tests Passed")
 

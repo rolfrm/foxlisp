@@ -50,6 +50,12 @@ bool  _lisp_eq(lisp_value a, lisp_value b){
   return a.integer == b.integer;
 }
 
+bool  string_eq(lisp_value a, lisp_value b){
+  if(a.type != b.type) return false;
+  if(a.type != LISP_STRING) return false;
+  return strcmp(a.string, b.string) == 0;
+}
+
 void * gc_clone(void * mem, size_t s){
   void * d = GC_MALLOC(s);
   memcpy(d, mem, s);
@@ -797,6 +803,18 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   return nil;
 }
 
+lisp_value lisp_eval_value(lisp_value code){
+  while(true){
+    var next_code = lisp_macro_expand(current_context->globals, code);
+		
+    if(lisp_value_eq(next_code, code))
+      break;
+    code = next_code;
+  }
+  println(code);
+  return lisp_eval(current_context->globals, code);
+}
+
 lisp_value lisp_eval_stream(io_reader * rd){
   lisp_value result = nil;
   while(true){
@@ -839,87 +857,97 @@ lisp_value lisp_eval_file(const char * filepath){
   return r;
 }
 
-lisp_value print(lisp_value v){
-  lisp_value iv = v;
+int print2(char * buffer, int l2, lisp_value v){
+  char * initbuf = buffer;
+  int l = 0;
+#define OBUF buffer ? (initbuf + l) : buffer
+#define LEN1 l2 ? (l2 - l) : 0
+
   switch(v.type){
   case LISP_NIL:
-	 printf("()");
-	 break;
+	 return snprintf(buffer, LEN1, "()");
   case LISP_T:
-	 printf("t");
-	 break;
+	 return snprintf(buffer, LEN1, "t");
   case LISP_INTEGER:
-	 printf("%lli", v.integer);
-	 break;
+	 return snprintf(buffer, LEN1, "%lli", v.integer);
   case LISP_BYTE:
-	 printf("%i", (u8)v.integer);
-	 break;
+	 return snprintf(buffer, LEN1, "%i", (u8)v.integer);
   case LISP_VECTOR:
 	 {
-		printf("#(");
+		int l = 0;
+      l = snprintf(buffer, LEN1, "#(");
+      
 		var vector = v.vector;
 		for(size_t i = 0; i < vector->count; i++){
 		  var elem = vector_ref(v, integer(i));
-		  if(i != 0) printf(" ");
-		  print(elem);
+		  if(i != 0) l += snprintf(OBUF, LEN1, " ");
+		  l += print2(OBUF, LEN1, elem);
 		}
-		printf(")");
-		
+		l += snprintf(OBUF, LEN1, ")");
+		return l;
 	 }
-	 break;
   case LISP_NATIVE_POINTER:
 	 if(v.integer == 0)
-		printf("NULL");
+		return snprintf(buffer, LEN1, "NULL");
 	 else
-		printf("%p", v.integer);
-	 break;
+		return snprintf(buffer, LEN1, "%p", v.integer);
   case LISP_ALIEN_FUNCTION:
-	 printf("ALIENF %p", v.alien_func->func);
-	 break;
+	 return snprintf(buffer, LEN1, "ALIENF %p", v.alien_func->func);
   case LISP_FLOAT32:
   case LISP_RATIONAL:
-	 printf("%f", v.rational);
-	 break;
+	 return snprintf(buffer, LEN1, "%f", v.rational);
   case LISP_STRING:
-	 printf("\"%s\"", v.string);
-	 break;
+	 return snprintf(buffer, LEN1, "\"%s\"", v.string);
   case LISP_SYMBOL:
-	 printf("%s", symbol_name(v.integer));
-	 break;
+	 return snprintf(buffer, LEN1, "%s", symbol_name(v.integer));
   case LISP_FUNCTION:
-	 printf("FUNCTION");
-	 break;
+	 return snprintf(buffer, LEN1, "FUNCTION");
   case LISP_FUNCTION_MACRO:
-	 printf("FUNCTION_MACRO");
-	 break;
+	 return snprintf(buffer, LEN1, "FUNCTION_MACRO");
   case LISP_FUNCTION_NATIVE:
-	 printf("Native function");
-	 break;
+	 return snprintf(buffer, LEN1, "Native function");
   case LISP_MACRO_BUILTIN:
-	 printf("MacroBuiltin");
-	 break;
+	 return snprintf(buffer, LEN1, "MacroBuiltin");
   case LISP_CONS:
-	 printf("(");
-	 var first = true;
-	 while(v.type == LISP_CONS){
-		if(first){
-		  first = false;
-		}else{
-		  printf(" ");
-		}
-		print(v.cons->car);
-		v = v.cons->cdr;
-	 }
-	 if(v.type != LISP_NIL){
-		printf(" . ");
-		print(v);
-	 }
-	 printf(")");
-	 break;
+    {
+      int l = 0;
+      l = snprintf(buffer, LEN1, "(");
+      var first = true;
+      while(v.type == LISP_CONS){
+        if(first){
+          first = false;
+        }else{
+          l += snprintf(OBUF, LEN1, " ");
+        }
+        l += print2(OBUF, LEN1, v.cons->car);
+        v = v.cons->cdr;
+      }
+      if(v.type != LISP_NIL){
+        l += snprintf(OBUF, LEN1, " . ");
+        l += print2(OBUF, LEN1, v);
+      }
+      l += snprintf(OBUF, LEN1, ")");
+      return l;
+    }
   }
-  return iv;
-
+  return 0;
 }
+
+lisp_value print(lisp_value v){
+  int l = print2(NULL,0,  v);
+  char * str = GC_malloc(l + 1);
+  print2(str, l+ 1, v);
+  printf("%s", str);
+  return integer(l);
+}
+
+lisp_value value_to_string(lisp_value v){
+  int l = print2(NULL,0,  v);
+  char * str = GC_malloc(l+ 1);
+  print2(str, l + 1, v);
+  return (lisp_value){.type = LISP_STRING, .string = str};
+}
+
 void lisp_register_value(const char * name, lisp_value value){
   lisp_scope_create_value(current_context->globals, get_symbol(name), value);
 }
@@ -1048,7 +1076,6 @@ lisp_value lisp_float32(lisp_value v){
   return v;
 }
 
-
 lisp_value lisp_panic(lisp_value v){
   printf("Panic: ");print(v);printf("\n");
   error();
@@ -1058,6 +1085,11 @@ lisp_value lisp_panic(lisp_value v){
 lisp_value integer(int64_t v){
   return (lisp_value){.type = LISP_INTEGER, .integer = v};
 }
+
+lisp_value byte(unsigned char v){
+  return (lisp_value){.type = LISP_BYTE, .integer = v};
+}
+
 
 lisp_value native_pointer(void * ptr){
   return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
@@ -1270,6 +1302,49 @@ lisp_value vector_copy(lisp_value vector){
   return vector2;
 }
 
+lisp_value vector_to_string(lisp_value vector){
+  vector = vector_copy(vector);
+  vector.vector->count = vector.vector->count * vector.vector->elem_size;
+  vector.vector->default_value = byte(0);
+  var cnt = vector.vector->count;
+  u8 * ptr = vector.vector->data;
+  size_t i;
+  for(i = 0; i < cnt; i++){
+    if(ptr[i] == 0) break;
+  }
+  if(i == cnt)
+    i = i + 1;
+  vector = vector_resize(vector, integer(i));
+
+  lisp_value str = {.type = LISP_STRING, .string = vector.vector->data};
+  return str;
+}
+
+lisp_value string_to_vector(lisp_value str){
+  type_assert(str, LISP_STRING);
+  char * strbuf = str.string;
+  size_t l = strlen(strbuf) + 1;
+  size_t elem_size = 1;
+
+  lisp_vector * vector = GC_malloc(sizeof(*vector));
+  vector->data = strbuf;
+  vector->count = l;
+  vector->elem_size = elem_size;
+  vector->default_value = byte(0);
+  lisp_value v = {.type = LISP_VECTOR, .vector = vector};
+  return v;
+}
+
+
+lisp_value parse_hex(lisp_value str){
+  type_assert(str, LISP_STRING);
+  char * tp = NULL;
+  int64_t o = strtoll(str.string, &tp, 16);
+  if(tp != str.string )
+    return (lisp_value) {.type = LISP_INTEGER, .integer = o }; 
+  return nil;
+}
+
 lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   type_assert(vector, LISP_VECTOR);
   type_assert(k, LISP_INTEGER);
@@ -1352,6 +1427,7 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native(">", 2, lisp_greater);
   lisp_register_native("print", 1, print);
   lisp_register_native("println", 1, println);
+  lisp_register_native("value->string", 1, value_to_string);
   lisp_register_native("car", 1, car);
   lisp_register_native("cdr", 1, cdr);
   lisp_register_native("set-car!", 2, set_car);
@@ -1360,6 +1436,7 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native("length", 1, list_length);
 
   lisp_register_native("=", 2, lisp_eq);
+  lisp_register_native("string=", 2, string_eq);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
   lisp_register_native("rational", 1, lisp_rational);
@@ -1383,6 +1460,11 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native("vector-element-type", 1, vector_elem_type);
   lisp_register_native("vector-native-element-pointer", 2, vector_native_element_pointer);
   lisp_register_native("vector-resize", 2, vector_resize);
+  lisp_register_native("vector->string", 1, vector_to_string);
+  lisp_register_native("string->vector", 1, string_to_vector);
+
+  lisp_register_native("parse-hex", 1, parse_hex);
+ 
 
   lisp_register_native("make-hashtable", 2, lisp_make_hashtable);
   lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
@@ -1391,7 +1473,7 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
   
   lisp_register_native("register-finalizer", 2, lisp_register_finalizer);
-  
+  lisp_register_native("eval", 1, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
   lisp_register_macro("let", LISP_LET);
@@ -1401,7 +1483,7 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_macro("macro", LISP_MACRO);
   lisp_register_macro("set", LISP_SET);
   lisp_register_macro("define", LISP_DEFINE);
-  lisp_register_macro("eval", LISP_EVAL);
+  //lisp_register_macro("eval", LISP_EVAL);
   lisp_register_macro("quasiquote", LISP_QUASIQUOTE);
   lisp_register_macro("unquote", LISP_UNQUOTE);
 

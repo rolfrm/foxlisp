@@ -225,23 +225,45 @@
     ))
 
 ;;; from https://github.com/nickg/swank-chicken/blob/master/swank-chicken.scm
+(defun current-process-id ()
+  1)
+
+(define swank:coding-system "utf-8-unix")
+
+(defun swank:connection-info ()
+    `(:ok (:pid ,(current-process-id)
+           :package (:name CSI :prompt CSI)
+           :encoding (:coding-systems (,swank:coding-system))
+           :lisp-implementation 
+           (:type "Fox Lisp" :version "0.1"))))
+
+(defun swank-handle-command (slime cmd)
+  (when (eq (car cmd) ':emacs-rex)
+    (write slime (eval (cadr cmd))))
+                                        ;(println (list slime cmd))
+  
+  )
+
+
 
 (defun swank-event-loop(slime)
   (let ((len-buf (make-vector 6 (byte 0)))
         (active t)
         )
     (loop active
-          
           (let ((read-len (read slime len-buf)))
-            (let ((len (vector-ref len-buf 0)))
-              (println (list read-len len slime (vector-ref len-buf 1) (vector-ref len-buf 2) (vector-ref len-buf 3) (vector-ref len-buf 4)(vector-ref len-buf 5)))
-              (sleep 1.0)
+            (let ((len (parse-hex (vector->string len-buf))))
               (let ((buf2 (make-vector len (byte 0))))
-                (read slime buf2)))))))
+                (read slime buf2)
+                (let ((cmd (read-string (vector->string buf2))))
+                  (swank-handle-command slime cmd)
+                )))))))
 
 (defun swank-make-server (port file)
   (let ((listener (tcp-listen port)))
     (let ((emacs (tcp-accept listener)))
       (swank-event-loop emacs))))
 
-;(swank-make-server 8810 nil)
+(println (parse-hex "00cc"))
+
+(swank-make-server 8810 nil)

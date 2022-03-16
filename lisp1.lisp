@@ -91,10 +91,12 @@
 (defun equals? (a b)
   (let ((type (type-of a)))
     (when (= type (type-of b))
+      (if (= type 'STRING)
+          (string= a b)
       (if (= type 'CONS)
           (and (equals? (car a) (car b))
                (equals? (cdr a) (cdr b)))
-          (= a b)))))
+          (= a b))))))
 
 (defun cddr (l)
   (cdr (cdr l)))

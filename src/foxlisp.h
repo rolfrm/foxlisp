@@ -142,6 +142,7 @@ lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
 lisp_value vector_elem_type(lisp_value vector);
 lisp_value vector_copy(lisp_value vector);
 lisp_value integer(int64_t v);
+lisp_value byte(unsigned char v);
 lisp_value native_pointer(void * ptr);
 lisp_value lisp_rational(lisp_value value);
 
