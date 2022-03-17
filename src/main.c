@@ -216,9 +216,22 @@ lisp_value read_token_string(io_reader * rd){
   io_read_u8(rd); // skip first quote.
   while(true){
 	 uint8_t c = io_read_u8(rd);
+    if(c == '\\'){
+      var c2 = io_peek_u8(rd);
+      if(c2 == '\\'){
+        c = io_read_u8(rd);
+      }else{
+        if(c2 == 'n'){
+          io_read_u8(rd);
+          c = '\n';
+        }
+      }
+    }
 	 if(c == '"'){
 		c = io_peek_u8(rd);
 		if(c == '"'){
+        io_read_u8(rd);
+        //printf("double quote!\n");
 		  io_write_u8(&wd, c);
 		}else{
 		  break;
@@ -237,11 +250,20 @@ lisp_value read_token_string(io_reader * rd){
   return v;
 }
 
+bool is_keyword(lisp_value sym){
+  return sym.type == LISP_SYMBOL && sym.integer >= 0x10000000;
+}
+
 int64_t get_symbol_id(const char * s){
   int64_t id = 0;
+  
   if(ht_get(current_context->symbols, &s, &id))
 	 return id;
+  
   id = current_context->next_symbol++;
+  if(s[0] == ':'){
+    id += 0x10000000;
+  }
   ht_set(current_context->symbols, &s, &id);
   ht_set(current_context->symbols_reverse, &id, &s);
   return id;
@@ -286,8 +308,10 @@ lisp_value parse_token(const char * x, int count){
 		return (lisp_value) {.type = LISP_RATIONAL, .rational = o }; 
 	 }
   }
+  
   // otherwise it is a symbol
   lisp_value r = {.type = LISP_SYMBOL, .integer = get_symbol_id(x)};
+
   return r;
 }
 
@@ -312,12 +336,21 @@ lisp_value read_token_data(io_reader * rd){
 }
 
 lisp_value tokenize_stream(io_reader * rd){
+  static int quote_level = 0;
   skip_comment_and_whitespace(rd);
   uint8_t c = io_peek_u8(rd);
   if(c == 0) return nil;
+  if(c == ':'){
+    var symbol = read_token_data(rd);
+    return symbol;
+  }
   if(c == '\''){
 	 io_read_u8(rd);
-	 return new_cons(quote_sym, new_cons(tokenize_stream(rd), nil));
+    quote_level += 1;
+    
+	 var c = new_cons(quote_sym, new_cons(tokenize_stream(rd), nil));
+    quote_level -= 1;
+    return c;
   }
   if(c == '`'){
 	 io_read_u8(rd);
@@ -790,12 +823,18 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 	 }
 	 break;
   case LISP_SYMBOL:
-	 if(lisp_scope_try_get_value(scope, value, &value))
-		return value;
-	 else{
-		printf("Symbol ");print(value); printf(" not found\n");
-		error();
-	 }
+    {
+      if(is_keyword(value))
+        return value;
+      lisp_value r;
+      if(lisp_scope_try_get_value(scope, value, &r))
+        return r;
+      else{
+        
+        printf("Symbol ");print(value); printf(" not found\n");
+        error();
+      }
+    }
 		 
   default:
 	 return value;
@@ -1328,11 +1367,20 @@ lisp_value string_to_vector(lisp_value str){
 
   lisp_vector * vector = GC_malloc(sizeof(*vector));
   vector->data = strbuf;
-  vector->count = l;
+  vector->count = l - 1;
   vector->elem_size = elem_size;
   vector->default_value = byte(0);
   lisp_value v = {.type = LISP_VECTOR, .vector = vector};
   return v;
+}
+
+lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
+  type_assert(vector, LISP_VECTOR);
+  type_assert(k, LISP_INTEGER);
+  
+  void * ptr = vector.vector->data + k.integer * vector.vector->elem_size;
+  
+  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
 }
 
 
@@ -1345,14 +1393,22 @@ lisp_value parse_hex(lisp_value str){
   return nil;
 }
 
-lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
-  type_assert(vector, LISP_VECTOR);
-  type_assert(k, LISP_INTEGER);
-  
-  void * ptr = vector.vector->data + k.integer * vector.vector->elem_size;
-  
-  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
+lisp_value hex_string(lisp_value i, lisp_value dec){
+  int v = i.integer;
+  int l = dec.integer;
+  int cnt = snprintf(NULL, 0, "%x", v);
+  if(is_nil(dec))
+    l = cnt;
+  char * buf = GC_malloc(l + 1);
+  printf("%i %i %i\n", v, l, cnt);
+  snprintf(buf + MAX(0, l - cnt), MIN(cnt, l) + 1, "%x", v);
+  buf[l] = 0;
+  for(int i = 0; i < MAX(0, l - cnt); i++)
+    buf[i] = '0';
+  return (lisp_value){.type = LISP_STRING, .string = buf};
 }
+
+
 
 void item_finalizer(void * obj, void * data){
   lisp_value item = {.type = LISP_CONS, .cons = obj};
@@ -1442,7 +1498,6 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native("rational", 1, lisp_rational);
   lisp_register_native("float32", 1, lisp_float32);
   lisp_register_native("byte", 1, lisp_byte);
-  lisp_register_native("rational", 1, lisp_rational);
   lisp_register_native("sin", 1, lisp_sin);
   lisp_register_native("type-of", 1, lisp_type_of);
   
@@ -1458,12 +1513,14 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native("vector-ref", 2, vector_ref);
   lisp_register_native("vector-set!", 3, vector_set);
   lisp_register_native("vector-element-type", 1, vector_elem_type);
+  lisp_register_native("vector-length", 1, vector_length);
   lisp_register_native("vector-native-element-pointer", 2, vector_native_element_pointer);
   lisp_register_native("vector-resize", 2, vector_resize);
   lisp_register_native("vector->string", 1, vector_to_string);
   lisp_register_native("string->vector", 1, string_to_vector);
 
   lisp_register_native("parse-hex", 1, parse_hex);
+  lisp_register_native("hex-string", 2, hex_string);
  
 
   lisp_register_native("make-hashtable", 2, lisp_make_hashtable);

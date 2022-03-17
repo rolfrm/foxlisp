@@ -111,8 +111,11 @@
 (assert (equals? '(1 . 2) '( 1 . 2)))
 (assert-not (equals? '(1 . 2) '(2 . 1)))
 (assert (= 10 (do 1 2 10)))
-(assert (= 3 (plookup '(:a 1 :b 2 :c 3 :d 4) ':c)))
-(assert-not (plookup '(:a 1 :b 2 :c 3 :d 4) ':g))
+
+(println '(:a))
+
+(assert (= 3 (plookup '(:a 1 :b 2 :c 3 :d 4) :c)))
+(assert-not (plookup '(:a 1 :b 2 :c 3 :d 4) :g))
 
 (assert (symbol? 'test-sym))
 (assert-not (symbol? 1))
@@ -149,14 +152,31 @@
   (hashtable-remove ht 5)
   (assert-not (hashtable-ref ht 5))
   )
-
+(println (string->vector "123"))
 (assert (equals? "123" (vector->string (string->vector "123"))))
 (assert-not (= "123" (vector->string (string->vector "123"))))
 (let ((expect '(1 2 3)))
   (assert (equals? expect (read-string (vector->string (string->vector (value->string expect))))))
   (assert-not (eq expect (read-string (vector->string (string->vector (value->string expect))))))
-  
   )
+
+
+(println (parse-hex "00cc"))
+(println (hex-string 100 6))
+(println (hex-string 1000000))
+(assert (symbol? :a))
+(assert (eq ':a :a))
+(assert (eq :a :a))
+(assert-not (eq '':a :a))
+
+(println (list ':a :a '':a))
+
+(define teststr "\"1\"" )
+
+
+(let ((teststr "(:emacs-rex (swank:connection-info) ""COMMON-LISP-USER"" t 1)")
+      (first :emacs-rex))
+  (assert (eq (car (read-string teststr)) :emacs-rex)))
 
 (println "Tests Passed")
 

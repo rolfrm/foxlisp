@@ -91,8 +91,11 @@ lisp_value lisp_read(lisp_value item, lisp_value buffer){
 	 return nil;
   }
   ssize_t r = read(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type));
-  printf("READ %p\n", r);
-  if(r == -1) return nil;
+  printf("READ %i\n", r);
+  if(r == -1) {
+    
+    return nil;
+  }
   return integer(r);
 }
 
@@ -130,6 +133,6 @@ lisp_value lisp_sleep(lisp_value time){
   var t = lisp_rational(time).rational;
   printf("Sleeping %f\n", t);
 
-  iron_sleep(t);
+  iron_usleep((int)(t * 100000.0));
   return nil;
 }
