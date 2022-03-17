@@ -45,9 +45,12 @@
   (apply f args))
 
 (defun nil? (v) (not v))
+(defun null? (v) (not v))
 (defun cons? (v) (= (type-of v) 'CONS))
+(define list? cons?)
 (defun integer? (v) (= (type-of v) 'INTEGER))
 (defun rational? (v) (= (type-of v) 'RATIONAL))
+(defun string? (v) (= (type-of v) 'STRING))
 (defun and (&rest items)
   (let ((it items)
         (ok t))
@@ -106,9 +109,16 @@
 
 (defun cdddr (l)
   (cdr (cddr l)))
+(defun cadar (l)
+  (car (cdar l)))
 
 (defun caddr (l)
   (car (cddr l)))
+
+(defun caar (x)
+  (car (car x)))
+(defun cdar (x)
+  (cdr (car x)))
 
 
 (defmacro pop! (lst)
@@ -152,6 +162,29 @@
 
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))
+
+
+(defmacro cond (&rest args)
+  (defun condi (args)
+    (println (caar args))
+    (if args
+        (if (eq (caar args) 'else)
+            (cadar args)
+            `(if ,(caar args)
+                 ,(cadar args)
+                 ,(condi (cdr args))))
+        nil))
+  (condi args))
+
+(defun memq (obj list)
+  (let ((result nil))
+    (while list
+           (when (= (car list) obj)
+             (set! result list)
+             (set! list nil)
+             )
+           (set! list (cdr list)))
+    result))
 
 
 (define libc (load-lib "libc.so.6"))

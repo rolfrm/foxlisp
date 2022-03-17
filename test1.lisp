@@ -173,11 +173,27 @@
 
 (define teststr "\"1\"" )
 
+(define var1 5)
+((lambda ()
+  (define var1 6)
+  (assert (eq var1 6))))
+(assert (eq var1 5))
 
 (let ((teststr "(:emacs-rex (swank:connection-info) ""COMMON-LISP-USER"" t 1)")
       (first :emacs-rex))
   (assert (eq (car (read-string teststr)) :emacs-rex)))
 
+(defun test-cond (x)
+  (cond
+    ((symbol? x) 1)
+    ((integer? x) 2)
+    (else 3)))
+
+(assert (eq 1 (test-cond 'a)))
+(assert (eq 2 (test-cond 3)))
+(assert (eq 3 (test-cond 3.0)))
+(assert (eq 3 (cadr (println (memq :b (list :a 2 :b 3 :c 4))))))
+(println (eval '(progn (+ 1 2))))
 (println "Tests Passed")
 
 

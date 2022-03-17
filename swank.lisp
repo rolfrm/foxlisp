@@ -24,69 +24,79 @@
 (defun swank-repl:create-repl (&rest args)
   '(:ok ("CSI" "CSI")))
 
-(define (swank:autodoc forms . args)
+(defun swank-repl:listener-eval (str)
+  (let ((e (lambda ()
+        (let ((forms (read-string str)))
+          (if (not (null? forms))
+              (eval `(progn ,forms)))))))
+    (let ((result (e)))
+      (println result)
+      `(:ok (:values ,(value->string result))))))
 
-    (define (find-cursor thing)
-    (cond
-     ((and (list? thing)
-           (memq 'swank::%cursor-marker% thing))
-      thing)
-     ((list? thing)
-      (let loop ((elems thing))
-        (if (null? elems)
-            #f
-            (or (find-cursor (car elems))
-                (loop (cdr elems))))))
-     (else #f)))
+(defun swank:autodoc (forms &rest args)
   
-  (define (highlight-arg info args)
-    (cond
-     ((null? info) '())
-     ((null? args) info)
-     ((not (pair? info))  ; Variable length argument list
-      (list '===> info '<===))  
-     ((eq? (car args) 'swank::%cursor-marker%)
-      (append (list '===> (car info) '<===)
-              (cdr info)))
-     ((and (string? (car args)) (string=? (car args) ""))
-      (highlight-arg info (cdr args)))
-     (else (cons (car info)
-                 (highlight-arg (cdr info) (cdr args))))))
-
-  (define (symbol-procedure? sym)
-    (handle-exceptions exn #f (procedure? (eval sym))))
+    (defun find-cursor(thing)
+      (cond
+        ((and (list? thing)
+              (memq 'swank::%cursor-marker% thing))
+         thing)
+        ((list? thing)
+         (let ((loop (lambda (elems))
+                     (if (null? elems)
+                         #f
+                         (or (find-cursor (car elems))
+                             (loop (cdr elems))))))
+           (loop thing)))
+        (else #f)))
   
-  (define (info sym)
-    (cond
-     ((unbound? sym) #f)
-     ((symbol-procedure? sym)
-      (let ((pi (procedure-information (symbol-value sym))))
-        (if (pair? pi)
-            pi
-            `(,pi . args))))
-     (else #f)))
+    (defun highlight-arg (info args)
+      (cond
+        ((null? info) '())
+        ((null? args) info)
+        ((not (pair? info))  ; Variable length argument list
+         (list '===> info '<===))  
+        ((eq? (car args) 'swank::%cursor-marker%)
+         (append (list '===> (car info) '<===)
+                 (cdr info)))
+        ((and (string? (car args)) (string=? (car args) ""))
+         (highlight-arg info (cdr args)))
+        (else (cons (car info)
+                    (highlight-arg (cdr info) (cdr args))))))
+    
+    (defun symbol-procedure? (sym)
+      (handle-exceptions exn #f (procedure? (eval sym))))
+  
+    (defun info( sym)
+      (cond
+        ((unbound? sym) #f)
+        ((symbol-procedure? sym)
+         (let ((pi (procedure-information (symbol-value sym))))
+           (if (pair? pi)
+               pi
+               `(,pi . args))))
+        (else #f)))
 
   ;; Choose a doc-node from all matches, this is only a heuristic solution.
   ;; The heuristic is to find the doc node that has the same name as the symbol,
   ;; and the module name is listed in ##sys#module-table. If there are multiple
   ;; such nodes, choose the first one.
-  ;;
-  (define (guess-doc-node doc-nodes)
-    (case (length doc-nodes)
-      ((0) #f)
-      ;; ((1) (car doc-nodes))
-      (else (any (lambda (n) (and (assoc (car (chicken-doc#node-path n))
-                                         ##sys#module-table)
-                                  n))
-                 doc-nodes))))
-
-  (define (signature-from-doc sym)
+    ;;
+    (defun guess-doc-node(doc-nodes)
+      (case (length doc-nodes)
+        ((0) #f)
+        ;; ((1) (car doc-nodes))
+        (else (any (lambda (n) (and (assoc (car (chicken-doc#node-path n))
+                                           ##sys#module-table)
+                                    n))
+                   doc-nodes))))
+    
+  (defun signature-from-doc (sym)
     (cond ((eq? sym 'define) ))
     (if (or (##sys#macro? sym) (symbol-procedure? sym))
         (let* ((doc-nodes (match-nodes sym))
                (guessed-doc-node (guess-doc-node doc-nodes)))
           (cond
-           ((null? doc-nodes) #f)
+            ((null? doc-nodes) #f)
            (guessed-doc-node
             (car (string->forms
                   (string-delete (char-set #\[ #\])

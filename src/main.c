@@ -652,13 +652,10 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  case LISP_DEFINE:
 			 {
 				var sym = cadr(value);
-				if(sym.type != LISP_SYMBOL){
+				if(sym.type != LISP_SYMBOL)
 				  return nil; // error
-				}
+				
 				var value = lisp_eval(scope, caddr(value));
-				while(scope->super != NULL)
-				  scope = scope->super;
-
 				lisp_scope_create_value(scope, sym, value);
 				return value;
 			 }
