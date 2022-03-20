@@ -1,5 +1,5 @@
 OPT = -O0 -g3
-LIB_SOURCES1 = main.c hashtable.c
+LIB_SOURCES1 = main.c hashtable.c gc.c
 
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc

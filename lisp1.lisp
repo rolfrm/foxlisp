@@ -47,7 +47,9 @@
 (defun nil? (v) (not v))
 (defun null? (v) (not v))
 (defun cons? (v) (= (type-of v) 'CONS))
-(define list? cons?)
+(define pair? cons?)
+(defun list? (x) (or (null? x) (cons? x)))
+
 (defun integer? (v) (= (type-of v) 'INTEGER))
 (defun rational? (v) (= (type-of v) 'RATIONAL))
 (defun string? (v) (= (type-of v) 'STRING))

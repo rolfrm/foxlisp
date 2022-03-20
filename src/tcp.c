@@ -107,16 +107,16 @@ lisp_value lisp_write(lisp_value item, lisp_value buffer){
 }
 
 void * lisp_perform_work(void * args){
-  foxlist_thread_init();
   lisp_value eval = {.type = LISP_FUNCTION, .function = args};
   lisp_eval(current_context->globals, new_cons(eval, nil));
   return NULL;
 }
 
+pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data);
+
 lisp_value thread_start(lisp_value func){
   type_assert(func, LISP_FUNCTION);
-  pthread_t thread;
-  pthread_create(&thread, NULL, lisp_perform_work, func.function);
+  var thread = foxlisp_create_thread(lisp_perform_work, func.function);
   
   return new_cons(get_symbol("thread"), native_pointer((void *) thread));
 }

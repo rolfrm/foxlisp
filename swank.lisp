@@ -79,7 +79,7 @@
       (cond
         ((unbound? sym) #f)
         ((symbol-procedure? sym)
-         (let ((pi (procedure-information (symbol-value sym))))
+         (let ((pi (type-of (symbol-value sym))))
            (if (pair? pi)
                pi
                `(,pi . args))))
@@ -159,4 +159,4 @@
 (defun swank:start-server ()
   (swank-make-server *swank:server-port* nil))
 
-;(thread-start swank:start-server)
+(thread-start swank:start-server)

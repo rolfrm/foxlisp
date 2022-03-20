@@ -206,8 +206,6 @@
   (println "")
   )
 
-                                        ;(let ((prev-print print))
-                                        ;  (set! print (lambda (x) (print '-) (prev-print x))))
 (println (mat-mul (mat3-scale 2 3) (mat3-scale 4 5)))
 
 (thread-join (thread-start (lambda () (println 'thread!))))

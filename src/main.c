@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <iron/full.h>
+#define GC_REDIRECT_TO_LOCAL
 #define GC_THREADS
 #include <gc.h>
 #include <dlfcn.h>
@@ -1585,12 +1586,14 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_macro("bound?", LISP_BOUND);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
-
+  GC_allow_register_threads();
   for(int i = 1; i < argc; i++)
 	 lisp_eval_file(argv[i]);  
   return 0;
 }
 
-void foxlist_thread_init(){
-
+pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
+  pthread_t thread;
+  GC_pthread_create(&thread, NULL, f, data);
+  return thread;
 }

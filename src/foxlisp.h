@@ -82,7 +82,6 @@ typedef struct{
   hash_table * symbols_reverse;
   size_t next_symbol;
   lisp_scope * globals;
-  lisp_value pinned;
 }lisp_context;
 
 struct __lisp_function{
@@ -117,6 +116,8 @@ extern lisp_value unquote_sym;
 extern lisp_value unquote_splice_sym;
 
 void foxlist_thread_init();
+void gc_collect_garbage(lisp_context * context);
+
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 
