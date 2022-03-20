@@ -130,6 +130,10 @@ struct _hash_table{
   size_t elem_size;
 };
 
+size_t ht_count(hash_table * ht){
+  return ht->count;
+}
+
 void ht_set_hash(hash_table * ht, i32 (* hash)(const void * key,  void * userdata)){
   ht->hash = hash;
 }
@@ -251,12 +255,12 @@ static i64 ht_find_free(const hash_table * ht, const void * key){
       return i;
     case HT_OCCUPIED:
       {
-	let thiskey = ht->keys + i * key_size;
-	if(compare != NULL && compare(key, thiskey, ht->userdata)){
-	  return i;
-	}else if(memcmp(thiskey, key, key_size) == 0){
-	  return i;
-	}	
+        let thiskey = ht->keys + i * key_size;
+        if(compare != NULL && compare(key, thiskey, ht->userdata)){
+          return i;
+        }else if(memcmp(thiskey, key, key_size) == 0){
+          return i;
+        }	
       }
     }
   }

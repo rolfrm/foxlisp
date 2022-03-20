@@ -236,8 +236,12 @@
 (println (countup))
 (clear)
 (println (countup))
-  
 
+(define asdasddsa222 (list 1 2 3))
+(define asdasddsa221 (list 1 2 3))
+(define asdasddsa223 '( 1 2 3))
+(define asdasddsa224 '( 1 2 3))
+;(gc-collect)
 
 (println "Tests Passed")
 

@@ -1506,7 +1506,7 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
 	 return new_cons(t, value);
   return nil;
 }
-
+lisp_value run_gc();
  int main(int argc, char ** argv){
   ht_mem_malloc = GC_malloc;
   ht_mem_free = GC_free;
@@ -1569,6 +1569,8 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
   
   lisp_register_native("register-finalizer", 2, lisp_register_finalizer);
+  
+  lisp_register_native("gc-collect", 0, run_gc);
   lisp_register_native("eval", 1, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
@@ -1596,4 +1598,9 @@ pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
   pthread_t thread;
   GC_pthread_create(&thread, NULL, f, data);
   return thread;
+}
+
+lisp_value run_gc(){
+  gc_collect_garbage(current_context);
+  return t;
 }
