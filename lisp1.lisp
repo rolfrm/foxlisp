@@ -8,7 +8,7 @@
 (define set! set)
 (define display println)
 (define eq =)
-
+(define #f ())
 (defun not (x) (= x nil))
 (define append2 
     (lambda (lst)
@@ -36,7 +36,7 @@
   (let ((x 0))
     (loop (< x n)
        (set x (+ 1 x))
-       (f2))))
+       (f2 x))))
 
 (defun apply (f args)
   (eval (cons f args)))
@@ -51,6 +51,15 @@
 (defun integer? (v) (= (type-of v) 'INTEGER))
 (defun rational? (v) (= (type-of v) 'RATIONAL))
 (defun string? (v) (= (type-of v) 'STRING))
+(defun symbol? (p) (= 'SYMBOL (type-of p))) 
+(defun macro? (s) (eq (type-of s) 'FUNCTION_MACRO))
+(defun procedure? (s) (eq (type-of s) 'FUNCTION))
+(defun symbol-macro? (s) (macro? (symbol-value s) 'FUNCTION_MACRO))
+(defun symbol-procedure? (s) (procedure? (symbol-value s)))
+(defun unbound? (s) (not (bound? s)))
+(defun last (lst)
+  (if (cdr lst) (last (cdr lst)) (car lst)))
+
 (defun and (&rest items)
   (let ((it items)
         (ok t))
@@ -90,6 +99,8 @@
 
 (defmacro do (&rest body)
   `(progn ,@body))
+
+(define eq? =)
 
 (defun equals? (a b)
   (let ((type (type-of a)))
@@ -134,7 +145,6 @@
      (when ,var ,@body)))
 
 
-(defun symbol? (p) (= 'SYMBOL (type-of p))) 
 
 (defun plookup (lst sym)
   (let ((r nil))
@@ -185,6 +195,16 @@
              )
            (set! list (cdr list)))
     result))
+
+(defmacro let* (vars &rest body)
+  (defun ilet(vars body)
+    (if vars
+        (let ((var (car vars)))
+          `(let (,var)
+             ,(ilet (cdr vars) body)))
+        `(let () ,@body))
+    )
+  (ilet vars body))
 
 
 (define libc (load-lib "libc.so.6"))

@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <iron/full.h>
+#define GC_THREADS
 #include <gc.h>
 #include <dlfcn.h>
 
@@ -32,6 +33,16 @@ void error(){
 void error_print(const char * str){
   printf("%s\n", str);
   error();
+}
+
+
+void type_assert(lisp_value val, lisp_type type){
+  if(val.type != type){
+	 printf("Invalid type, expected %s, but got %s\n",
+			  lisp_type_to_string(type),
+			  lisp_type_to_string(val.type));
+	 error();
+  }
 }
 
 #define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
@@ -218,16 +229,13 @@ lisp_value read_token_string(io_reader * rd){
 	 uint8_t c = io_read_u8(rd);
     if(c == '\\'){
       var c2 = io_peek_u8(rd);
-      if(c2 == '\\'){
-        c = io_read_u8(rd);
+      if(c2 == 'n'){
+        io_read_u8(rd);
+        c = '\n';
       }else{
-        if(c2 == 'n'){
-          io_read_u8(rd);
-          c = '\n';
-        }
+        c = io_read_u8(rd);
       }
-    }
-	 if(c == '"'){
+    }else if(c == '"'){
 		c = io_peek_u8(rd);
 		if(c == '"'){
         io_read_u8(rd);
@@ -282,14 +290,17 @@ const char * symbol_name(int64_t id){
   return NULL;
 }
 
-void type_assert(lisp_value val, lisp_type type){
-  if(val.type != type){
-	 printf("Invalid type, expected %s, but got %s\n",
-			  lisp_type_to_string(type),
-			  lisp_type_to_string(val.type));
-	 error();
-  }
+lisp_value string_to_symbol(lisp_value string){
+  type_assert(string, LISP_STRING);
+  return get_symbol(string.string);
 }
+
+lisp_value symbol_to_string(lisp_value sym){
+  type_assert(sym, LISP_SYMBOL);
+  char * sym_string = (char *) symbol_name(sym.integer);
+  return (lisp_value) {.type = LISP_STRING, .string = sym_string};
+}
+
 
 lisp_value parse_token(const char * x, int count){
 
@@ -663,6 +674,28 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 {
 				return lisp_eval(scope, lisp_eval(scope, cadr(value)));
 			 }
+        case LISP_SYMBOL_VALUE:
+          {
+            var sym = lisp_eval(scope, cadr(value));
+            
+            if(sym.type != LISP_SYMBOL){
+              println(sym);
+              printf("Not a symbol\n");
+              return nil;
+            }
+            if(lisp_scope_try_get_value(scope, sym, &value))
+              return value;
+            return nil;
+          }
+        case LISP_BOUND:
+          {
+            var sym = lisp_eval(scope, cadr(value));
+            if(sym.type != LISP_SYMBOL)
+              return nil;
+            if(lisp_scope_try_get_value(scope, sym, &value))
+              return t;
+            return nil;
+          }
 		  }
 		}
 		lisp_value things = lisp_sub_eval(scope, cdr(value));
@@ -847,7 +880,7 @@ lisp_value lisp_eval_value(lisp_value code){
       break;
     code = next_code;
   }
-  println(code);
+  //println(code);
   return lisp_eval(current_context->globals, code);
 }
 
@@ -1291,7 +1324,11 @@ lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
   var vector = _vector.vector;
   var v = value;
   void * dst = vector->data + k.integer * vector->elem_size;
-  
+  if(k.integer >= vector->count){
+    printf("index outside of the bounds of the vector\n");
+    error();
+    return nil;
+  }
   void * src;
   if(vector->default_value.type == LISP_NIL)
 	 ((lisp_value *) vector->data)[k.integer] = value;
@@ -1319,10 +1356,12 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
 	 elem_size = sizeof(double);
   }
   vector.vector->data = GC_realloc(vector.vector->data, l * elem_size);
-  for(size_t i = vector.vector->count; i < l; i++){
+  size_t prevCount = vector.vector->count;
+  vector.vector->count = l;
+  for(size_t i = prevCount; i < l; i++){
 	 vector_set(vector, integer(i), vector.vector->default_value);
   }
-  vector.vector->count = l;
+
   return vector;
 }
 
@@ -1518,7 +1557,9 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
 
   lisp_register_native("parse-hex", 1, parse_hex);
   lisp_register_native("hex-string", 2, hex_string);
- 
+
+  lisp_register_native("symbol->string", 1, symbol_to_string);
+  lisp_register_native("string->symbol", 1, string_to_symbol);
 
   lisp_register_native("make-hashtable", 2, lisp_make_hashtable);
   lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
@@ -1540,10 +1581,16 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   //lisp_register_macro("eval", LISP_EVAL);
   lisp_register_macro("quasiquote", LISP_QUASIQUOTE);
   lisp_register_macro("unquote", LISP_UNQUOTE);
+  lisp_register_macro("symbol-value", LISP_SYMBOL_VALUE);
+  lisp_register_macro("bound?", LISP_BOUND);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 
   for(int i = 1; i < argc; i++)
 	 lisp_eval_file(argv[i]);  
   return 0;
+}
+
+void foxlist_thread_init(){
+
 }

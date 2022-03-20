@@ -107,6 +107,7 @@ lisp_value lisp_write(lisp_value item, lisp_value buffer){
 }
 
 void * lisp_perform_work(void * args){
+  foxlist_thread_init();
   lisp_value eval = {.type = LISP_FUNCTION, .function = args};
   lisp_eval(current_context->globals, new_cons(eval, nil));
   return NULL;

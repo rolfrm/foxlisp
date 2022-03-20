@@ -25,8 +25,11 @@ void * (* ht_mem_malloc)(size_t s);
 void (* ht_mem_free)(void *);
 static void * alloc(size_t s){
   void * d;
-  if(ht_mem_malloc != NULL) d = ht_mem_malloc(s);
-  else d = malloc(s);
+  if(ht_mem_malloc != NULL)
+    d = ht_mem_malloc(s);
+  else
+    d = malloc(s);
+
   memset(d, 0, s);
   return d;
 }
@@ -208,8 +211,8 @@ void ht_free(hash_table *ht){
 
 bool ht_set(hash_table * ht, const void * key, const void * nelem);
 
-static void ht_grow(hash_table * ht){
-  var ht2 = ht_create2(ht->capacity * 2, ht->key_size, ht->elem_size);
+void ht_set_capacity(hash_table * ht, size_t buckets){
+  var ht2 = ht_create2(buckets, ht->key_size, ht->elem_size);
   ht2->free_keys = ht->free_keys;
   ht2->free_values = ht->free_values;
   ht2->free_state = ht->free_state;
@@ -227,6 +230,10 @@ static void ht_grow(hash_table * ht){
   }
   SWAP(*ht2, *ht);
   ht_free(ht2);
+}
+
+static void ht_grow(hash_table * ht){
+  ht_set_capacity(ht, ht->capacity * 2);
 }
 
 static i64 ht_find_free(const hash_table * ht, const void * key){

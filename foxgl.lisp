@@ -128,6 +128,8 @@
     (vector-set! m 4 (float32 y))
     m))
 
+(define render-model nil)
+
 (let ((color '(1 1 1 1))
       (transform nil)
       (polygon-cache (make-hashtable t nil))
@@ -135,59 +137,62 @@
                       (println 'delete-poly)
                       (delete-polygon (cdr x))))
       )
-  (defun render-model (model)
-    (blit3d-init)
-    (let ((sym (car model))
-          (funcs ())
-          )
-      (when (eq sym 'color)
-        (let ((prev-color color))
-          (push! funcs (lambda () (set! color prev-color))))
-        
-        (let ((rgb (plookup (cdr model) ':rgb)))
-          (set! color rgb)
-          ))
-      (when (eq sym 'transform)
-        (let ((prev-tform transform))
-          (push! funcs (lambda () (set! transform prev-tform))))
-        (match tlate (plookup (cdr model) ':translate)
-               (set! transform (mat-mul (or transform (mat4-identity))
-                                        (mat4-translation (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))))
-        (match scale (plookup (cdr model) ':scale)
-               
-               (set! transform (mat-mul (or transform (mat4-identity))
-                                        (mat4-scale (car scale) (cadr scale) (or (caddr scale) 1.0))))
-               
-               ))
-      (when (eq sym 'unit-square)
-        (blit3d-color color)
-        (blit3d-transform (or transform (mat4-identity)))
-        (blit3d-square)
-        )
+  (set!
+   render-model
+   (lambda (model)
+     (blit3d-init)
+     (let ((sym (car model))
+           (funcs ())
+           )
+       (when (eq sym 'color)
+         (let ((prev-color color))
+           (push! funcs (lambda () (set! color prev-color)))
+           )
+         
+         (let ((rgb (plookup (cdr model) ':rgb)))
+           (set! color rgb)
+           ))
+       (when (eq sym 'transform)
+         (let ((prev-tform transform))
+           (push! funcs (lambda () (set! transform prev-tform))))
+         (match tlate (plookup (cdr model) ':translate)
+                (set! transform (mat-mul (or transform (mat4-identity))
+                                         (mat4-translation (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))))
+         (match scale (plookup (cdr model) ':scale)
+                
+                (set! transform (mat-mul (or transform (mat4-identity))
+                                         (mat4-scale (car scale) (cadr scale) (or (caddr scale) 1.0))))
+                
+                ))
+       (when (eq sym 'unit-square)
+         (blit3d-color color)
+         (blit3d-transform (or transform (mat4-identity)))
+         (blit3d-square)
+         )
       (when (eq sym 'print)
         (println (list (cdr model) transform color)))
-      (when (eq sym 'polygon)
-        (match poly (plookup (cdr model) ':2d-triangle-strip)
-               (let ((r (hashtable-ref polygon-cache (cdr model))))
-                 
-                 (unless r
-                   (println (list 'new-poly r))
-                   (set! r (cons 'poly (load-polygon (list-to-array poly))))
-                   (hashtable-set polygon-cache (cdr model) r)
-                   (register-finalizer r cache-delete)
-                   )
-                 (blit3d-color color)
-                 (blit3d-transform (or transform (mat4-identity)))
-                 (blit-polygon (cdr r))
-                 
-                 )
-
-               ))
-      
-      (plist-rest (cdr model) render-model)
-      
-      (map! funcall funcs)  
-      )))
+       (when (eq sym 'polygon)
+         (match poly (plookup (cdr model) ':2d-triangle-strip)
+                (let ((r (hashtable-ref polygon-cache (cdr model))))
+                  
+                  (unless r
+                    (println (list 'new-poly r))
+                    (set! r (cons 'poly (load-polygon (list-to-array poly))))
+                    (hashtable-set polygon-cache (cdr model) r)
+                    ;(register-finalizer r cache-delete)
+                    )
+                  (blit3d-color color)
+                  (blit3d-transform (or transform (mat4-identity)))
+                  (blit-polygon (cdr r))
+                  
+                  )
+                
+                ))
+       
+       (plist-rest (cdr model) render-model)
+       
+       (map! funcall funcs)  
+       ))))
 
 (let ((m1 (mat4-translation 4 0 0))
       (m2 (mat4-translation 3 2 1)))
@@ -207,6 +212,11 @@
 
 (thread-join (thread-start (lambda () (println 'thread!))))
 (thread-join (thread-start (lambda () (println 'thread!))))
+
+(define add (lambda (a b) (+ a b)))
+(defun add (a b) (+ a b))
+
+(define (add a b) (+ a b))
 
 (let ((srv (tcp-listen 8893))
       (cli (tcp-connect "127.0.0.1" 8893)))

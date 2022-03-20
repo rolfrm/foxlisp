@@ -31,7 +31,9 @@ typedef enum {
 				  LISP_EVAL = 10,
 				  LISP_QUASIQUOTE = 11,
 				  LISP_UNQUOTE = 12,
-				  LISP_UNQUOTE_SPLICE = 13
+				  LISP_UNQUOTE_SPLICE = 13,
+              LISP_SYMBOL_VALUE = 14,
+              LISP_BOUND = 15
 }lisp_builtin;
 
 // structs
@@ -80,6 +82,7 @@ typedef struct{
   hash_table * symbols_reverse;
   size_t next_symbol;
   lisp_scope * globals;
+  lisp_value pinned;
 }lisp_context;
 
 struct __lisp_function{
@@ -113,6 +116,7 @@ extern lisp_value quasiquote_sym;
 extern lisp_value unquote_sym;
 extern lisp_value unquote_splice_sym;
 
+void foxlist_thread_init();
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 

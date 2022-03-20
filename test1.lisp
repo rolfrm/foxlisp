@@ -193,7 +193,52 @@
 (assert (eq 2 (test-cond 3)))
 (assert (eq 3 (test-cond 3.0)))
 (assert (eq 3 (cadr (println (memq :b (list :a 2 :b 3 :c 4))))))
+
+(let* ((a 1) (b (+ a 1)) (c (+ b 1)))
+  (assert (eq 3 c))
+  (assert (eq 2 b))
+  (assert (eq 1 a)))
+
+(defun ht-stress ()
+  (let ((ht (make-hashtable nil nil)))
+    (do-times 20 (lambda (i)
+                    (hashtable-set ht (cons i i) i)
+                    (vector->string (string->vector (value->string '(1 2 3))))
+                    ))))
+(do-times 20 (lambda (i) (ht-stress)))
+
 (println (eval '(progn (+ 1 2))))
+;(println ("\\\"asd\\\""))
+(define asdstr (read-string (read-string "\"asd\"")))
+(define hej 10)
+(println (symbol-procedure? 'apply))
+(println asdstr)
+(assert (unbound? 'hejjj))
+(assert (bound? 'hej))
+
+(define countup nil)
+(define clear nil)
+
+(let ((counter 0) (decrement ()))
+  (set! countup (lambda ()
+                  (set! counter (+ counter 1))
+                  (push! decrement (lambda () (set! counter (- counter 1))))
+                  counter
+                  
+                  ))
+  (set! clear (lambda ()
+                (map! funcall decrement)
+                (set! decrement nil)
+                nil
+                ))
+  )
+(do-times 10 countup)
+(println (countup))
+(clear)
+(println (countup))
+  
+
+
 (println "Tests Passed")
 
 

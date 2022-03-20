@@ -24,14 +24,23 @@
 (defun swank-repl:create-repl (&rest args)
   '(:ok ("CSI" "CSI")))
 
-(defun swank-repl:listener-eval (str)
+(defun swank-repl:listener-eval (str )
   (let ((e (lambda ()
         (let ((forms (read-string str)))
           (if (not (null? forms))
               (eval `(progn ,forms)))))))
     (let ((result (e)))
-      (println result)
       `(:ok (:values ,(value->string result))))))
+
+(defun swank:compile-string-for-emacs (str buffer position filename _)
+  (let ((e (lambda ()
+        (let ((forms (read-string str)))
+          (if (not (null? forms))
+              (eval `(progn ,forms)))))))
+    (let ((result (e)))
+      `(:ok (:compilation-result nil t 0.0 nil nil)))))
+
+
 
 (defun swank:autodoc (forms &rest args)
   
@@ -63,8 +72,8 @@
         (else (cons (car info)
                     (highlight-arg (cdr info) (cdr args))))))
     
-    (defun symbol-procedure? (sym)
-      (handle-exceptions exn #f (procedure? (eval sym))))
+  ;(defun symbol-procedure? (sym)
+   ;   (handle-exceptions exn #f (procedure? (eval sym))))
   
     (defun info( sym)
       (cond
@@ -92,9 +101,9 @@
     
   (defun signature-from-doc (sym)
     (cond ((eq? sym 'define) ))
-    (if (or (##sys#macro? sym) (symbol-procedure? sym))
-        (let* ((doc-nodes (match-nodes sym))
-               (guessed-doc-node (guess-doc-node doc-nodes)))
+    (if (or (symbol-macro? sym) (symbol-procedure? sym))
+        (let* ((doc-nodes nil);(match-nodes sym))
+               (guessed-doc-node nil)); (guess-doc-node doc-nodes)))
           (cond
             ((null? doc-nodes) #f)
            (guessed-doc-node
@@ -113,20 +122,14 @@
               `(:ok (:not-available t))))
         '(:ok (:not-available t)))))
 
-(defun last (lst)
-  (if (cdr lst) (last (cdr lst)) (car lst)))
 
 (defun swank-handle-command (slime cmd)
-  (println (list 'command cmd))
   (when (eq (car cmd) ':emacs-rex)
     (let ((str (value->string `(:return ,(eval (cadr cmd)) ,(last cmd)))))
       (let ((strbuf (string->vector str)))
         (let ((lenbuf (hex-string (vector-length strbuf) 6)))
-          (println (list 'write: str lenbuf))
-      
           (write slime (string->vector lenbuf))
           (write slime (string->vector str)))
-                                        ;(println (list slime cmd))
     ))))
 
 
@@ -137,18 +140,23 @@
         )
     (loop active
           (let ((read-len (read slime len-buf)))
-            (sleep 0.25)
             (when (< 0 read-len)
               
             (let ((len (parse-hex (vector->string len-buf))))
               (let ((buf2 (make-vector len (byte 0))))
                 (read slime buf2)
-                (let ((cmd (read-string (println (vector->string buf2)))))
+                (let ((cmd (read-string (vector->string buf2))))
                   (swank-handle-command slime cmd)
-                ))))))))
+                  ))))))))
+
+(define *swank:server-port* 8810)
 
 (defun swank-make-server (port file)
   (let ((listener (tcp-listen port)))
     (let ((emacs (tcp-accept listener)))
       (swank-event-loop emacs))))
-(swank-make-server 8810 nil)
+
+(defun swank:start-server ()
+  (swank-make-server *swank:server-port* nil))
+
+;(thread-start swank:start-server)

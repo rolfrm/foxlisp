@@ -2,7 +2,7 @@
 (load "foxgl.lisp")
 
 (define win (create-window (integer 800) (integer 600)))
-(set-title win "Hello Ducky 2")
+(set-title win "Hello 2")
 (make-current win)
 
 (load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
@@ -27,33 +27,35 @@
       )
     ))
 
-                                        ;(define h1 (test-f1))
 
 (define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
 (define time 0.0)
-(loop go
-     
-     (render-model
-      `(root
-        (color :rgb (0.1 0.1 0.1)
-               (transform :translate (-1 -1) :scale (2 2) ,square-model))
-                     (color :rgb (0.9 0.9 0.5)
-                            (transform :scale (0.2 0.2)
-                                       ,square-model
-                                       )
-                            (color :rgb (0.5 0.5 1.0)
-                                   (transform :scale (0.1 0.1)
-                                              :translate (0.1 0.2)
-                                              ,square-model
-                                              ))
-                            (transform :translate (,(* 0.1 (sin time)) -0.5) :scale (0.2 0.2)
-                                       (color :rgb (0.9 0.5 0.2)
-                                              (polygon :2d-triangle-strip (0 0 1 -1 2 0))
-                                              (polygon :2d-triangle-strip (0 0 0.2 0.4 0.4 0 ))
-                                              (transform :translate (1.6 0)
-                                                         (polygon :2d-triangle-strip (0 0 0.2 0.4 0.4 0 )))
-                                              ))
-                            )))
+(loop t
+
+      ;(render-model '(color :rgb (0.1 0.1 0.1)))
+      
+      (render-model
+       `(root
+         (color :rgb (0.1 0.1 0.1) 
+                (transform :translate (-1 -1) :scale (2 2) ,square-model))
+         
+         (color :rgb (0.9 0.9 0.5)
+               (transform :scale (0.2 0.2)
+                          ,square-model
+                          )
+               (color :rgb (0.5 0.5 1.0)
+                      (transform :scale (0.1 0.1)
+                                 :translate (0.1 0.2)
+                                 ,square-model
+                                 ))
+               (transform :translate (,(* 0.1 (sin time)) -0.5) :scale (0.2 0.2)
+                          (color :rgb (0.9 0.5 0.2)
+                                 (polygon :2d-triangle-strip (0 0 1 -1 2 0))
+                                 (polygon :2d-triangle-strip (0 0 0.2 0.4 0.4 0 ))
+                                 (transform :translate (1.6 0)
+                                            (polygon :2d-triangle-strip (0 0 0.2 0.4 0.4 0 )))
+                                 ))
+               )))
 
      (swap win)
      (poll-events)

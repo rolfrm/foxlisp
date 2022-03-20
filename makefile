@@ -25,7 +25,7 @@ foxgl.so: src/foxgl.c src/tcp.c
 	gcc src/foxgl.c src/tcp.c -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
-	gcc -DGC_PTHREADS -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
+	gcc -DGC_PTHREADS -DGC_THREADS -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .
