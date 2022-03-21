@@ -241,7 +241,12 @@
 (define asdasddsa221 (list 1 2 3))
 (define asdasddsa223 '( 1 2 3))
 (define asdasddsa224 '( 1 2 3))
-;(gc-collect)
+
+(define (test-def x) (+ x 10))
+(assert (eq (test-def 5) 15))
+(define (test-def2 . x) (cons 10 x))
+(assert (equals? (test-def2 5) '(10 5)))
+                                        ;(gc-collect)
 
 (println "Tests Passed")
 

@@ -1580,7 +1580,7 @@ lisp_value run_gc();
   lisp_register_macro("loop", LISP_LOOP);
   lisp_register_macro("macro", LISP_MACRO);
   lisp_register_macro("set", LISP_SET);
-  lisp_register_macro("define", LISP_DEFINE);
+  lisp_register_macro("def", LISP_DEFINE);
   //lisp_register_macro("eval", LISP_EVAL);
   lisp_register_macro("quasiquote", LISP_QUASIQUOTE);
   lisp_register_macro("unquote", LISP_UNQUOTE);

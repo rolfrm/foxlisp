@@ -1,14 +1,17 @@
-(define defun (macro (name args &rest body) `(define ,name (lambda ,args ,@body))))
 
-(define defmacro (macro (name args &rest body)
-                        `(define ,name  (macro ,args ,@body))))
+(def defun (macro (name args &rest body) `(def ,name (lambda ,args ,@body))))
 
-(define list (lambda (&rest x) x))
-(define begin progn)
-(define set! set)
-(define display println)
-(define eq =)
-(define #f ())
+(def defmacro (macro (name args &rest body)
+                        `(def ,name  (macro ,args ,@body))))
+(defmacro define (var value)
+  `(def ,var ,value))
+
+(def list (lambda (&rest x) x))
+(def begin progn)
+(def set! set)
+(def display println)
+(def eq =)
+(def #f ())
 (defun not (x) (= x nil))
 (define append2 
     (lambda (lst)
@@ -127,12 +130,10 @@
 
 (defun caddr (l)
   (car (cddr l)))
-
 (defun caar (x)
   (car (car x)))
 (defun cdar (x)
   (cdr (car x)))
-
 
 (defmacro pop! (lst)
   `(let ((fst (car ,lst)))
@@ -145,8 +146,6 @@
 (defmacro match (var lookup &rest body)
   `(let ((,var ,lookup))
      (when ,var ,@body)))
-
-
 
 (defun plookup (lst sym)
   (let ((r nil))
@@ -161,7 +160,6 @@
             (set! lst (cdr lst)))))
     r))
 
-
 (defun list-to-array (list)
   (let ((i 0)
         (v (make-vector (length list) (float32 0.0))))
@@ -174,7 +172,6 @@
 
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))
-
 
 (defmacro cond (&rest args)
   (defun condi (args)
@@ -207,7 +204,17 @@
         `(let () ,@body))
     )
   (ilet vars body))
+(defun build-arg-list (args)
+  (if (cons? args)
+      (cons (car args) (build-arg-list (cdr args)))
+      (if (null? args)
+          nil
+          (list '&rest args))))
 
+(defmacro define (var &rest value)
+  (if (cons? var)
+      `(defun ,(car var) ,(build-arg-list (cdr var)) ,@value)
+      `(def ,var ,(car value))))
 
 (define libc (load-lib "libc.so.6"))
 (define fopen (load-alien libc "fopen" native-null-pointer (list "pathname" "mode")))
