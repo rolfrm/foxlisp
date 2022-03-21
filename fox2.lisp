@@ -114,5 +114,8 @@
    
      (swap win)
      (poll-events)
+     (let ((evts (foxgl-get-events)))
+       (when evts
+         (println evts)))
      (incf time time-interval)           ;(set! go nil)
      )

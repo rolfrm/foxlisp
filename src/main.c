@@ -268,7 +268,7 @@ int64_t get_symbol_id(const char * s){
   
   if(ht_get(current_context->symbols, &s, &id))
 	 return id;
-  
+  s = gc_clone(s, strlen(s) + 1);
   id = current_context->next_symbol++;
   if(s[0] == ':'){
     id += 0x10000000;

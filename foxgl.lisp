@@ -31,6 +31,7 @@
 (define blit3d-square (load-wrap foxgl2 "lblit_square2" 0))
 (define blit3d-color (load-wrap foxgl2 "lblit_color" 1))
 (define blit3d-transform (load-wrap foxgl2 "lblit_transform" 1))
+(define foxgl-get-events (load-wrap foxgl2 "foxgl_get_events" 0))
 
 (define load-polygon (load-wrap foxgl2 "load_polygon" 1))
 (define blit-polygon (load-wrap foxgl2 "blit_polygon" 1))

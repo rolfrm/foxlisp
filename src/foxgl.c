@@ -633,3 +633,74 @@ lisp_value delete_polygon (lisp_value val){
   blit3d_polygon_destroy(&poly);
   return nil;
 }
+
+lisp_value foxgl_create_window(lisp_value width, lisp_value height){
+  type_assert(width, LISP_INTEGER);
+  type_assert(height, LISP_INTEGER);
+  gl_window * win = gl_window_open(width.integer, height.integer);
+  
+  
+  return native_pointer(win);
+}
+
+lisp_value foxgl_get_events(){
+  lisp_value evts = nil;
+  gl_window_event events[20];
+  while(true){
+    size_t cnt = gl_get_events(events, array_count(events));
+    if(cnt == 0)
+      break;
+    for(size_t i = 0; i < cnt; i++){
+      gl_window_event evt = events[i];
+      gl_event_known_event_types type = evt.type;
+      lisp_value levt = nil;
+      switch(type){
+      case EVT_MOUSE_MOVE:
+        levt = new_cons(get_symbol("mouse-move"), new_cons(integer(evt.mouse_move.x), integer(evt.mouse_move.y)));
+        break;
+      case EVT_MOUSE_LEAVE:
+        levt = new_cons(get_symbol("mouse-leave"), nil);
+        break;
+      case EVT_MOUSE_ENTER:
+        levt = new_cons(get_symbol("mouse-enter"), nil);
+        break;
+      case EVT_MOUSE_BTN_DOWN:
+        levt = new_cons(get_symbol("mouse-button-down"),
+                        new_cons(integer(evt.mouse_btn.button), nil));
+        break;
+      case EVT_MOUSE_BTN_UP:
+        levt = new_cons(get_symbol("mouse-button-up"),
+                        new_cons(integer(evt.mouse_btn.button), nil));
+      case EVT_KEY_DOWN:
+      case EVT_KEY_UP:
+      case EVT_KEY_REPEAT:
+        {
+        char keystr[6] = {0};
+        if(evt.key.codept != 0)
+          codepoint_to_utf8(evt.key.codept, keystr, 5);
+        
+        
+        lisp_value keyevt = nil;
+        if(strlen(keystr) >0){
+          keyevt = new_cons(get_symbol("key"), new_cons(get_symbol(keystr), nil));
+        }
+        else if(evt.key.key != -1){
+          keyevt = new_cons(get_symbol("key"), new_cons(integer(evt.key.key), nil));
+        }else if(evt.key.scancode != -1){
+          keyevt = new_cons(get_symbol("scankey"), new_cons(integer(evt.key.scancode), nil));
+        
+        }
+        
+        levt = new_cons(get_symbol(type == EVT_KEY_DOWN ? "key-down" : (EVT_KEY_UP ? "key-up" : "key-repeat")), keyevt);
+        }
+        break;
+      default:
+        levt = new_cons(get_symbol("unknown"), new_cons(integer(type), nil));
+      
+      }
+      levt = new_cons(get_symbol("event"), new_cons(get_symbol("timestamp"), new_cons(integer(evt.timestamp), levt)));
+      evts = new_cons(levt, evts);
+    }
+  }
+  return evts;
+}

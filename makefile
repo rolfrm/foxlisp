@@ -8,7 +8,7 @@ LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 LDFLAGS= -L. $(OPT) -rdynamic
 LIBS= -lpthread -ldl libmicroio.a -lm
 ALL= $(TARGET)
-CFLAGS = -Isrc/ -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall -shared -fPIC
+CFLAGS = -Isrc/  -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -msse4.2 -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall -shared -fPIC
 
 all: libmicroio.a
 all: $(TARGET)
@@ -22,7 +22,7 @@ libmicroio/libmicroio.a:
 	make -C libmicroio
 
 foxgl.so: src/foxgl.c src/tcp.c
-	gcc src/foxgl.c src/tcp.c -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
+	gcc src/foxgl.c src/tcp.c -I.. -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
 	gcc -DGC_PTHREADS -DGC_THREADS -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
