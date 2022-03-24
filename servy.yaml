@@ -1,0 +1,22 @@
+#!servy
+endpoints:
+  "/.*\\.html":
+    call: dash -c "cat $PWD$URL $PWD$URL/index.html 2>/dev/null"
+  "/.*\\.js":
+    call: dash -c "cat $PWD$URL"
+    response-type: text/javascript
+  "/.*\\.css":
+    call: dash -c "cat $PWD$URL"
+    response-type: text/css
+  "/.*\\.wasm":
+    call: dash -c "cat $PWD$URL"
+    resonse-type: application/wasm
+  "/.*\\.hjson":
+    call: dash -c "cat $PWD$URL"
+  "/.*/$":
+    call: dash -c "cat $PWD$URL/index.html"
+    response-type: text/html
+  /:
+    call: cat index.html
+
+host: localhost:8890

@@ -348,7 +348,6 @@ lisp_value read_token_data(io_reader * rd){
 }
 
 lisp_value tokenize_stream(io_reader * rd){
-  static int quote_level = 0;
   skip_comment_and_whitespace(rd);
   uint8_t c = io_peek_u8(rd);
   if(c == 0) return nil;
@@ -358,10 +357,7 @@ lisp_value tokenize_stream(io_reader * rd){
   }
   if(c == '\''){
 	 io_read_u8(rd);
-    quote_level += 1;
-    
-	 var c = new_cons(quote_sym, new_cons(tokenize_stream(rd), nil));
-    quote_level -= 1;
+  	 var c = new_cons(quote_sym, new_cons(tokenize_stream(rd), nil));
     return c;
   }
   if(c == '`'){
@@ -657,9 +653,9 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				if(sym.type != LISP_SYMBOL){
 				  return nil; // error
 				}
-				var value = lisp_eval(scope, caddr(value));
-				lisp_scope_set_value(scope, sym, value);
-				return value;
+				var value2 = lisp_eval(scope, caddr(value));
+				lisp_scope_set_value(scope, sym, value2);
+				return value2;
 			 }
 		  case LISP_DEFINE:
 			 {
@@ -667,9 +663,9 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				if(sym.type != LISP_SYMBOL)
 				  return nil; // error
 				
-				var value = lisp_eval(scope, caddr(value));
-				lisp_scope_create_value(scope, sym, value);
-				return value;
+				var value2 = lisp_eval(scope, caddr(value));
+				lisp_scope_create_value(scope, sym, value2);
+				return value2;
 			 }
 		  case LISP_EVAL:
 			 {
@@ -1176,7 +1172,11 @@ lisp_value load_lib(lisp_value str){
 	 return nil;
   }
   printf("Loading: %s\n", str.string);
+#ifndef EMSCRIPTEN
   void * handle = dlopen(str.string, RTLD_GLOBAL |RTLD_NOW);
+#else
+  void * handle = NULL;
+#endif
   char * err = dlerror();
   if(err != NULL) printf("DL error: %s\n", err);
   if(handle == NULL) return nil;
@@ -1588,9 +1588,12 @@ lisp_value run_gc();
   lisp_register_macro("bound?", LISP_BOUND);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
+#ifndef EMSCRIPTEN
   GC_allow_register_threads();
+#endif
   for(int i = 1; i < argc; i++)
-	 lisp_eval_file(argv[i]);  
+	 lisp_eval_file(argv[i]);
+  printf("Foxlisp finished\n");
   return 0;
 }
 

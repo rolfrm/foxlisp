@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en-us">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <!--<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />-->
+ <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+  <!--<meta name="viewport" content="width=device-width, user-scalable=no" />-->
+
+  <title>Foxlisp</title>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: hidden;
+      position: fixed;
+ 
+    touch-action: manipulation;
+    }
+
+    body {
+      background-color: #222222;
+      color: #FFFFFF;
+      position: relative;
+    }
+    .touch_button {
+      padding-top: 10px;
+      padding-bottom: 10px;
+    padding-left: 15px;
+    padding-right: 15px;
+    background-color: #777;
+  color: white;
+  cursor: pointer;
+  font-size: 100%;
+  display: inline;
+    }
+
+    #controls2 {  
+      z-index: 3;
+      position: absolute;
+    }
+
+    .emscripten_border {
+      z-index: 2;
+      margin-top: 5px;
+      position: absolute;
+      width:100%;
+    height:100%;
+    cursor: none;
+    }
+
+
+    #placeholder {
+
+      height: 100%;
+      width: 100%;
+      opacity: 0.5;
+      z-index: 1;
+    }
+
+    #canvas {
+      z-index: 2;
+    position: absolute;
+    width:100%;
+    height:100%;
+    }
+
+    .colorpicker {
+      position: relative;
+      display: inline;
+    }
+    .collapsible {
+      display: none;
+    }
+    .expander {
+       background-color: #777;
+  color: white;
+  cursor: pointer;
+  padding: 10px;
+  font-size: 100%;
+  display: inline;
+}
+
+
+  </style>
+</head>
+
+<body>
+  <div class="spinner" id='spinner'></div>
+  <div class="emscripten" id="status"></div>
+
+  <span id='controls'>
+    <span><input type="checkbox" id="resize" checked="true" hidden=1></span>
+    <span><input type="button" value="Fullscreen" hidden=1 onclick="Module.requestFullscreen(document.querySelector('#pointerLock').checked, 
+                                                                      document.querySelector('#resize').checked)">
+    </span>
+
+  </span>
+      <button class="expander">?</button>
+      <div class="collapsible">
+      Infinite zoom painting application. Currently supports all the colors. Click anywhere to paint. Use shift+Up/Down
+      to zoom. Use middle-click+drag or arrows to pan. Touch: Two fingers to drag, one to paint. Click Q to show palette. A/Z to zoom, S/X change brush res. D/C change brush size. W to toggle front/back colors.
+      For a demo try <a href="./?file=MegaZoom">this.</a>
+      </div>
+      
+      <!--<button class="expander">log</button>
+      <div class="collapsible">
+      	<textarea id="log" rows="8"></textarea>
+      </div>-->
+      
+        <button class="expander">+</button>
+        <div class="collapsible">
+         <input type="file" id="load_btn" value="Load"></input>
+         <a type id="save_link" download="painting.bin" href="data:text/plain;charset=utf-8,123456">Download</a>
+         <input id="name_select" type="text" value="painting"></text>
+        </div>
+         
+      
+      <button class="expander">Paint</button>
+      <div class="collapsible">
+          <input id="brushcolor" type="color" value="#FFFFFF" />
+          Brush Size:
+          <Input id="brush-size" type='range' min="1" value="3" max="6" w></Input>
+          Brush Res:
+          <Input id="brush-res" type='range' min="3" value="6" max="8" ></Input>
+          Touch Paint Mode:
+         <input type="checkbox" id="TouchPaintEnable"/>
+      </div>
+      
+      
+      <Button id="zoom_in_btn" class="touch_button" >Zoom +</Button>
+      <Button id="zoom_out_btn" class="touch_button">Zoom -</Button>
+  </div>
+  <div class="emscripten">
+    <progress value="0" max="100" id="progress" height="0" hidden=1></progress>
+  </div>
+  <div class="emscripten_border">
+
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+    <canvas id="placeholder" />
+  </div>
+
+  <script type='text/javascript'>
+    {
+      if(false){
+      (function (){
+      var old = console.log;
+    var logger = document.querySelector('#log');
+    logger.addEventListener('touchstart', function(e){ e.stopPropagation()});
+    logger.value = '';
+    console.log = function (message) {
+      
+      
+        if (typeof message == 'object') {
+          logger.value += (JSON && JSON.stringify ? JSON.stringify(message) : message) + '\n';
+        } else {
+          if(message.startsWith("Rules ") == false)
+          logger.value +=  '\n' + message;
+        }
+        
+        logger.scrollTop = logger.scrollHeight;
+        old(message);
+    }
+    console.error = console.log;
+    console.warn = console.log;
+      })();
+      }
+       
+      
+      var coll = document.getElementsByClassName("expander");
+      var i;
+
+      for (i = 0; i < coll.length; i++) {
+        coll[i].addEventListener("click", function () {
+          this.classList.toggle("active");
+          var content = this.nextElementSibling;
+          if (content.style.display === "inline-block") {
+            content.style.display = "none";
+          } else {
+            content.style.display = "inline-block";
+          }
+        });
+      }
+   }
+    var statusElement = document.querySelector('#status');
+    var progressElement = document.querySelector('#progress');
+    var spinnerElement = document.querySelector('#spinner');
+    var grid = document.querySelector('#controls2')
+
+    loadFileLevel = function (){
+        getFile = function(url){
+		      
+        return new URL(document.URL).searchParams.get('file');
+      }
+      alert(document.URL)
+      var file = getFile(document.URL);
+      
+      if(typeof file === 'string'){
+        const data = fetch("../" + file);
+        data.then(response => response.arrayBuffer()).then(function (buf){
+          var typedArray = new Uint8Array(buf);
+        var numBytes = typedArray.length * typedArray.BYTES_PER_ELEMENT;
+        var ptr = Module._malloc(numBytes);
+        var heapBytes = new Uint8Array(Module.HEAPU8.buffer, ptr, numBytes);
+        heapBytes.set(new Uint8Array(typedArray.buffer));
+        Module.ccall("decodeAsString2", [], ['number', 'length'], [heapBytes.byteOffset, numBytes]);
+
+        });
+      }
+
+    };
+
+    var Module = {
+      preRun: [],
+      postRun: [],
+      loadInitFile: loadFileLevel,
+      print: (function () {
+        var element = document.querySelector('#output');
+        if (element) element.value = ''; // clear browser cache
+        return function (text) {
+          if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+          console.log(text);
+        };
+      })(),
+      printErr: function (text) {
+        if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+        
+        console.error(text);
+      },
+      canvas: (function () {
+        var canvas = document.querySelector('#canvas');
+        canvas.addEventListener("webglcontextlost", function (e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+        return canvas;
+      })(),
+      placeholder: document.querySelector('#placeholder'),
+      brushcolor: document.querySelector('#brushcolor'),
+      setStatus: function (text) {
+        if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+        if (text === Module.setStatus.last.text) return;
+        var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+        var now = Date.now();
+        if (m && now - Module.setStatus.last.time < 30) return; // if this is a progress update, skip it if too soon
+        Module.setStatus.last.time = now;
+        Module.setStatus.last.text = text;
+        if (m) {
+          text = m[1];
+          progressElement.value = parseInt(m[2]) * 100;
+          progressElement.max = parseInt(m[4]) * 100;
+          progressElement.hidden = false;
+          spinnerElement.hidden = false;
+        } else {
+          progressElement.value = null;
+          progressElement.max = null;
+          progressElement.hidden = true;
+          if (!text) spinnerElement.style.display = 'none';
+        }
+        statusElement.innerHTML = text;
+      },
+      totalDependencies: 0,
+      monitorRunDependencies: function (left) {
+        this.totalDependencies = Math.max(this.totalDependencies, left);
+        Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+      }
+    };
+    Module.setStatus('Downloading...');
+    window.onerror = function (event) {
+      // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
+      Module.setStatus('Exception thrown, see JavaScript console');
+      //alert(event)
+      spinnerElement.style.display = 'none';
+      Module.setStatus = function (text) {
+        if (text) Module.printErr('[post-exception status] ' + text);
+      };
+    };
+    colorWell = document.querySelector("#brushcolor");
+
+    colorWell.select();
+    function updateFirst(e) {
+      Module.ccall("setColor", [], ['string'], [colorWell.value]);
+    }
+    colorWell.addEventListener("input", updateFirst, false);
+    clicklink = function (e) {
+      var stringv = Module.ccall("encodeAsString", 'string', [], []);
+      document.querySelector("#save_link").download = document.querySelector("#name_select").value;
+      document.querySelector("#save_link").href = "data:text/plain;charset=utf-8," + stringv;
+    }
+
+
+    document.querySelector("#save_link").addEventListener("click", clicklink, false)
+
+    loadFileAsString = function (evt) {
+
+      var reader = new FileReader();
+      var file = evt.target.files[0];
+      reader.onload = function (e) {
+        var typedArray = new Uint8Array(e.target.result);
+        var numBytes = typedArray.length * typedArray.BYTES_PER_ELEMENT;
+        var ptr = Module._malloc(numBytes);
+        var heapBytes = new Uint8Array(Module.HEAPU8.buffer, ptr, numBytes);
+        heapBytes.set(new Uint8Array(typedArray.buffer));
+        Module.ccall("decodeAsString2", [], ['number', 'number'], [heapBytes.byteOffset, numBytes]);
+      }
+      reader.readAsArrayBuffer(file);
+    }
+
+  </script>
+  <script async type="text/javascript" src="index.js"></script>
+</body>
+
+</html>
