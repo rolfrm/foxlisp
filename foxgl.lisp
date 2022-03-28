@@ -25,6 +25,7 @@
 (define blit-quad (load-wrap foxgl2 "quad"))
 
 (define mat-mul (load-wrap foxgl2 "lmat4_mul" 2))
+(define mat4:rotate (load-wrap foxgl2 "lmat4_rotate" 3))
 (define mat4-print (load-wrap foxgl2 "lmat4_print" 1))
 
 (define blit3d-init (load-wrap foxgl2 "lblit_init" 0))
@@ -38,6 +39,7 @@
 (define foxgl:framebuffer-texture (load-wrap foxgl2 "lblit_framebuffer_texture" 1))
 (define foxgl:bind-texture (load-wrap foxgl2 "lblit_bind_texture" 1))
 (define foxgl:blit-text (load-wrap foxgl2 "lblit_blit_text" 2))
+(define foxgl:blend (load-wrap foxgl2 "lblit_blend" 1))
  
 (define foxgl-get-events (load-wrap foxgl2 "foxgl_get_events" 0))
 
@@ -172,21 +174,40 @@
            (push! funcs (lambda () (set! color prev-color)))
            )
          
-         (let ((rgb (plookup (cdr model) ':rgb)))
+         (match rgb (plookup (cdr model) ':rgb)
            (set! color rgb)
-           ))
+           )
+         (match rgb (plookup (cdr model) ':rgba)
+           (set! color rgb)
+           )
+         )
+       (when (eq sym 'view)
+         
+         )
+       
        (when (eq sym 'transform)
          (let ((prev-tform transform))
            (push! funcs (lambda () (set! transform prev-tform))))
          (match tlate (plookup (cdr model) ':translate)
                 (set! transform (mat-mul (or transform (mat4-identity))
                                          (mat4-translation (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))))
+
          (match scale (plookup (cdr model) ':scale)
                 
                 (set! transform (mat-mul (or transform (mat4-identity))
                                          (mat4-scale (car scale) (cadr scale) (or (caddr scale) 1.0))))
                 
-                ))
+                )
+         (match rotation (plookup (cdr model) ':rotate)
+                
+                (set! transform
+                      (mat-mul (or transform (mat4-identity))
+                               (mat4:rotate (car rotation)
+                                            (or (cadr rotation) 0.0)
+                                            (or (caddr rotation) 0.0))))
+                
+                )
+         )
        (when (eq sym 'unit-square)
          (blit3d-color color)
          (blit3d-transform (or transform (mat4-identity)))
@@ -210,13 +231,11 @@
               (set! fb (load-framebuffer model (or s '(100 100))))))
           (foxgl:bind-framebuffer fb)
           (set! transform nil)
-          
           (push! funcs (lambda ()
                          (foxgl:unbind-framebuffer fb)
-                         ;(println (foxgl:framebuffer-texture fb))
                          (set! transform prev-transform)
                          (unless square-buffers
-                           (set! test-tex (load-texture-from-path "../iron/duck.png"))
+   
                            (set! square-buffers
                                  (list
                                   (load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
@@ -224,10 +243,11 @@
                            
                            )
                          (foxgl:bind-texture (foxgl:framebuffer-texture fb))
-                         ;(foxgl:bind-texture test-tex)
+                         (blit3d-color color)
                          (blit3d-transform (or transform (mat4-identity)))
+                         (foxgl:blend t)
                          (blit-polygon square-buffers)
-                         
+                         (foxgl:blend nil)
                          (foxgl:bind-texture nil)
                          
                          ))
@@ -238,6 +258,7 @@
                 (let ((r (hashtable-ref polygon-cache (cdr model))))
                   
                   (unless r
+                    
                     (println (list 'new-poly r))
                     (set! r (cons 'poly (load-polygon (list-to-array poly))))
                     (hashtable-set polygon-cache (cdr model) r)

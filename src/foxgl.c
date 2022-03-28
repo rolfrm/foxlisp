@@ -1,6 +1,7 @@
 #include <iron/full.h>
 #include <iron/gl.h>
 #include "foxlisp.h"
+#include <GL/gl.h>
 
 lisp_value rect2(lisp_value r, lisp_value g,lisp_value b,lisp_value a){
   blit_rectangle2(r.rational,g.rational,b.rational,a.rational);
@@ -494,6 +495,19 @@ lisp_value lmat4_mul(lisp_value a, lisp_value b){
   error_print("Invalid number of rows and columns");
   return a;
 }
+lisp_value mat4_to_lisp (mat4 a);
+lisp_value lmat4_rotate(lisp_value x, lisp_value y, lisp_value z){
+  mat4 m1 = mat4_identity();
+  if(is_nil(y)){
+    m1 = mat4_rotate_Z(m1, z.rational);
+  }else{
+    m1 = mat4_rotate_X(m1, x.rational);
+    m1 = mat4_rotate_Y(m1, y.rational);
+    m1 = mat4_rotate_Z(m1, z.rational);
+  }
+  //mat4_print(m1);printf(" %f %f %f \n", x.rational, y.rational, z.rational);
+  return mat4_to_lisp(m1);
+}
 
 mat4 lisp_to_mat4(lisp_value a){
   type_assert(a, LISP_VECTOR);
@@ -509,6 +523,15 @@ mat4 lisp_to_mat4(lisp_value a){
 
   error_print("Invalid number of rows and columns");
   return mat4_identity();
+}
+lisp_value make_vector(lisp_value len, lisp_value _default);
+
+lisp_value mat4_to_lisp (mat4 a){
+  lisp_value vec = make_vector(integer(16), (lisp_value){.type = LISP_FLOAT32, .rational = 0.0f});
+  float * data = &a;
+  mat4 * v = vec.vector->data;
+  *v = a;
+  return vec;
 }
 
 
@@ -627,7 +650,6 @@ lisp_value blit_polygon (lisp_value val){
       val = val.cons->cdr;
       i++;
     }
-    //printf("%i \n", i);
     blit3d_polygon_blit2(blit3d_current_context, poly2, i);
   
     return nil;
@@ -734,6 +756,8 @@ lisp_value lblit_create_framebuffer (lisp_value width, lisp_value height){
   b->width = width.integer;
   b->height = height.integer;
   b->channels = 4;
+  b->mode = IMAGE_MODE_NONE;
+ 
   blit_create_framebuffer(b);
   return native_pointer(b);
 }
@@ -742,6 +766,8 @@ lisp_value lblit_bind_framebuffer(lisp_value fb){
   //printf("Use fb\n");
   type_assert(fb, LISP_NATIVE_POINTER);
   blit_use_framebuffer(fb.native_pointer);
+  glClearColor(0,0,0,0);
+  glClear(GL_COLOR_BUFFER_BIT);
   return nil;
 }
 
@@ -785,4 +811,11 @@ lisp_value lblit_blit_text(lisp_value text, lisp_value matrix){
   blit3d_text(blit3d_current_context, mat4_identity(), *m1, text.string);
 
   return nil;
+}
+
+lisp_value lblit_blend(lisp_value blend){
+  if(!is_nil(blend))
+    glEnable(GL_BLEND);
+  else
+    glDisable(GL_BLEND);
 }
