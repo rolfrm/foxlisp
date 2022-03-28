@@ -15,10 +15,11 @@ CFLAGS = -Isrc/  -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gn
 all: libmicroio.a
 all: $(TARGET)
 
-$(TARGET): $(LIB_OBJECTS) gc.o foxgl.so libiron.so 
+$(TARGET): $(LIB_OBJECTS) gc.o foxgl.so
 	$(CC) $(LDFLAGS) $(LIB_OBJECTS) gc.o $(LIBS)  -o $(TARGET)
 
-iron/libiron.so:
+.FORCE:
+iron/libiron.so: .FORCE
 	make -C iron
 
 libiron.so: iron/libiron.so
@@ -28,9 +29,9 @@ libmicroio/libmicroio.a:
 	make -C libmicroio
 
 libmicroio.bc:
-	emcc -Ixlibmicroio/include -c libmicroio/src/microio.c -o libmicroio.bc
+	emcc -Ilibmicroio/include -c libmicroio/src/microio.c -o libmicroio.bc
 
-foxgl.so: src/foxgl.c src/tcp.c
+foxgl.so: src/foxgl.c src/tcp.c libiron.so
 	gcc src/foxgl.c src/tcp.c -I.. -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
@@ -40,7 +41,7 @@ gc.bc: gc/bdwgc/extra/gc.c
 	emcc -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.bc -O3 -Igc/bdwgc/include
 
 index.js: $(BCOBJECTS) gc.bc libmicroio.bc
-	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) -s ASYNCIFY -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=4 libmicroio.bc gc.bc -o $@ 
+	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS)  --preload-file fox2.lisp -s ASYNCIFY -s USE_PTHREADS=1 -s PTHREAD_POOL_SIZE=4 libmicroio.bc gc.bc -o $@ 
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .

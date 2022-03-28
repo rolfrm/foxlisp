@@ -159,4 +159,4 @@
 (defun swank:start-server ()
   (swank-make-server *swank:server-port* nil))
 
-;(thread-start swank:start-server)
+(thread-start swank:start-server)

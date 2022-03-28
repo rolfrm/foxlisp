@@ -1,9 +1,6 @@
 #include <iron/full.h>
 #include <iron/gl.h>
 #include "foxlisp.h"
-void white_rect(){
-  blit_rectangle2(1.0,1.0,1.0,1.0);
-}
 
 lisp_value rect2(lisp_value r, lisp_value g,lisp_value b,lisp_value a){
   blit_rectangle2(r.rational,g.rational,b.rational,a.rational);
@@ -591,6 +588,7 @@ lisp_value lblit_init(){
   if(blit3d_current_context == NULL)
 	 blit3d_current_context = blit3d_context_new();
   blit3d_context_load(blit3d_current_context);
+  //glDisable(GL_BLEND);
   return nil;
 }
 
@@ -621,6 +619,19 @@ lisp_value load_polygon (lisp_value val){
 }
 
 lisp_value blit_polygon (lisp_value val){
+  if(val.type == LISP_CONS){
+    blit3d_polygon * poly2[10];
+    int i = 0;
+    while(is_nil(val) == false){
+      poly2[i] = val.cons->car.native_pointer;
+      val = val.cons->cdr;
+      i++;
+    }
+    //printf("%i \n", i);
+    blit3d_polygon_blit2(blit3d_current_context, poly2, i);
+  
+    return nil;
+  }
   type_assert(val, LISP_NATIVE_POINTER);
   blit3d_polygon * poly = val.native_pointer;
   blit3d_polygon_blit2(blit3d_current_context, &poly, 1);
@@ -671,6 +682,7 @@ lisp_value foxgl_get_events(){
       case EVT_MOUSE_BTN_UP:
         levt = new_cons(get_symbol("mouse-button-up"),
                         new_cons(integer(evt.mouse_btn.button), nil));
+        break;
       case EVT_KEY_DOWN:
       case EVT_KEY_UP:
       case EVT_KEY_REPEAT:
@@ -682,7 +694,8 @@ lisp_value foxgl_get_events(){
         
         lisp_value keyevt = nil;
         if(strlen(keystr) >0){
-          keyevt = new_cons(get_symbol("key"), new_cons(get_symbol(keystr), nil));
+          levt = new_cons(get_symbol("char"), new_cons(get_symbol(keystr), nil));
+          break;
         }
         else if(evt.key.key != -1){
           keyevt = new_cons(get_symbol("key"), new_cons(integer(evt.key.key), nil));
@@ -703,4 +716,73 @@ lisp_value foxgl_get_events(){
     }
   }
   return evts;
+}
+
+void foxgl_register(){
+  lisp_register_native("blit-rect", 4, rect2);
+}
+
+//(define foxgl:create-framebuffer (load-wrap foxgl2 "lblit_create_framebuffer"))
+//(define foxgl:bind-framebuffer (load-wrap foxgl2 "lblit_bind_framebuffer"))
+//(define foxgl:destroy-framebuffer (load-wrap foxgl2 "lblit_destroy_framebuffer"))
+//(define foxgl:framebuffer-texture (load-wrap foxgl2 "lblit_framebuffer_texture"))
+
+lisp_value lblit_create_framebuffer (lisp_value width, lisp_value height){
+  type_assert(width, LISP_INTEGER);
+  type_assert(height, LISP_INTEGER);
+  blit_framebuffer * b = lisp_malloc(sizeof(*b));
+  b->width = width.integer;
+  b->height = height.integer;
+  b->channels = 4;
+  blit_create_framebuffer(b);
+  return native_pointer(b);
+}
+
+lisp_value lblit_bind_framebuffer(lisp_value fb){
+  //printf("Use fb\n");
+  type_assert(fb, LISP_NATIVE_POINTER);
+  blit_use_framebuffer(fb.native_pointer);
+  return nil;
+}
+
+lisp_value lblit_unbind_framebuffer(lisp_value fb){
+  //printf("Unuse fb\n");
+  type_assert(fb, LISP_NATIVE_POINTER);
+  blit_unuse_framebuffer(fb.native_pointer);
+  return nil;
+}
+
+lisp_value lblit_destroy_framebuffer(lisp_value fb){
+  type_assert(fb, LISP_NATIVE_POINTER);
+  blit_delete_framebuffer(fb.native_pointer);
+  return nil;
+}
+
+lisp_value lblit_framebuffer_texture(lisp_value fb){
+  type_assert(fb, LISP_NATIVE_POINTER);
+  texture * tx = lisp_malloc(sizeof(*tx));
+  *tx = blit_framebuffer_as_texture(fb.native_pointer);
+  return native_pointer(tx);
+}
+
+//blit3d_bind_texture(blit3d_context * ctx, texture * tex){
+lisp_value lblit_bind_texture(lisp_value tex){
+  if(is_nil(tex)){
+    blit3d_bind_texture(blit3d_current_context, NULL);
+    return nil;
+  }
+  type_assert(tex, LISP_NATIVE_POINTER);
+  
+  blit3d_bind_texture(blit3d_current_context, tex.native_pointer);
+  return nil;
+}
+
+lisp_value lblit_blit_text(lisp_value text, lisp_value matrix){
+  type_assert(text, LISP_STRING);
+  type_assert(matrix, LISP_VECTOR);
+  mat4 * m1 = matrix.vector->data;
+
+  blit3d_text(blit3d_current_context, mat4_identity(), *m1, text.string);
+
+  return nil;
 }

@@ -763,7 +763,6 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  var it = f->code;
 		  lisp_value ret = nil;
 		  while(it.type != LISP_NIL){
-			 //printf("-->");println(car(it));
 			 ret = lisp_eval(function_scope, car(it));
 			 it = cdr(it);
 		  }

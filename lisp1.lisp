@@ -35,6 +35,11 @@
        (set lst (cdr lst))  
        ))
 
+(defun map (lst f2)
+  (when lst
+    (cons (f2 (car lst))
+          (map (cdr lst) f2))))
+
 (defun do-times (n f2)
   (let ((x 0))
     (loop (< x n)
@@ -215,6 +220,8 @@
   (if (cons? var)
       `(defun ,(car var) ,(build-arg-list (cdr var)) ,@value)
       `(def ,var ,(car value))))
+
+(define hashtable-set! hashtable-set)
 
 (define libc (load-lib "libc.so.6"))
 (define fopen (load-alien libc "fopen" native-null-pointer (list "pathname" "mode")))

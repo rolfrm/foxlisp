@@ -31,6 +31,14 @@
 (define blit3d-square (load-wrap foxgl2 "lblit_square2" 0))
 (define blit3d-color (load-wrap foxgl2 "lblit_color" 1))
 (define blit3d-transform (load-wrap foxgl2 "lblit_transform" 1))
+(define foxgl:create-framebuffer (load-wrap foxgl2 "lblit_create_framebuffer" 2))
+(define foxgl:bind-framebuffer (load-wrap foxgl2 "lblit_bind_framebuffer" 1))
+(define foxgl:unbind-framebuffer (load-wrap foxgl2 "lblit_unbind_framebuffer" 1))
+(define foxgl:destroy-framebuffer (load-wrap foxgl2 "lblit_destroy_framebuffer" 1))
+(define foxgl:framebuffer-texture (load-wrap foxgl2 "lblit_framebuffer_texture" 1))
+(define foxgl:bind-texture (load-wrap foxgl2 "lblit_bind_texture" 1))
+(define foxgl:blit-text (load-wrap foxgl2 "lblit_blit_text" 2))
+ 
 (define foxgl-get-events (load-wrap foxgl2 "foxgl_get_events" 0))
 
 (define load-polygon (load-wrap foxgl2 "load_polygon" 1))
@@ -130,14 +138,28 @@
     m))
 
 (define render-model nil)
-
+(define get-framebuffer nil)
+(define load-framebuffer nil)
 (let ((color '(1 1 1 1))
       (transform nil)
+      (framebuffer-cache (make-hashtable t nil))
+      
       (polygon-cache (make-hashtable t nil))
       (cache-delete (lambda (x)
                       (println 'delete-poly)
                       (delete-polygon (cdr x))))
+      (square-buffers nil)
+      (test-tex nil)
       )
+  (set! get-framebuffer
+        (lambda (model)
+          (hashtable-ref framebuffer-cache model)))
+  (set! load-framebuffer
+        (lambda (model size)
+          (let ((bf (foxgl:create-framebuffer (car size) (cadr size))))
+            (hashtable-set! framebuffer-cache model bf)
+            bf)))
+                  
   (set!
    render-model
    (lambda (model)
@@ -172,6 +194,45 @@
          )
       (when (eq sym 'print)
         (println (list (cdr model) transform color)))
+      (when (eq sym 'text)
+        (blit3d-color color)
+        (blit3d-transform (or transform (mat4-identity)))
+        (foxgl:blit-text (cadr model)
+                         (mat-mul (mat4-scale 0.02 0.02 1.0)
+                         (or transform (mat4-identity))))
+        )
+      (when (eq sym 'flat)
+        (let ((fb (get-framebuffer model))
+              (prev-transform transform)
+              )
+          (when (null? fb)
+            (let ((s (plookup (cdr model) :size)))
+              (set! fb (load-framebuffer model (or s '(100 100))))))
+          (foxgl:bind-framebuffer fb)
+          (set! transform nil)
+          
+          (push! funcs (lambda ()
+                         (foxgl:unbind-framebuffer fb)
+                         ;(println (foxgl:framebuffer-texture fb))
+                         (set! transform prev-transform)
+                         (unless square-buffers
+                           (set! test-tex (load-texture-from-path "../iron/duck.png"))
+                           (set! square-buffers
+                                 (list
+                                  (load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
+                                  (load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
+                           
+                           )
+                         (foxgl:bind-texture (foxgl:framebuffer-texture fb))
+                         ;(foxgl:bind-texture test-tex)
+                         (blit3d-transform (or transform (mat4-identity)))
+                         (blit-polygon square-buffers)
+                         
+                         (foxgl:bind-texture nil)
+                         
+                         ))
+          )
+        )
        (when (eq sym 'polygon)
          (match poly (plookup (cdr model) ':2d-triangle-strip)
                 (let ((r (hashtable-ref polygon-cache (cdr model))))
@@ -180,7 +241,7 @@
                     (println (list 'new-poly r))
                     (set! r (cons 'poly (load-polygon (list-to-array poly))))
                     (hashtable-set polygon-cache (cdr model) r)
-                    ;(register-finalizer r cache-delete)
+                    (register-finalizer r cache-delete)
                     )
                   (blit3d-color color)
                   (blit3d-transform (or transform (mat4-identity)))
@@ -211,11 +272,6 @@
 
 (thread-join (thread-start (lambda () (println 'thread!))))
 (thread-join (thread-start (lambda () (println 'thread!))))
-
-(define add (lambda (a b) (+ a b)))
-(defun add (a b) (+ a b))
-
-(define (add a b) (+ a b))
 
 (let ((srv (tcp-listen 8893))
       (cli (tcp-connect "127.0.0.1" 8893)))

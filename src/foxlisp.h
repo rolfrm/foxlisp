@@ -164,6 +164,8 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
 
 lisp_scope * lisp_context_get_root_scope();
 
+void lisp_register_value(const char * name, lisp_value value);
+void lisp_register_native(const char * name, int nargs, void * fptr);
 // macros
 #define POP(x)pop(&x)
 
