@@ -248,6 +248,8 @@
 (assert (equals? (test-def2 5) '(10 5)))
                                         ;(gc-collect)
 
+(assert (eq (- 0 5) -5))
+
 (println "Tests Passed")
 
 

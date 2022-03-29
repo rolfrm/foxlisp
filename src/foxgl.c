@@ -509,6 +509,25 @@ lisp_value lmat4_rotate(lisp_value x, lisp_value y, lisp_value z){
   return mat4_to_lisp(m1);
 }
 
+#define TYPE_ASSERT(val, tp) type_assert(val, tp);
+
+lisp_value lmat4_perspective(lisp_value fov, lisp_value aspect, lisp_value near, lisp_value far){
+  TYPE_ASSERT(fov, LISP_RATIONAL);
+  TYPE_ASSERT(aspect, LISP_RATIONAL);
+  TYPE_ASSERT(near, LISP_RATIONAL);
+  TYPE_ASSERT(far, LISP_RATIONAL);
+  mat4 p = mat4_perspective(fov.rational, aspect.rational, near.rational, far.rational);
+  return mat4_to_lisp(p);
+}
+           
+lisp_value lmat4_orthographic(lisp_value w, lisp_value h, lisp_value z){
+  TYPE_ASSERT(w, LISP_RATIONAL);
+  TYPE_ASSERT(h, LISP_RATIONAL);
+  TYPE_ASSERT(z, LISP_RATIONAL);
+  mat4 p = mat4_ortho(-w.rational, w.rational, -h.rational, h.rational, -z.rational, z.rational);
+  return mat4_to_lisp(p);
+}
+
 mat4 lisp_to_mat4(lisp_value a){
   type_assert(a, LISP_VECTOR);
   type_assert(a.vector->default_value, LISP_FLOAT32);

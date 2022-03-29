@@ -67,6 +67,8 @@
 (defun symbol-macro? (s) (macro? (symbol-value s) 'FUNCTION_MACRO))
 (defun symbol-procedure? (s) (procedure? (symbol-value s)))
 (defun unbound? (s) (not (bound? s)))
+(define string=? string=)
+
 (defun last (lst)
   (if (cdr lst) (last (cdr lst)) (car lst)))
 
@@ -135,6 +137,10 @@
 
 (defun caddr (l)
   (car (cddr l)))
+
+(defun cadddr (l)
+  (car (cdddr l)))
+
 (defun caar (x)
   (car (car x)))
 (defun cdar (x)

@@ -26,6 +26,8 @@
 
 (define mat-mul (load-wrap foxgl2 "lmat4_mul" 2))
 (define mat4:rotate (load-wrap foxgl2 "lmat4_rotate" 3))
+(define mat4:perspective (load-wrap foxgl2 "lmat4_perspective" 4))
+(define mat4:orthographic (load-wrap foxgl2 "lmat4_orthographic" 3))
 (define mat4-print (load-wrap foxgl2 "lmat4_print" 1))
 
 (define blit3d-init (load-wrap foxgl2 "lblit_init" 0))
@@ -182,6 +184,21 @@
            )
          )
        (when (eq sym 'view)
+         (match p (plookup (cdr model) :perspective)
+                (let ((fov (car p))
+                      (aspect (cadr p))
+                      (near (caddr p))
+                      (far (cadddr p))
+                      (prev-tform transform))
+                  (set! transform (mat4:perspective fov aspect near far))
+                  (push! funcs (lambda () (set! transform prev-tform)))))
+         (match p (plookup (cdr model) :orthographic)
+                (let ((w (car p))
+                      (h (cadr p))
+                      (z (caddr p))
+                      (prev-tform transform))
+                  (set! transform (mat4:orthographic w h z))
+                  (push! funcs (lambda () (set! transform prev-tform)))))
          
          )
        
