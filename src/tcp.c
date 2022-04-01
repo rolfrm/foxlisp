@@ -90,14 +90,13 @@ lisp_value lisp_read(lisp_value item, lisp_value buffer){
     printf("NO FD\n");
 	 return nil;
   }
-  ssize_t r = read(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type));
-  printf("READ %i\n", r);
+  ssize_t r = read(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type));;
   if(r == -1) {
-    
     return nil;
   }
   return integer(r);
 }
+
 
 lisp_value lisp_write(lisp_value item, lisp_value buffer){
   var fd = get_fd(item);
@@ -132,8 +131,42 @@ lisp_value thread_join(lisp_value func){
 
 lisp_value lisp_sleep(lisp_value time){
   var t = lisp_rational(time).rational;
-  printf("Sleeping %f\n", t);
-
-  iron_usleep((int)(t * 100000.0));
+  
+  iron_usleep((int)(t * 1000000.0));
   return nil;
+}
+
+
+lisp_value foxgl_create_mutex(){
+  pthread_mutex_t *lock = lisp_malloc(sizeof(*lock));
+  *lock = (pthread_mutex_t){0};
+  pthread_mutex_init(lock, NULL);
+  return new_cons(get_symbol("mutex"), native_pointer(lock));
+}
+
+lisp_value foxgl_lock_mutex(lisp_value lock){
+  type_assert(lock, LISP_CONS);
+  type_assert(cdr(lock), LISP_NATIVE_POINTER);
+  
+  pthread_mutex_t * l = lock.native_pointer;
+  pthread_mutex_lock(l);
+  return t;
+}
+
+
+lisp_value foxgl_unlock_mutex(lisp_value lock){
+  type_assert(lock, LISP_CONS);
+  type_assert(cdr(lock), LISP_NATIVE_POINTER);
+  
+  pthread_mutex_t * l = lock.native_pointer;
+  pthread_mutex_lock(l);
+  return t;
+}
+
+lisp_value foxgl_destroy_mutex(lisp_value lock){
+  type_assert(lock, LISP_CONS);
+  type_assert(cdr(lock), LISP_NATIVE_POINTER);
+  pthread_mutex_t * l = lock.native_pointer;
+  pthread_mutex_destroy(l);
+ return t;
 }

@@ -5,6 +5,7 @@
                         `(def ,name  (macro ,args ,@body))))
 (defmacro define (var value)
   `(def ,var ,value))
+(define defvar define)
 
 (def list (lambda (&rest x) x))
 (def begin progn)
@@ -13,6 +14,7 @@
 (def eq =)
 (def #f ())
 (defun not (x) (= x nil))
+
 (define append2 
     (lambda (lst)
       (if (not (cdr lst))
@@ -43,8 +45,9 @@
 (defun do-times (n f2)
   (let ((x 0))
     (loop (< x n)
-       (set x (+ 1 x))
-       (f2 x))))
+          (f2 x)
+          (set x (+ 1 x))
+          )))
 
 (defun apply (f args)
   (eval (cons f args)))
@@ -61,11 +64,11 @@
 (defun integer? (v) (= (type-of v) 'INTEGER))
 (defun rational? (v) (= (type-of v) 'RATIONAL))
 (defun string? (v) (= (type-of v) 'STRING))
-(defun symbol? (p) (= 'SYMBOL (type-of p))) 
+(defun symbol? (p) (= (type-of p) 'SYMBOL)) 
 (defun macro? (s) (eq (type-of s) 'FUNCTION_MACRO))
 (defun procedure? (s) (eq (type-of s) 'FUNCTION))
-(defun symbol-macro? (s) (macro? (symbol-value s) 'FUNCTION_MACRO))
-(defun symbol-procedure? (s) (procedure? (symbol-value s)))
+(defun symbol-macro? (s) (and (bound? s t) (macro? (symbol-value s) 'FUNCTION_MACRO)))
+(defun symbol-procedure? (s) (and (bound? s t) (procedure? (symbol-value s))))
 (defun unbound? (s) (not (bound? s)))
 (define string=? string=)
 
@@ -101,7 +104,7 @@
 
 
 (defmacro assert (test text)
-  `(unless ,test (panic (cons ,(if text text "assertion failed") ',test)))) 
+  `(unless ,test (panic ,(or text "assertion failed"))))
 
 (defmacro assert-not (test text)
   `(when ,test (panic (cons ,(if text text "assertion failed") ',test)))) 
@@ -227,6 +230,30 @@
       `(defun ,(car var) ,(build-arg-list (cdr var)) ,@value)
       `(def ,var ,(car value))))
 
+(defun reverse! (lst)
+  (let ((head lst))
+    (set! lst (cdr lst))
+    (set-cdr! head nil)
+    (while lst
+           (let ((new-head lst))
+             (set! lst (cdr new-head))
+             (when new-head
+               (set-cdr! new-head head)
+               )
+             (set! head new-head)
+             )
+           )
+    head))
+
+(defun take (f list)
+  (let ((result nil))
+    (loop list
+          (when (f (car list))
+            (set! result (cons (car list) result)))
+          (set! list (cdr list)))
+    (reverse! result)))
+
+
 (define hashtable-set! hashtable-set)
 
 (define libc (load-lib "libc.so.6"))
@@ -238,3 +265,20 @@
 
 (define malloc (load-alien libc "malloc" native-null-pointer (list (integer 0))))
 (define free (load-alien libc "free" nil (list native-null-pointer)))
+
+(define lisp:descriptions (make-hashtable))
+
+(defun lisp:write-doc (item signature)
+  (hashtable-set! lisp:descriptions item signature))
+
+(defun lisp:describe (item)
+  (println (list 'describe item))
+  (hashtable-ref lisp:descriptions item))
+
+(lisp:write-doc make-hashtable '(make-hashtable weak-keys weak-values))
+(lisp:write-doc hashtable-set! '(hashtable-set! hashtable key value))
+(lisp:write-doc hashtable-ref '(hashtable-ref hashtable key))
+(lisp:write-doc defun '(defun name args &rest body))
+(lisp:write-doc define '(define name value))
+(lisp:write-doc vector-set! '(vector-set! vector index value))
+(lisp:write-doc make-vector '(make-vector count default-value ))

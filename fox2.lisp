@@ -2,6 +2,8 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 
+;(thread-start swank:start-server)
+
 (define win (create-window (integer 800) (integer 600)))
 (set-title win "Hello 2")
 (make-current win)
@@ -26,7 +28,7 @@
       (hashtable-set ht2 item1 item2)
       ht2
       )
-    ))
+    )) 
 
 (define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
 (define trinagle '(polygon :2d-triangle-strip (0 0 0.5 1 1 0)))
@@ -56,6 +58,41 @@
        ,square-model)
       ,square-model))
 
+(defun fox (time jump)
+  `(transform :scale (0.2 0.2) :translate (,(- time 0.25) ,(+ -0.8 (sin (* 3.14 (or jump 0.0)))) -0.25)
+    :rotate (0 0 ,(* 0.5 (sin (* time 5.0))))
+    (transform
+     :translate (-1.0 2.0)
+     (color :rgb (0.9 0.5 0.2)
+      (transform :translate (0.5 -0.5) :scale (1 -1.0)
+                                        ;(color ;:rgb (0 0 0)
+       (transform :scale (0.2 1.25)
+        (transform :translate (0 0)
+         ,square-model)
+        (transform :translate (4 0) 
+         ,square-model))
+                                        ;)
+       ,square-model))
+     
+     (color :rgb (0.9 0.9 0.9)
+      (transform :translate (0.5 -0.5) :scale (1 -1.0) ,trinagle))
+     (color :rgb (0.9 0.5 0.2)
+      (polygon :2d-triangle-strip (0 0 1 -1 2 0))
+      (polygon :2d-triangle-strip (0 0 0.2 0.4 0.4 0 ))
+      (transform :translate (1.6 0) :scale (0.4 0.4) ,trinagle)
+      )
+
+     (color :rgb (0.8 0.3 0.2)
+      (transform :translate (0.5 -0.5) :scale (1 -0.5)
+       ,trinagle))
+     (color :rgb (0 0 0)
+      (transform :scale (0.3 -0.3) :translate (0.5 -0.1)
+       ,trinagle))
+     (color :rgb (0 0 0)
+      (transform :scale (0.3 -0.3) :translate (1.2 -0.1)
+       ,trinagle))
+     )))
+
 (defun fmt (&rest args) "")
 
 
@@ -71,34 +108,71 @@
       )))
 (load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
 
+(define sample1 (make-vector (* 2 4096) (float32 0)))
+(do-times (* 2 4096)
+  (lambda (i) (vector-set! sample1  i (float32 (sin (* 0.02 (rational i)))))))
+
+(println sample1)
+(define sample1-loaded (audio:load-sample sample1))
 (define txt nil)
+(define jump nil)
+
+(defun sine-instrument (freq phase)
+  (sin (* freq phase)))
+
+(define song '(melody 0 2 4 8))
+(define song-buffer (make-vector (* 44100 3) (float32)))
+(progn
+  (while nil
+         (process-song song song-buffer 44100 0.0 1.0)
+         (println 'done))
+  ;;(set! sample1-loaded (audio:load-sample song-buffer))
+ ;(println song-buffer)
+ )
+
 (defun render-scene ()
-  
+  ;;(sleep 0.1)
+  (audio:update)
+  (when (and jump (< jump 1.0))
+    (println jump)
+    (incf jump 0.05))
+  (when (and jump (> jump 1.0))
+    (set! jump nil))
   
   (let ((evts (poll-events2)))
     (map! (lambda (x)
             (when (eq (car x) 'key-down)
-              (print x)))
+              (match key (plookup (cdr x) 'scankey)
+                     (when (and (eq key 65) (null? jump))
+                       (set! jump 0.0)
+                       (audio:play-sample (println sample1-loaded))
+                       (println 'space)))))
 
           evts 
           )
     (when evts
-                                        ;(println evts)
+      
+      ;(println evts)
       ))
   
   (render-model
+   ;asd
    `(root
      (color :rgb ,bg-color
       (transform :translate (-1 -1) :scale (2 2) ,square-model))
      (color :rgb (0.7 0.8 1.0)
       (transform :translate (-1 0.05) :scale (2 2) ,square-model))
+
+     ;; sun
      (transform :translate ( 0.0 0.0 0.0) 
       (color :rgb (1.0 1.0 0.0)
       
-       (transform :translate (0.53 0.53) :scale (0.15 0.15) ,square-model)
+       (transform :translate (0.53 0.57) :scale (0.15 0.15) ,square-model)
+       
        ))
 
-     (transform :translate (,(* time -0.1) 0.0 0.0) 
+     (transform :translate (,(* time -0.1) 0.0 0.0)
+      ;; cloud
      (color :rgb (1.0 1.0 1.0)
       
       (transform :translate (0.53 0.53) :scale (0.15 0.15) ,square-model)
@@ -124,57 +198,28 @@
         ,square-model))
       
       
-      (transform :scale (0.2 0.2) :translate (,(- time 0.25) -0.8 -0.25)
-       :rotate (0 0 ,(* 0.5 (sin (* time 5.0))))
-       (transform
-        :translate (-1.0 2.0)
-       (color :rgb (0.9 0.5 0.2)
-        
-        (transform :translate (0.5 -0.5) :scale (1 -1.0)
-                                        ;(color ;:rgb (0 0 0)
-         (transform :scale (0.2 1.25)
-          (transform :translate (0 0)
-           ,square-model)
-          (transform :translate (4 0)
-           ,square-model))
-                                        ;)
-         ,square-model))
-       
-       (color :rgb (0.9 0.9 0.9)
-        (transform :translate (0.5 -0.5) :scale (1 -1.0) ,trinagle))
-       (color :rgb (0.9 0.5 0.2)
-        (polygon :2d-triangle-strip (0 0 1 -1 2 0))
-        (polygon :2d-triangle-strip (0 0 0.2 0.4 0.4 0 ))
-        (transform :translate (1.6 0) :scale (0.4 0.4) ,trinagle)
-        )
-
-       (color :rgb (0.8 0.3 0.2)
-        (transform :translate (0.5 -0.5) :scale (1 -0.5)
-         ,trinagle))
-       (color :rgb (0 0 0)
-        (transform :scale (0.3 -0.3) :translate (0.5 -0.1)
-         ,trinagle))
-       (color :rgb (0 0 0)
-        (transform :scale (0.3 -0.3) :translate (1.2 -0.1)
-         ,trinagle))
-       ))
+      ,(fox time jump)
       )
       )
      (color :rgb (1 1 1 0.9)
+      ;; <trasform translate="(0.6, 0.6)" scale="(0.5, 0.5)
+      ;;
+      
       (transform :translate (0.6 -0.6) :scale (0.4 0.4)
        (transform :rotate (0.0 ,time ,time)
         (transform :translate (-0.5 -0.5)
          (flat :size (256 256)
           (color :rgb (1 1 1 0.5)
-           (transform :scale (0.8 0.8) (polygon :2d-triangle-strip (-1 -1 -1 1 1 -1 1 1))))
+           (transform :scale (0.8 0.8)
+            (polygon :2d-triangle-strip (-1 -1 -1 1 1 -1 1 1))))
           (color :rgb (1 1 0) (polygon :2d-triangle-strip (0 0 0.5 1 1 0)))
+          (color :rgb (0 1 1) (polygon :2d-triangle-strip (0 0 0.5 -1 1 0)))
+          
           (color :rgb (0 0 0)
            (transform :scale (1 -1) :translate (-40 40)
-            (text "Text
-text
-text")
+            (text "Hej
+Sebasianowich")
             ))
-          (color :rgb (0 1 1) (polygon :2d-triangle-strip (0 0 0.5 -1 1 0)))
           
           ))))))
    )
@@ -185,8 +230,16 @@ text")
 (define time -2.0)
 (define time-interval 0.05)
 (loop t
-     (render-scene)
-     (swap win)
-     (poll-events)
-     (incf time time-interval)
+      (thread:lock-mutex *swank-mutex*)
+      (with-exception-handler
+          (render-scene)
+        (lambda (x)
+          (println x)
+          (sleep 0.5)
+          ))
+      (swap win)
+      (poll-events)
+      (incf time time-interval)
+      (thread:unlock-mutex *swank-mutex*)
      )
+

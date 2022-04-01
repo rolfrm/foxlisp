@@ -19,6 +19,8 @@ lisp_value quote_sym = {.type = LISP_SYMBOL};
 lisp_value quasiquote_sym = {.type = LISP_SYMBOL};
 lisp_value unquote_sym = {.type = LISP_SYMBOL};
 lisp_value unquote_splice_sym = {.type = LISP_SYMBOL};
+lisp_value nil = {0};
+lisp_value t = {.type = LISP_T};
 
 #undef ASSERT
 void ht_free(hash_table *ht);
@@ -27,23 +29,36 @@ extern void (* ht_mem_free)(void *);
 void ht_set_mem_values(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr));
 void ht_set_mem_keys(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr));
 void ht_empty(hash_table *ht);
-
-void error(){
-  raise(SIGINT);
+void print_call_stack();
+static __thread lisp_value current_error;
+bool lisp_is_in_error(){
+  return !is_nil(current_error);
 }
-void error_print(const char * str){
+
+void raise_string(const char * str){
+  current_error = (lisp_value){.string = str, .type = LISP_STRING};
   printf("%s\n", str);
-  error();
+  print_call_stack();
 }
 
+lisp_value lisp_error(lisp_value value){
+  current_error = value;
+  println(current_error);
+  print_call_stack();
+  return nil;
+}
 
 void type_assert(lisp_value val, lisp_type type){
   if(val.type != type){
-	 printf("Invalid type, expected %s, but got %s\n",
+    char buffer[1000];
+	 sprintf(buffer, "Invalid type, expected %s, but got %s\n",
 			  lisp_type_to_string(type),
 			  lisp_type_to_string(val.type));
-	 error();
+	 raise_string(gc_clone(buffer, strlen(buffer)));
   }
+}
+void elem_type_assert(lisp_value vector, lisp_type type){
+  type_assert(vector.vector->default_value, type);
 }
 
 #define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
@@ -68,7 +83,7 @@ bool  string_eq(lisp_value a, lisp_value b){
   return strcmp(a.string, b.string) == 0;
 }
 
-void * gc_clone(void * mem, size_t s){
+void * gc_clone(const void * mem, size_t s){
   void * d = GC_MALLOC(s);
   memcpy(d, mem, s);
   return d;
@@ -89,17 +104,28 @@ lisp_value lisp_scope_get_value(lisp_scope * scope, lisp_value sym){
   return lisp_scope_get_value(scope->super, sym);
 }
 
+size_t ht_calc_hash(hash_table * ht, void * key);
+bool ht_get_precalc(hash_table * ht, size_t hashed_key, const void *key, void * out_elem);
+
+bool _lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out, size_t hash){
+  if(scope == NULL) return false;
+  if(scope->values != NULL && ht_get_precalc(scope->values, hash, &sym.integer, out))
+	 return true;
+  return _lisp_scope_try_get_value(scope->super, sym, out, hash);
+}
+
 bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out){
   if(scope == NULL) return false;
-  if(scope->values != NULL && ht_get(scope->values,&sym.integer, out))
-	 return true;
-  return lisp_scope_try_get_value(scope->super, sym, out);
+  if(scope->values == NULL)
+    return lisp_scope_try_get_value(scope->super, sym, out);
+  size_t hash = ht_calc_hash(scope->values, &sym.integer);
+  return _lisp_scope_try_get_value(scope, sym, out, hash);
 }
 
 lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value){
   if(scope == NULL){
-	 printf("Error: variable '%s' not found\n", symbol_name(sym.integer));
-	 error();
+	 raise_string("Variable not found");
+
 	 return nil;
   }
   if(scope->values != NULL && ht_get(scope->values,&sym.integer,NULL)){
@@ -279,8 +305,9 @@ int64_t get_symbol_id(const char * s){
 }
 
 lisp_value get_symbol(const char * s){
-  if(s == NULL || strlen(s) == 0)
-	 error();
+  if(s == NULL || strlen(s) == 0){
+    raise_string("Symbol empty\n");
+  }
   return (lisp_value){.type = LISP_SYMBOL, .integer = get_symbol_id(s)};
 }
 
@@ -300,6 +327,14 @@ lisp_value symbol_to_string(lisp_value sym){
   type_assert(sym, LISP_SYMBOL);
   char * sym_string = (char *) symbol_name(sym.integer);
   return (lisp_value) {.type = LISP_STRING, .string = sym_string};
+}
+
+lisp_value string_starts_with(lisp_value str, lisp_value str2){
+  type_assert(str, LISP_STRING);
+  type_assert(str2, LISP_STRING);
+  if(strncmp(str.string, str2.string, strlen(str2.string)) == 0)
+    return t;
+  return nil;
 }
 
 
@@ -410,7 +445,7 @@ lisp_value tokenize_stream(io_reader * rd){
 			 next.cons->cdr = v;
 			 skip_comment_and_whitespace(rd);
 			 if(io_read_u8(rd) != ')'){
-				error_print("Unexpected token");
+				raise_string("Unexpected token");
 			 }
 			 break;
 		  }
@@ -483,14 +518,14 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		println(value);
 		println(args);
 		println(args2);
-		error_print("arg name must be a symbol\n");
+		raise_string("arg name must be a symbol\n");
 		return nil;
 	 }
 	 if(arg.symbol == rest_sym.symbol){
 		args = cdr(args);
 		arg = car(args);
 		if(arg.type != LISP_SYMBOL){
-		  error_print("(2) arg name must be a symbol.");
+		  raise_string("(2) arg name must be a symbol.");
 		  return nil;
 		}
 		lisp_scope_create_value(function_scope, arg, args2);
@@ -567,11 +602,36 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
   }
 }
 
+static __thread lisp_value call_chain = {0};
+void print_call_stack(){
+  lisp_value top = call_chain;
+  int id = 1;
+  printf("Stack trace:\n");
+  while(top.type == LISP_CONS){
+    printf(" %i - ", id++);
+    println(car(top));
+    top = cdr(top);
+  }
+}
+
+lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+  if(lisp_is_in_error())
+    return nil;
+  
+  call_chain = new_cons(value, call_chain);
+  var r = lisp_eval2(scope, value);
+  call_chain = cdr(call_chain);
+  return r;
+}
+
+lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
+
   switch(value.type){
   case LISP_CONS:
 	 {
-		lisp_value first_value = lisp_eval(scope, car(value));
+      var first = car(value);
+      lisp_value first_value = lisp_eval(scope, first);
 		if(first_value.type == LISP_MACRO_BUILTIN){
 		  switch(first_value.builtin){
 		  case LISP_IF:
@@ -591,8 +651,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 return lisp_eval_quasiquoted(scope, cadr(value));
 		  case LISP_UNQUOTE_SPLICE:
 		  case LISP_UNQUOTE:
-			 printf("Unexpected unquote!\n");
-			 error();
+			 raise_string("Unexpected unquote!\n");
 			 break;
 		  case LISP_LET:
 			 {
@@ -686,18 +745,41 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           }
         case LISP_BOUND:
           {
+            var the_scope = scope;
+            if(!is_nil(cddr(value)) & !is_nil(lisp_eval(scope, caddr(value)))){
+              the_scope = current_context->globals;
+            }
+              
             var sym = lisp_eval(scope, cadr(value));
             if(sym.type != LISP_SYMBOL)
               return nil;
-            if(lisp_scope_try_get_value(scope, sym, &value))
+            
+            if(lisp_scope_try_get_value(the_scope, sym, &value))
               return t;
             return nil;
           }
-		  }
-		}
+        case LISP_WITH_EXCEPTION_HANDLER:
+          {
+            var result = lisp_eval(scope, cadr(value));
+            if(lisp_is_in_error()){
+              var error = current_error;
+              current_error = nil;
+              var error_handler = lisp_eval(scope, caddr(value));
+              var result2 = lisp_eval(scope, new_cons(error_handler, new_cons(error, nil)));
+              return result2;
+            }
+            return result;
+            
+            break;
+          }
+        }
+      }
+
+      //cons args[6];
 		lisp_value things = lisp_sub_eval(scope, cdr(value));
 		
 		if(first_value.type == LISP_FUNCTION_NATIVE){
+      
 		  var n = first_value.nfunction;
 		  union{
 			 lisp_value (* n0)();
@@ -717,17 +799,19 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 return f.n1(car(things));
 		  case 2:
 			 return f.n2(car(things), cadr(things));
-		  case 3:
-			 return f.n3(car(things), cadr(things), caddr(things));
+          
+        case 3:
+			 return f.n3(car(things), cadr(things), caddr(things));       
 		  case 4:
 			 return f.n4(car(things), cadr(things), caddr(things), cadddr(things));
 		  case 5:
 			 return f.n5(car(things), cadr(things), caddr(things), cadddr(things), caddddr(things));
+          
 		  case 6:
 			 return f.n6(car(things), cadr(things), caddr(things), cadddr(things), caddddr(things), cadddddr(things));
-		  default:
-			 printf("Unsupported number of args");
-		  }
+        default:
+			 raise_string("Unsupported number of args");
+        }
 		}else if(first_value.type == LISP_FUNCTION){
 		  
 		  var f = first_value.function;
@@ -738,7 +822,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 var arg = car(args);
 			 if(arg.type != LISP_SYMBOL){
 				println(f->args);
-				error_print("(3) arg name must be a symbol");
+				raise_string("(3) arg name must be a symbol");
 				return nil;
 			 }
 			 if(arg.symbol == rest_sym.symbol){
@@ -747,7 +831,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				if(arg.type != LISP_SYMBOL){
 				  // error
 				  println(arg);
-				  printf("(4) arg name must be a symbol");
+				  raise_string("(4) arg name must be a symbol");
 				  return nil;
 				}
 				lisp_scope_create_value(function_scope, arg, args2);
@@ -776,6 +860,8 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 int64_t (* n0)();
 			 int64_t (* n1)(int64_t);
 			 int64_t (* n2)(int64_t, int64_t);
+          double (* n1d)(double);
+			 double (* n2d)(double, double);
 			 int64_t (* n3)(int64_t, int64_t, int64_t);
 			 int64_t (* n4)(int64_t, int64_t, int64_t, int64_t);
 			 int64_t (* n5)(int64_t, int64_t, int64_t, int64_t, int64_t);
@@ -798,10 +884,16 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				r = f.n0();
 				break;
 			 case 1:
-				r = f.n1(car(things).integer);
+            if(car(things).type == LISP_RATIONAL)
+              r = f.n1d(car(things).rational);
+            else
+              r = f.n1(car(things).integer);
 				break;
 			 case 2:
-				r = f.n2(car(things).integer, cadr(things).integer);
+            if(car(things).type == LISP_RATIONAL)
+              r = f.n2d(car(things).rational, cadr(things).rational);
+            else
+              r = f.n2(car(things).integer, cadr(things).integer);
 				break;
 			 case 3:
 				r = f.n3(car(things).integer, cadr(things).integer, caddr(things).integer);
@@ -812,7 +904,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 default:
 				
 				printf("invalid argnr for "); print(value); printf("\n");
-				error();
+				raise_string("");
 			 }
 		  }else{
 			 switch(arg_len){
@@ -832,8 +924,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				f.nr4(car(things).integer, cadr(things).integer, caddr(things).integer, cadddr(things).integer);
 				break;
 			 default:
-				printf("unsupported number of arguments\n");
-				error();
+				raise_string("unsupported number of arguments\n");
 			 }
 		  }
 		  var ret = func->return_example;
@@ -841,9 +932,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  return ret;
 		  		  
 		}else{
-		  printf("not a function :");
-		  println(value);
-		  error();
+		  raise_string("not a function");
 		  return nil;
 		}
 	 }
@@ -856,9 +945,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
       if(lisp_scope_try_get_value(scope, value, &r))
         return r;
       else{
-        
-        printf("Symbol ");print(value); printf(" not found\n");
-        error();
+        raise_string("symbol not found.");
       }
     }
 		 
@@ -887,6 +974,8 @@ lisp_value lisp_eval_stream(io_reader * rd){
 	 var code = lisp_read_stream(rd);
 	 if(off == rd->offset || code.type == LISP_NIL) break;
 	 while(true){
+      if(lisp_is_in_error())
+        return nil;
 		var next_code = lisp_macro_expand(current_context->globals, code);
 		
 		if(lisp_value_eq(next_code, code))
@@ -894,7 +983,10 @@ lisp_value lisp_eval_stream(io_reader * rd){
 		code = next_code;
 	 }
 	 println(code);
+
 	 result = lisp_eval(current_context->globals, code);
+    if(lisp_is_in_error())
+      return nil;
   }
   return result;
 }
@@ -1099,12 +1191,6 @@ lisp_value lisp_len(lisp_value a){
   return (lisp_value){.type = LISP_INTEGER, .integer = i};
 }
 
-lisp_value lisp_error(lisp_value a){
-  println(a);
-  error();
-  return nil;
-}
-
 lisp_value println(lisp_value v){
   print(v);
   printf("\n");
@@ -1133,6 +1219,9 @@ lisp_value lisp_rational(lisp_value v){
   return v;
 }
 
+lisp_value rational(double v){
+  return (lisp_value){.rational = v, .type = LISP_RATIONAL};
+}
 
 lisp_value lisp_float32(lisp_value v){
   if(v.type != LISP_RATIONAL && v.type != LISP_FLOAT32)
@@ -1142,9 +1231,7 @@ lisp_value lisp_float32(lisp_value v){
 }
 
 lisp_value lisp_panic(lisp_value v){
-  printf("Panic: ");print(v);printf("\n");
-  error();
-  return nil;
+  return lisp_error(v);
 }
 
 lisp_value integer(int64_t v){
@@ -1166,10 +1253,7 @@ lisp_value gc_heap(){
 }
 
 lisp_value load_lib(lisp_value str){
-  if(str.type != LISP_STRING) {
-	 lisp_error((lisp_value){.type = LISP_STRING, .string = (void *)"not a string"});
-	 return nil;
-  }
+  type_assert(str, LISP_STRING);
   printf("Loading: %s\n", str.string);
 #ifndef EMSCRIPTEN
   void * handle = dlopen(str.string, RTLD_GLOBAL |RTLD_NOW);
@@ -1231,9 +1315,6 @@ void * lisp_malloc(size_t v){
   return GC_malloc(v);
 }
 
-void * lisp_realloc(void * ptr, size_t size){
-  return GC_realloc(ptr, size);
-}
 
 const char * lisp_type_to_string(lisp_type t){
   switch(t){
@@ -1254,8 +1335,8 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_BYTE: return "BYTE";
   case LISP_FLOAT32: return "FLOAT32";
   }
-  printf("Unknown type: %i\n", t);
-  error();
+  raise_string("Unknown type:\n");
+  
   return NULL;
 }
 
@@ -1289,8 +1370,10 @@ lisp_value make_vector(lisp_value len, lisp_value _default){
   vector->count = l;
   vector->elem_size = elem_size;
   vector->default_value = _default;
-  memset(data, 0, l * elem_size);
   lisp_value v = {.type = LISP_VECTOR, .vector = vector};
+  for(size_t i = 0; i < l; i++)
+    vector_set(v, integer(i),_default);
+    
   return v;
 }
 
@@ -1325,8 +1408,7 @@ lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
   var v = value;
   void * dst = vector->data + k.integer * vector->elem_size;
   if(k.integer >= vector->count){
-    printf("index outside of the bounds of the vector\n");
-    error();
+    raise_string("index outside of the bounds of the vector\n");
     return nil;
   }
   void * src;
@@ -1355,8 +1437,10 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
   }else{
 	 elem_size = sizeof(double);
   }
+  void * new_data = GC_malloc(l * elem_size);
+  size_t prevCount = vector.vector->count;   
+  memcpy(new_data, vector.vector->data, prevCount * elem_size);
   vector.vector->data = GC_realloc(vector.vector->data, l * elem_size);
-  size_t prevCount = vector.vector->count;
   vector.vector->count = l;
   for(size_t i = prevCount; i < l; i++){
 	 vector_set(vector, integer(i), vector.vector->default_value);
@@ -1444,7 +1528,11 @@ lisp_value hex_string(lisp_value i, lisp_value dec){
   return (lisp_value){.type = LISP_STRING, .string = buf};
 }
 
-
+lisp_value lisp_signature(lisp_value func){
+  if(func.type == LISP_FUNCTION)
+    return new_cons(get_symbol("func"), func.function->args);
+  return nil;
+}
 
 void item_finalizer(void * obj, void * data){
   lisp_value item = {.type = LISP_CONS, .cons = obj};
@@ -1488,6 +1576,19 @@ lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
   return nil;
 }
 
+void it_symbols(void * k1, void * k2, void * target){
+  lisp_value * val = target;
+  const int64_t * sym = k2;
+  lisp_value prev = *val;
+  *val = new_cons((lisp_value){.type = LISP_SYMBOL, .integer = *sym}, prev); 
+}
+
+lisp_value lisp_all_symbols(){
+  lisp_value val = nil;
+  hash_table * symbols = current_context->symbols;
+  ht_iterate(symbols, it_symbols, &val);
+  return val;
+}
 
 lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
   type_assert(_ht, LISP_NATIVE_POINTER);
@@ -1505,8 +1606,10 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
 	 return new_cons(t, value);
   return nil;
 }
+//void setup_signal_handler();
 lisp_value run_gc();
- int main(int argc, char ** argv){
+int main(int argc, char ** argv){
+  //setup_signal_handler();
   ht_mem_malloc = GC_malloc;
   ht_mem_free = GC_free;
   current_context = lisp_context_new();
@@ -1554,18 +1657,20 @@ lisp_value run_gc();
   lisp_register_native("vector-resize", 2, vector_resize);
   lisp_register_native("vector->string", 1, vector_to_string);
   lisp_register_native("string->vector", 1, string_to_vector);
-
+  lisp_register_native("string-starts-with", 2, string_starts_with);
   lisp_register_native("parse-hex", 1, parse_hex);
   lisp_register_native("hex-string", 2, hex_string);
 
   lisp_register_native("symbol->string", 1, symbol_to_string);
   lisp_register_native("string->symbol", 1, string_to_symbol);
+  lisp_register_native("all-symbols", 0, lisp_all_symbols);
 
   lisp_register_native("make-hashtable", 2, lisp_make_hashtable);
   lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
   lisp_register_native("hashtable-set", 3, lisp_hashtable_set);
   lisp_register_native("hashtable-remove", 2, lisp_hashtable_remove);
   lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
+  lisp_register_native("function-signature", 1, lisp_signature);
   
   lisp_register_native("register-finalizer", 2, lisp_register_finalizer);
   
@@ -1585,6 +1690,7 @@ lisp_value run_gc();
   lisp_register_macro("unquote", LISP_UNQUOTE);
   lisp_register_macro("symbol-value", LISP_SYMBOL_VALUE);
   lisp_register_macro("bound?", LISP_BOUND);
+  lisp_register_macro("with-exception-handler", LISP_WITH_EXCEPTION_HANDLER);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 #ifndef EMSCRIPTEN
@@ -1606,3 +1712,67 @@ lisp_value run_gc(){
   gc_collect_garbage(current_context);
   return t;
 }
+#include <execinfo.h>
+int str_index_of_last(const char * str, char symbol){
+  int idx = -1;
+  
+  for(int i = 0; str[i] != 0; i++){
+    if(str[i] == symbol)
+      idx = i;
+  }
+  return idx;
+}
+
+void log_stacktrace(void)
+{
+  static const char start[] = "BACKTRACE ------------\n";
+  static const char end[] = "----------------------\n";
+  
+  void *bt[1024];
+  int bt_size;
+  char **bt_syms;
+  int i;
+  
+  bt_size = backtrace(bt, 1024);
+  bt_syms = backtrace_symbols(bt, bt_size);
+  printf(start);
+  for (i = 1; i < bt_size; i++) {
+
+    //char syscom[256];
+    int itemidx = str_index_of_last(bt_syms[i], '(');
+    char filename[itemidx + 1];
+    strncpy(filename, bt_syms[i],itemidx);
+    filename[itemidx] = 0;
+
+    printf("#%d (%s) %s\n", i, filename, bt_syms[i]);
+    //sprintf(syscom,"addr2line -j text  -e %s %p", filename, bt[i]); //last parameter is the name of this app
+    //system(syscom);
+  }
+  printf(end);
+  free(bt_syms);
+}
+
+/*
+#include <signal.h>
+static void handler(int sig, siginfo_t *dont_care, void *dont_care_either)
+{
+  printf("segfault");
+
+  log_stacktrace();
+  exit(1);
+}
+
+void setup_signal_handler(){
+  struct sigaction sa;
+
+  memset(&sa, 0, sizeof(sigaction));
+  sigemptyset(&sa.sa_mask);
+
+  sa.sa_flags     = SA_NODEFER;
+  sa.sa_sigaction = handler;
+
+  sigaction(SIGSEGV, &sa, NULL);
+
+}
+
+*/

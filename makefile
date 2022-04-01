@@ -31,8 +31,8 @@ libmicroio/libmicroio.a:
 libmicroio.bc:
 	emcc -Ilibmicroio/include -c libmicroio/src/microio.c -o libmicroio.bc
 
-foxgl.so: src/foxgl.c src/tcp.c libiron.so
-	gcc src/foxgl.c src/tcp.c -I.. -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
+foxgl.so: src/foxgl.c src/tcp.c libiron.so src/foxal.c
+	gcc src/foxgl.c src/tcp.c src/foxal.c -I.. -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
 	gcc -DGC_PTHREADS -DGC_THREADS -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include

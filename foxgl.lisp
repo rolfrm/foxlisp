@@ -42,8 +42,19 @@
 (define foxgl:bind-texture (load-wrap foxgl2 "lblit_bind_texture" 1))
 (define foxgl:blit-text (load-wrap foxgl2 "lblit_blit_text" 2))
 (define foxgl:blend (load-wrap foxgl2 "lblit_blend" 1))
- 
+(define foxal:play-sample (load-wrap foxgl2 "foxal_play_sample" 1))
 (define foxgl-get-events (load-wrap foxgl2 "foxgl_get_events" 0))
+
+(define audio:load-sample (load-wrap foxgl2 "foxal_load_sample" 1))
+(define audio:play-sample (load-wrap foxgl2 "foxal_play_sample" 1))
+(define audio:update (load-wrap foxgl2 "foxal_update" 1))
+
+(define thread:create-mutex (load-wrap foxgl2 "foxgl_create_mutex" 0))
+(define thread:destroy-mutex (load-wrap foxgl2 "foxgl_destroy_mutex" 1))
+(define thread:lock-mutex (load-wrap foxgl2 "foxgl_lock_mutex" 1))
+(define thread:unlock-mutex (load-wrap foxgl2 "foxgl_unlock_mutex" 1))
+
+(define math:pow (load-wrap foxgl2 "lisp_pow" 2))
 
 (define load-polygon (load-wrap foxgl2 "load_polygon" 1))
 (define blit-polygon (load-wrap foxgl2 "blit_polygon" 1))
@@ -64,12 +75,15 @@
 (define gllib (load-lib "libGL.so"))
 (define glerror (load-alien gllib "glGetError" 1))
 
+(define libm (load-lib "libm-2.31.so"))
+
+(println (math:pow 5.0 4.0))
 
 (assert load-font "!!")
 (define build-distance-field (load-wrap foxgl2 "lisp_build_df" 1))
 (define distance-field-print (load-wrap foxgl2 "lisp_print_df" 1))
 (define blit-distance-field (load-wrap foxgl2 "lisp_blit_distance_field" 4))
-
+"
 (define df1 (build-distance-field
              '
              (color :rgb (0.9 0.5 0.99)
@@ -90,9 +104,11 @@
              (sphere :center (1 1 1) :radius 1.0)))
 (println (list 'df1 df1))
 (distance-field-print df1) (println " ")
+
 (let ((t1 (timestamp)))
   (blit-distance-field nil 64 64 df1)
   (println `(rendering took ,(- (timestamp) t1) us)))
+"
 (println (type-of (byte 1)))
 (println (timestamp))
 
@@ -328,3 +344,38 @@
     ))
 
 (load "swank.lisp")
+
+(defvar audio:note-low (* 12.0 8.0))
+(defun audio:note-to-frequency(note)
+  (* 440.0 (math:pow 2.0 (/ (rational note) 12.0)))
+  )
+
+(defun process-song(song buffer sample-rate phase speed)
+  (let ((i 0)
+        (sample (rational sample-rate)))
+  (defun rec(song)
+    
+    (let ((fst (car song))
+          (result 0.0))
+      (when (eq fst 'melody)
+        (let ((lst (cdr song))
+              (p phase))
+          (loop lst
+                (if (< p 0.5)
+                    (progn ;; found note
+                      (set! result (sin (* 6.28 (* p (audio:note-to-frequency (car lst))))))          (set! lst nil)
+            
+                      )
+                    (progn
+                      (set! lst (cdr lst))
+                      (set! p (- p 0.5)))))
+          )
+        )
+      result
+      ))
+  (loop (< i (vector-length buffer))
+        (vector-set! buffer i (float32 (rec song)))
+        (incf phase (/ 1.0 sample))
+        (incf i 1))
+  ))
+

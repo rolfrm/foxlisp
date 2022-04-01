@@ -246,9 +246,35 @@
 (assert (eq (test-def 5) 15))
 (define (test-def2 . x) (cons 10 x))
 (assert (equals? (test-def2 5) '(10 5)))
-                                        ;(gc-collect)
-
+   
 (assert (eq (- 0 5) -5))
+
+(println (all-symbols))
+(assert (string-starts-with "asd" "as"))
+(assert-not (string-starts-with "dsa" "as"))
+(println (string-starts-with (symbol->string 'list) "li"))
+
+(assert (equals? '(6 5 4 3 2 1) (reverse! '(1 2 3 4 5 6))))
+
+(println (take (lambda (x) (string-starts-with (symbol->string x) "lis")) (all-symbols)))
+(assert (equals? '(1 2 3) (take (lambda (x) (> x 0)) '(-1 1 -2 2 -3 3))))
+
+(define exception-handled nil)
+(define normal-form-completed nil)
+
+(with-exception-handler
+    (progn
+      (panic "empty list")
+      (set! normal-form-completed t)
+      )
+  (lambda (ex)
+    (set! exception-handled t)
+    (println "its ok)")))
+
+
+(assert exception-handled)
+(assert-not normal-form-completed)
+
 
 (println "Tests Passed")
 

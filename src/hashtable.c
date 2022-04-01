@@ -134,6 +134,10 @@ size_t ht_count(hash_table * ht){
   return ht->count;
 }
 
+size_t ht_calc_hash(hash_table * ht, void * key){
+  i32 hash = ht->hash == NULL ? (i32)hash1(key, ht->key_size) : ht->hash(key, ht->userdata);
+  return (size_t)hash;
+}
 void ht_set_hash(hash_table * ht, i32 (* hash)(const void * key,  void * userdata)){
   ht->hash = hash;
 }
@@ -240,9 +244,8 @@ static void ht_grow(hash_table * ht){
   ht_set_capacity(ht, ht->capacity * 2);
 }
 
-static i64 ht_find_free(const hash_table * ht, const void * key){
+static i64 ht_find_free_pre_hashed(const hash_table * ht, size_t hash, const void * key){
   size_t key_size = ht->key_size;
-  i32 hash = ht->hash == NULL ? (i32)hash1(key, key_size) : ht->hash(key, ht->userdata);
   size_t capacity = ht->capacity;
   compare_t compare = ht->compare;
 
@@ -267,6 +270,14 @@ static i64 ht_find_free(const hash_table * ht, const void * key){
   return -1;	 
 }
 
+static i64 ht_find_free(const hash_table * ht, const void * key){
+  size_t key_size = ht->key_size;
+  i32 hash = ht->hash == NULL ? (i32)hash1(key, key_size) : ht->hash(key, ht->userdata);
+  return ht_find_free_pre_hashed(ht, hash, key);
+}
+
+
+
 bool ht_set(hash_table * ht, const void * key, const void * nelem){
   ht_init(ht);
   if(ht->count * 2 > ht->capacity)
@@ -289,6 +300,17 @@ bool ht_set(hash_table * ht, const void * key, const void * nelem){
 bool ht_get(hash_table * ht, const void *key, void * out_elem){
   if(ht->keys == NULL) return false;
   i64 index = ht_find_free(ht, key);
+  if(ht->occupied[index] == HT_FREE || index == -1)
+    return false;
+  size_t elem_size = ht->elem_size;
+  if(out_elem != NULL)
+    memcpy(out_elem, ht->elems + index * elem_size, elem_size);
+  return true;
+}
+
+bool ht_get_precalc(hash_table * ht, int hashed_key, const void *key, void * out_elem){
+  if(ht->keys == NULL) return false;
+  i64 index = ht_find_free_pre_hashed(ht, hashed_key, key);
   if(ht->occupied[index] == HT_FREE || index == -1)
     return false;
   size_t elem_size = ht->elem_size;

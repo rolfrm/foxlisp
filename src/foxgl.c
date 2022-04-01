@@ -2,6 +2,14 @@
 #include <iron/gl.h>
 #include "foxlisp.h"
 #include <GL/gl.h>
+#include <math.h>
+#undef POP
+
+lisp_value lisp_pow(lisp_value a, lisp_value b){
+  type_assert(a, LISP_RATIONAL);
+  type_assert(b, LISP_RATIONAL);
+  return rational(pow(a.rational, b.rational));
+}
 
 lisp_value rect2(lisp_value r, lisp_value g,lisp_value b,lisp_value a){
   blit_rectangle2(r.rational,g.rational,b.rational,a.rational);
@@ -119,7 +127,7 @@ bool try_rational(float * out, lisp_value v){
   printf("YES: %f\n", *out);
   return true;
 }
-
+#define POP(x) pop(&x)
 bool list_vec3(lisp_value c, vec3 * out){
   
   vec3 v;
@@ -228,7 +236,8 @@ df_value build_df(lisp_value v){
 		df_value sub = build_df(car(v));
 		v = cdr(v);
 		subcnt += 1;
-		subs = lisp_realloc(subs, subcnt * sizeof(subs[0]));
+      raise_string("lisp_realloc not defined.");
+      //		subs = lisp_realloc(subs, subcnt * sizeof(subs[0]));
 		subs[subcnt - 1] = sub;
 		continue;
 	 }
@@ -480,7 +489,7 @@ lisp_value lmat4_mul(lisp_value a, lisp_value b){
 		*m3 = mat4_mul(*m1, *m2);
 		return r;
 	 }
-	 error_print("Invalid number of rows and columns");	
+	 raise_string("Invalid number of rows and columns");	
   }else if(a.vector->count == 9){
 	 mat3 * m1 = a.vector->data;
 	 if(b.vector->count == 9){
@@ -492,7 +501,7 @@ lisp_value lmat4_mul(lisp_value a, lisp_value b){
 	 }
   }
 
-  error_print("Invalid number of rows and columns");
+  raise_string("Invalid number of rows and columns");
   return a;
 }
 lisp_value mat4_to_lisp (mat4 a);
@@ -540,7 +549,7 @@ mat4 lisp_to_mat4(lisp_value a){
 	 //return m0;
   }
 
-  error_print("Invalid number of rows and columns");
+  raise_string("Invalid number of rows and columns");
   return mat4_identity();
 }
 lisp_value make_vector(lisp_value len, lisp_value _default);
@@ -567,7 +576,7 @@ lisp_value lmat4_print(lisp_value a){
 	 return a;
   }
 
-  error_print("Invalid number of rows and columns");
+  raise_string("Invalid number of rows and columns");
   return a;
 }
 

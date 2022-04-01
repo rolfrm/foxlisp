@@ -33,7 +33,8 @@ typedef enum {
 				  LISP_UNQUOTE = 12,
 				  LISP_UNQUOTE_SPLICE = 13,
               LISP_SYMBOL_VALUE = 14,
-              LISP_BOUND = 15
+              LISP_BOUND = 15,
+              LISP_WITH_EXCEPTION_HANDLER = 16
 }lisp_builtin;
 
 // structs
@@ -105,8 +106,8 @@ struct __lisp_vector{
 };
 
 // globals
-static lisp_value nil = {0};
-static lisp_value t = {.type = LISP_T};
+extern lisp_value nil;
+extern lisp_value t;
 
 extern lisp_value rest_sym;
 extern lisp_value if_sym;
@@ -117,7 +118,7 @@ extern lisp_value unquote_splice_sym;
 
 void foxlist_thread_init();
 void gc_collect_garbage(lisp_context * context);
-
+void * gc_clone(const void * mem, size_t s);
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 
@@ -134,7 +135,7 @@ lisp_value cdr(lisp_value v);
 lisp_value pop(lisp_value * v);
 lisp_value lisp_append(lisp_value a, lisp_value b);
 void * lisp_malloc(size_t s);
-void * lisp_realloc(void * p, size_t v);
+//void * lisp_realloc(void * p, size_t v);
 
 lisp_value get_symbol(const char * s);
 bool eq(lisp_value a, lisp_value b);
@@ -147,6 +148,7 @@ lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
 lisp_value vector_elem_type(lisp_value vector);
 lisp_value vector_copy(lisp_value vector);
 lisp_value integer(int64_t v);
+lisp_value rational(double v);
 lisp_value byte(unsigned char v);
 lisp_value native_pointer(void * ptr);
 lisp_value lisp_rational(lisp_value value);
@@ -155,8 +157,9 @@ size_t lisp_type_size(lisp_type type);
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
 lisp_value lisp_error(lisp_value v);
-void error_print(const char * str);
+void raise_string(const char * str);
 void type_assert(lisp_value val, lisp_type type);
+void elem_type_assert(lisp_value vector, lisp_type type);
 
 lisp_scope * lisp_scope_new(lisp_scope * super);
 bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out);
@@ -167,7 +170,6 @@ lisp_scope * lisp_context_get_root_scope();
 void lisp_register_value(const char * name, lisp_value value);
 void lisp_register_native(const char * name, int nargs, void * fptr);
 // macros
-#define POP(x)pop(&x)
 
 #define cddr(x) cdr(cdr(x))
 #define cdddr(x) cdr(cddr(x))
