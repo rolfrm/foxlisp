@@ -632,9 +632,9 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   if(lisp_is_in_error())
     return nil;
   
-  call_chain = new_cons(value, call_chain);
+  //call_chain = new_cons(value, call_chain);
   var r = lisp_eval2(scope, value);
-  call_chain = cdr(call_chain);
+  //call_chain = cdr(call_chain);
   return r;
 }
 

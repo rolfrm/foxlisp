@@ -352,7 +352,10 @@
 
 (defun process-song(song buffer sample-rate phase speed)
   (let ((i 0)
-        (sample (rational sample-rate)))
+        (sample (rational sample-rate))
+        (llen (vector-length buffer))
+        (phase-incr (/ 1.0 phase)))
+                
   (defun rec(song)
     
     (let ((fst (car song))
@@ -361,21 +364,21 @@
         (let ((lst (cdr song))
               (p phase))
           (loop lst
-                (if (< p 0.5)
+                (if (< p 0.25)
                     (progn ;; found note
                       (set! result (sin (* 6.28 (* p (audio:note-to-frequency (car lst))))))          (set! lst nil)
             
                       )
                     (progn
                       (set! lst (cdr lst))
-                      (set! p (- p 0.5)))))
+                      (set! p (- p 0.25)))))
           )
         )
       result
       ))
-  (loop (< i (vector-length buffer))
+  (loop (< i llen)
         (vector-set! buffer i (float32 (rec song)))
-        (incf phase (/ 1.0 sample))
+        (incf phase phase-incr)
         (incf i 1))
   ))
 

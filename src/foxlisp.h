@@ -129,6 +129,7 @@ lisp_value lisp_len(lisp_value lst);
 const char * lisp_type_to_string(lisp_type t);
 
 lisp_value new_cons(lisp_value a, lisp_value b);
+lisp_value copy_cons(lisp_value a);
 
 lisp_value car(lisp_value v);
 lisp_value cdr(lisp_value v);
