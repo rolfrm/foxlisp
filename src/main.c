@@ -228,6 +228,12 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   return v;
 }
 
+lisp_value copy_cons(lisp_value a){
+  if(a.type == LISP_CONS)
+    return new_cons(car(a), copy_cons(cdr(a)));
+  return a;
+}
+
 void skip_comment_and_whitespace(io_reader * rd){
   while(true){
 	 uint8_t c = io_peek_u8(rd);
@@ -548,15 +554,22 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 }
 
 
-lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c){
+lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
   if(c.type == LISP_NIL) return nil;
   var next = cdr(c);
   if(next.type != LISP_NIL){
 	 var value = lisp_eval(scope, car(c));
-	 var nextr = lisp_sub_eval(scope, next);
-	 return new_cons(value, nextr);
+	 var nextr = lisp_sub_eval(scope, next, cons_buf + 1);
+    lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
+	 cns.cons->car =value;
+    cns.cons->cdr = nextr;
+    return cns;
+  }else{
+    lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
+    cns.cons->car = lisp_eval(scope, car(c));
+    cns.cons->cdr = nil;
+    return cns;
   }
-  return new_cons(lisp_eval(scope, car(c)), nil);
 }
 lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value);
 
@@ -775,9 +788,9 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         }
       }
 
-      //cons args[6];
-		lisp_value things = lisp_sub_eval(scope, cdr(value));
-		
+      cons args[10] = {0};
+		lisp_value things = lisp_sub_eval(scope, cdr(value), args);
+		//things = copy_cons(things);
 		if(first_value.type == LISP_FUNCTION_NATIVE){
       
 		  var n = first_value.nfunction;
@@ -834,7 +847,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				  raise_string("(4) arg name must be a symbol");
 				  return nil;
 				}
-				lisp_scope_create_value(function_scope, arg, args2);
+				lisp_scope_create_value(function_scope, arg, copy_cons(args2));
 				break;
 			 }
 			 var argv = car(args2);

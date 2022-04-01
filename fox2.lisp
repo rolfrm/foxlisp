@@ -123,7 +123,7 @@
 (define song '(melody 0 2 4 8))
 (define song-buffer (make-vector (* 44100 3) (float32)))
 (progn
-  (while nil
+  (while t
          (process-song song song-buffer 44100 0.0 1.0)
          (println 'done))
   ;;(set! sample1-loaded (audio:load-sample song-buffer))
