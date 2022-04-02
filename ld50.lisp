@@ -33,6 +33,7 @@
 
 (define car-model
     `(car
+      (transform :translate (-1 0 -2)
       (blend
        (transform :scale (2 1 4) :translate (-0.2 -0.5)
         (color :rgb ( 0.2 0.2 0.2)
@@ -52,7 +53,7 @@
        (transform :translate (0.25 1.0 0.5)
         :scale (1.5 0.8 2.0)
         ,cube-model))                           ;)
-      ))
+      )))
 (define tree-model
     `(color :rgb (0.5 0.8 0.5)
       (transform :scale (2 1 2)
@@ -77,7 +78,7 @@
 
 (defun world-model ()
   `(world
-    (transform :translate (0 0 0)
+    (transform :id world-base :translate (0 0 0)
      (color :rgb (0.3 0.3 0.3)
       (transform :scale (50 1 10) :translate (-15.0 0.0 -1.0) ,tile-model))
                                         ;,square-model
@@ -160,7 +161,10 @@
              (set! model (println (cdr model))))))
     result))
 (define car-object (model-find-elem world 'car))
-(assert (model-find-elem world 'car))
+(define world-base (model-find-elem world 'world-base))
+(assert car-object)
+(assert world-base)
+  
 (defun pset! (list key value)
   (loop list
         (when (eq (car list) key)
@@ -173,12 +177,36 @@
 (pset! test-obj :a 3)
 (println test-obj)
 (println car-object)
-(pset! car-object :translate '(-1 0 0))
-        
+(pset! car-object :rotate '(0.0 -0.5 0.0))
+(define car-rotation 0.0);
+(define car-position (make-vector 3 (float32 0.0)))
+(define forward (let ((v (make-vector 3 (float32 0.0))))
+                  (vector-set! v 2 (float32 1.0))
+                  v))
+(define scale-down (mat4-scale 0.1 0.1 0.1))
+(defun mat:add-inplace(v1 v2)
+  (do-times (vector-length v1)
+    (lambda (i) (vector-set!  v1 i (float32  (+ (rational (vector-ref v1 i)) (rational (vector-ref v2 i)))))))
+  v1)
 (defun render-scene()
+  
   ;;(incf time 0.3)
   (incf mx vx)
   (set! vx (* vx 0.9))
+  (pset! car-object :rotate `( 0.0 ,car-rotation 0.0))
+  (pset! car-object :translate `(,(vector-ref car-position 0) 0.0 ,(vector-ref car-position 2)))
+
+  (pset! world-base :translate `(,(- 0.0 (vector-ref car-position 0)) 0.0 ,(- 0.0 (vector-ref car-position 2))))
+  
+  (let ((car-direction (mat4:rotate 0.0 car-rotation 0.0)))
+    (let ((vd (mat-mul (mat4-scale vx vx vx) (mat-mul car-direction forward))))
+                                        ;      (println vd)
+      (mat:add-inplace car-position vd)
+;      (println car-position)
+      
+    
+    
+    ))
   (render-model
    `(root
      (transform :scale (2.0 2.0)
@@ -189,9 +217,9 @@
 
        ;; setting up the view
        (view :perspective (1.0 1.0 0.01 100.0)
-        (transform :translate (0 -2 -10)
-         (transform :rotate (0 ,(* (sin time) 0.33) 0)
-          (transform :translate (-0.5 -0.5 -0.5)
+        (transform :translate (0 -4 -4)
+         (transform :rotate (0.4 0.0 0)
+          (transform :translate (-0.5 -0.5 -10)
            :scale (0.5 0.5 0.5)
            
          
@@ -220,10 +248,6 @@
   (let ((evts (poll-events2)))
     (when evts
       (println evts)))
-  (when (foxgl:key-down? win 65)
-    (println 'ja)
-    (set! vx (- vx 0.1))
-    )
   (when nil
     (do-times 320 (lambda (i) (when (> i 31)
                                 (when (foxgl:key-down? win i)
@@ -234,13 +258,19 @@
   (when (foxgl:key-down? win foxgl:key-s)
     (set! vx (- vx 0.1))
     )
+  (when (foxgl:key-down? win foxgl:key-a)
+    (set! car-rotation (- car-rotation 0.1))
+    )
+  (when (foxgl:key-down? win foxgl:key-d)
+    (set! car-rotation (+ car-rotation 0.1))
+    )
   (audio:update)
   (render-scene)
   (swap win)
   (poll-events)
   )
 
-(define win (create-window (integer 400) (integer 400)))
+(define win (create-window (integer 700) (integer 700)))
 (set-title win "Drive My Car")
 (make-current win)
 (load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))

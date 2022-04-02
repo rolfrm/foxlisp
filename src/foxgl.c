@@ -489,6 +489,12 @@ lisp_value lmat4_mul(lisp_value a, lisp_value b){
 		*m3 = mat4_mul(*m1, *m2);
 		return r;
 	 }
+    if(b.vector->count == 3){
+      vec3 * m2 = b.vector->data;
+      var c = vector_copy(b);
+      ((vec3 *) c.vector->data)[0] = mat4_mul_vec3(*m1, *m2);
+      return c;
+    }
 	 raise_string("Invalid number of rows and columns");	
   }else if(a.vector->count == 9){
 	 mat3 * m1 = a.vector->data;
@@ -556,7 +562,7 @@ lisp_value make_vector(lisp_value len, lisp_value _default);
 
 lisp_value mat4_to_lisp (mat4 a){
   lisp_value vec = make_vector(integer(16), (lisp_value){.type = LISP_FLOAT32, .rational = 0.0f});
-  float * data = &a;
+  float * data = &a.m00;
   mat4 * v = vec.vector->data;
   *v = a;
   return vec;
