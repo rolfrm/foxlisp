@@ -76,6 +76,9 @@ typedef struct __lisp_scope lisp_scope;
 struct __lisp_scope{
   lisp_scope * super;
   hash_table * values;
+  cons * lookup;
+  size_t argcnt;
+  bool lookup_on_stack;
 };
 
 typedef struct{
@@ -130,6 +133,7 @@ const char * lisp_type_to_string(lisp_type t);
 
 lisp_value new_cons(lisp_value a, lisp_value b);
 lisp_value copy_cons(lisp_value a);
+lisp_value lisp_length(lisp_value lst);
 
 lisp_value car(lisp_value v);
 lisp_value cdr(lisp_value v);
@@ -163,6 +167,7 @@ void type_assert(lisp_value val, lisp_type type);
 void elem_type_assert(lisp_value vector, lisp_type type);
 
 lisp_scope * lisp_scope_new(lisp_scope * super);
+lisp_scope * lisp_scope_new2(lisp_scope * super, cons * argsbuffer, size_t cnt);
 bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out);
 lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 
@@ -172,14 +177,12 @@ void lisp_register_value(const char * name, lisp_value value);
 void lisp_register_native(const char * name, int nargs, void * fptr);
 // macros
 
-#define cddr(x) cdr(cdr(x))
 #define cdddr(x) cdr(cddr(x))
 #define cddddr(x) cdr(cdddr(x))
 #define cdddddr(x) cdr(cddddr(x))
 #define cddddddr(x) cdr(cdddddr(x))
 #define cdddddddr(x) cdr(cddddddr(x))
 
-#define cadr(x) car(cdr(x))
 #define caddr(x) car(cddr(x))
 #define cadddr(x) car(cdddr(x))
 #define caddddr(x) car(cddddr(x))

@@ -1,5 +1,6 @@
 (load "lisp1.lisp" )
-
+(let ((x2 10))
+  (println x2))
 (do-times 4 (lambda () (println (quote hej))))
 (map! print (list 1 2 3 4 (quote x)))
 (define x (macro (&rest b) b))
@@ -275,6 +276,8 @@
 (assert exception-handled)
 (assert-not normal-form-completed)
 
+(let ((x 5))
+  (println 'hej))
 
 (println "Tests Passed")
 

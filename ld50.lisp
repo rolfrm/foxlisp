@@ -1,6 +1,6 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
-(thread-start swank:start-server)
+;(thread-start swank:start-server)
 
 (define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
 
@@ -204,12 +204,16 @@
               (transform :scale (2 1)
                (color :rgb (0.3 0.8 0.3)
                 ,square-model))
-              (color :rgb (0.1 0.4 0.1)
-               (transform :scale (1.5 -2.3)
-                (transform :translate (0.0 -1.05)
-               (flat :size (128 128)
-                (transform :scale (2 2)
-                 (text "$"))))))))))
+       (transform :translate (0.7 -0.3)
+        (transform :translate (-0 0) :scale (0.05 0.05) (text "$") ))
+       ;(color :rgb (0.1 0.4 0.1)
+       ; (transform :scale (1.5 -2.3)
+       ;  (transform :translate (0.0 -1.05)
+       ;          (flat :size (128 128)
+       ;           (transform :scale (2 2)
+       ;            (text "$"))))))
+
+       ))))
 (define therm-base '(polygon :2d-triangle-strip
        (0 3
         0.3 3
@@ -371,7 +375,7 @@
         )
        
        (transform :scale (0.05 0.05) :translate (0.05 0.45)
-        ;(ref dollar-model)
+        (ref dollar-model)
         )
        (transform :scale (0.1 0.1) :translate (0.1 0.1)
         (transform :rotate (0 0 ,time)
@@ -422,7 +426,9 @@
     (set! car-rotation (+ car-rotation 0.1))
     )
   (audio:update)
-  (render-scene)
+  (measure
+   (do-times 100 (lambda ()
+                  (render-scene))))
   (swap win)
   (poll-events)
   )
@@ -441,5 +447,6 @@
          (sleep 0.5)
          ))
      (thread:unlock-mutex *swank-mutex*)
+     ;(lisp:exit)
      )
 

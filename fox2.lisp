@@ -5,12 +5,6 @@
 (defun sine-instrument (freq phase)
   (sin (* freq phase)))
 
-(defmacro measure(&rest body)
-  `(let ((time-start (timestamp))
-         (result (progn ,@body))
-         (time-end (timestamp)))
-    (println (list "operation took " (/ (rational (- time-end time-start)) 1000000.0)))
-    result))
          
 
 (define song '(melody 0 2 4 8))
@@ -26,7 +20,7 @@
  )
 
 
-;(thread-start swank:start-server)
+;
 
 (define win (create-window (integer 800) (integer 600)))
 (set-title win "Hello 2")

@@ -267,9 +267,9 @@
        (when (eq sym 'text)
          (blit3d-color color)
          (blit3d-transform (or transform (mat4-identity)))
+
          (foxgl:blit-text (cadr model)
-                          (mat-mul (mat4-scale 0.02 0.02 1.0)
-                                   (or transform (mat4-identity))))
+                          (or transform (mat4-identity)))
          )
        (when (eq sym 'flat)
          (let ((fb (get-framebuffer model))
@@ -405,3 +405,10 @@
 (define foxgl:key-a 65)
 (define foxgl:key-s 83)
 (define foxgl:key-d 68)
+
+(defmacro measure(&rest body)
+  `(let ((time-start (timestamp))
+         (result (progn ,@body))
+         (time-end (timestamp)))
+    (println (list "operation took " (/ (rational (- time-end time-start)) 1000000.0)))
+    result))

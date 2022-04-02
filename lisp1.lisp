@@ -31,12 +31,6 @@
 (defmacro unless (test &rest body)
   `(if ,test () (progn ,@body)))
 
-(defun map! (f lst) 
-  (loop lst 
-       (f (car lst))
-       (set lst (cdr lst))  
-       ))
-
 (defun map (lst f2)
   (when lst
     (cons (f2 (car lst))
@@ -59,55 +53,53 @@
 (defun null? (v) (not v))
 (defun cons? (v) (= (type-of v) 'CONS))
 (define pair? cons?)
-(defun list? (x) (or (null? x) (cons? x)))
+
 
 (defun integer? (v) (= (type-of v) 'INTEGER))
 (defun rational? (v) (= (type-of v) 'RATIONAL))
 (defun string? (v) (= (type-of v) 'STRING))
-(defun symbol? (p) (= (type-of p) 'SYMBOL)) 
+;(defun symbol?(p) (= (type-of p) 'SYMBOL)) 
 (defun macro? (s) (eq (type-of s) 'FUNCTION_MACRO))
 (defun procedure? (s) (eq (type-of s) 'FUNCTION))
-(defun symbol-macro? (s) (and (bound? s t) (macro? (symbol-value s) 'FUNCTION_MACRO)))
-(defun symbol-procedure? (s) (and (bound? s t) (procedure? (symbol-value s))))
+
 (defun unbound? (s) (not (bound? s)))
 (define string=? string=)
 
 (defun last (lst)
   (if (cdr lst) (last (cdr lst)) (car lst)))
 
-(defun and (&rest items)
-  (let ((it items)
-        (ok t))
-    (loop it
-         (if (car it)
-             (set! it (cdr it))
-             (progn
-               (set! ok nil)
-               (set! it nil))))
-    ok
-    ))
-
-(defun or (&rest items)
-  (let ((it items)
-        (ok nil))
-    (loop it
-         (let ((fst (car it)))
-           (if fst
-               (progn
-                 (set! ok fst)
-                 (set! it nil))
-               (set! it (cdr it))
-               
-               )))
-    ok
-    ))
+(defmacro or (&rest items)
+  (defun ior(l)
+    (when l
+      `(let ((v ,(car l)))
+        (if v
+            v
+            ,(ior (cdr l))))))
+  (ior items))
 
 
+(defmacro and (&rest items)
+  (defun iand(l)
+    (if l
+      `(let ((v ,(car l)))
+        (if v ,(iand (cdr l)) nil))
+      't))
+  (iand items))
+
+(defun symbol-macro? (s) (and (bound? s t) (macro? (symbol-value s) 'FUNCTION_MACRO)))
+(defun symbol-procedure? (s) (and (bound? s t) (procedure? (symbol-value s))))
+
+(defun list? (x) (or (null? x) (cons? x)))
 (defmacro assert (test text)
   `(unless ,test (panic ,(or text "assertion failed"))))
-
 (defmacro assert-not (test text)
   `(when ,test (panic (cons ,(if text text "assertion failed") ',test)))) 
+
+(assert (or nil nil 2))
+(assert (and t t t))
+(assert-not (and t nil t))
+(assert-not (or nil nil nil))
+
 
 (defmacro while (test &rest body)
   `(loop ,test ,@body))
@@ -126,12 +118,6 @@
           (and (equals? (car a) (car b))
                (equals? (cdr a) (cdr b)))
           (= a b))))))
-
-(defun cddr (l)
-  (cdr (cdr l)))
-
-(defun cadr (l)
-  (car (cdr l)))
 
 (defun cdddr (l)
   (cdr (cddr l)))
@@ -161,19 +147,6 @@
   `(let ((,var ,lookup))
      (when ,var ,@body)))
 
-(defun plookup (lst sym)
-  (let ((r nil))
-    (while lst
-      (let ((fst (car lst)))
-        (if (symbol? fst)
-            (if (eq fst sym)
-                (do
-                 (set! r (cadr lst))
-                 (set! lst nil))
-                (set! lst (cddr lst)))
-            (set! lst (cdr lst)))))
-    r))
-
 (defun list-to-array (list)
   (let ((i 0)
         (v (make-vector (length list) (float32 0.0))))
@@ -189,7 +162,6 @@
 
 (defmacro cond (&rest args)
   (defun condi (args)
-    (println (caar args))
     (if args
         (if (eq (caar args) 'else)
             (cadar args)
@@ -259,7 +231,7 @@
     (loop list
           (when (f (car list))
             (set! result (cons (car list) result)))
-            (set! list nil))
+          (set! list nil))
     result))
 
 
@@ -304,3 +276,5 @@
                   (lisp:write-doc ,name '(,name ,@params)))))
       r
     )))
+
+(define pi 3.141592)
