@@ -39,7 +39,8 @@
         (color :rgb ( 0.2 0.2 0.2)
          
          ,tile-model)))
-      (transform :translate (0 -0.6 0) ,wheel-model)
+       
+       (transform :translate (0 -0.6 0) ,wheel-model)
       (transform :translate (1.5 -0.6 0) ,wheel-model)
       (transform :translate (0 -0.6 3) ,wheel-model)
       (transform :translate (1.5 -0.6 3) ,wheel-model)
@@ -52,8 +53,20 @@
       (color :rgb (0 0 0)
        (transform :translate (0.25 1.0 0.5)
         :scale (1.5 0.8 2.0)
-        ,cube-model))                           ;)
-      )))
+        ,cube-model))
+
+       ;; sun roof
+       (color :rgb (1 0 0)
+        (transform :translate (0.25 2.0 0.5)
+                   :scale (1.5 0.8 2.0)
+         ,tile-model)
+        )
+       (color :rgb (0 0 0)
+        (transform :translate (0.4 2.0 1.2)
+                   :scale (1.2 0.8 0.9)
+         ,tile-model)
+        )
+       )))
 (define tree-model
     `(color :rgb (0.5 0.8 0.5)
       (transform :scale (2 1 2)
@@ -164,7 +177,7 @@
 (define world-base (model-find-elem world 'world-base))
 (assert car-object)
 (assert world-base)
-  
+
 (defun pset! (list key value)
   (loop list
         (when (eq (car list) key)
