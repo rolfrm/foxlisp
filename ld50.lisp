@@ -26,6 +26,8 @@
                                                  0 0 1
                                                  1 0 1)))
 
+
+
 (define wheel-model
     `(color :rgb (0.1 0.1 0.1)
       (transform :scale (0.5 0.5 0.8)
@@ -67,6 +69,7 @@
          ,tile-model)
         )
        )))
+
 (define tree-model
     `(color :rgb (0.5 0.8 0.5)
       (transform :scale (2 1 2)
@@ -132,21 +135,117 @@
      ))))
 
 (define gas-model
-  `(gas
-    (color :rgb (0.8 0.8 0.0)
-     (transform :scale( 0.5 0.7) :translate (0 0.5)
-     (polygon :2d-triangle-strip
-      (-0.25 1.0
-       0.25 1.0
-       -1 0.5
-       1 0.5
-       -1 -0
-       1 -0
-       -0.25 -0.5
-       0.25 -0.5
-       ))
-     ))))
+    `(gas
+      (transform :translate (0 -0.5)
+      ; background
+      (color :rgb (0.8 0.8 0.0)
+       (transform :scale( 0.5 0.7) :translate (0 0.5)
+        (polygon :2d-triangle-strip
+         (-0.25 1.0
+          0.25 1.0
+          -1 0.5
+          1 0.5
+          -1 -0
+          1 -0
+          -0.25 -0.5
+          0.25 -0.5
+          ))))
+      (transform :scale (0.5 0.5) :translate (0 0.6)
+      (color :rgb (0 0 0)
+       (polygon :2d-triangle-strip
+        (0 1
+         -0.4 0
+         0.4 0
+        -0.4 -0.2
+        0.4 -0.2
+        -0.2 -0.4
+        0.2 -0.4
+        ))
+      )))))
+(define dial-model
+    `(dial
+      (transform :translate (0 -0.7)
+      ; background
+      (color :rgb (0.3 0.3 0.3)
+       (transform :scale( 0.5 0.7) :translate (0 0.5)
+        (polygon :2d-triangle-strip
+         (-0.25 1.0
+          0.25 1.0
+          -1 0.5
+          1 0.5
+          -1 -0
+          1 -0
+          -0.25 -0.5
+          0.25 -0.5
+          ))))
+      (transform :scale (0.5 0.5) :translate (0 0.7)
+      (color :rgb (0.2 0.2 0.2)
+       (polygon :2d-triangle-strip
+        (0 1
+         -0.4 0.2
+         0.4 0.2
+        ))
+      )))))
 
+(define dollar-model
+    `(dollar
+      (transform :scale (0.5 0.5) :translate (-0.2 -0.3)
+      (transform :translate (0.1 -0.5) :rotate (0.0 0.0 1.0)
+              (transform :scale (2 1)
+               (color :rgb (0.15 0.65 0.15)
+                ,square-model)))
+
+      (transform :translate (0.3 -0.5) :rotate (0.0 0.0 1.0)
+              (transform :scale (2 1)
+               (color :rgb (0.2 0.7 0.2)
+                ,square-model)))
+
+      (transform :translate (0.5 -0.5) :rotate (0.0 0.0 1.0)
+              (transform :scale (2 1)
+               (color :rgb (0.3 0.8 0.3)
+                ,square-model))
+              (color :rgb (0.1 0.4 0.1)
+               (transform :scale (1.5 -2.3)
+                (transform :translate (0.0 -1.05)
+               (flat :size (128 128)
+                (transform :scale (2 2)
+                 (text "$"))))))))))
+(define therm-base '(polygon :2d-triangle-strip
+       (0 3
+        0.3 3
+        0 0
+        0.3 0
+        -0.3 0.3
+        0.6 0.3
+        -0.3 0.6
+        0.6 0.6
+        0.0 0.9
+        0.3 0.9
+        )))
+(define thermometer-model
+    `(thermo
+      (transform :scale (0.3 0.3) :translate (0 -0.3)
+       (ref therm-base)
+       (transform :scale (0.5 0.5) :translate (0.06 0.2)
+        (color :rgb (0 0 1)
+         (ref therm-base)))
+       )))
+(define trinagle '(polygon :2d-triangle-strip (0 0 0.5 1 1 0)))
+(define happy-fox-model
+    `(happy-fox
+      (transform :scale (0.5 0.5) :translate (-0.5 0.25)
+       
+       (color :rgb (0.9 0.5 0.2)
+        (polygon :2d-triangle-strip (0 0 1 -1 2 0))
+        (polygon :2d-triangle-strip (0 0 0.2 0.4 0.4 0 ))
+        (transform :translate (1.6 0) :scale (0.4 0.4) ,trinagle)
+        (color :rgb (0 0 0)
+         (transform :scale (0.4 0.4) :translate (0.5 -0.3)
+          ,trinagle))
+        (color :rgb (0 0 0)
+         (transform :scale (0.4 0.4) :translate (1.2 -0.3)
+          ,trinagle))
+        ))))
 
 (define bg-color '( 0.15 0.3 0.1))
 (define time 0.0)
@@ -203,7 +302,7 @@
   v1)
 (defun render-scene()
   
-  ;;(incf time 0.3)
+  (incf time 0.1)
   (incf mx vx)
   (set! vx (* vx 0.9))
   (pset! car-object :rotate `( 0.0 ,car-rotation 0.0))
@@ -238,11 +337,56 @@
          
            ,world ))))
        (transform :scale (0.05 0.05) :translate (0.05 0.95)
-        :rotate (0 0 0)
-        ,heart-model)
+        (ref heart-model)
+        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
+        (transform :scale (,(+ 1.0 (sin (+ 0.5 time))) 0.3) :translate (0.8 0)
+         (color :rgb (1 0 0)
+          (ref square-model)))
+        )
        (transform :scale (0.05 0.05) :translate (0.05 0.85)
-                  :rotate (0 0 0)
-        ,gas-model)
+        (ref gas-model)
+        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
+        (transform :scale (,(+ 1.0 (sin time)) 0.3) :translate (0.8 0)
+         (color :rgb (0 0 0)
+          (ref square-model)))
+        )
+       (transform :scale (0.05 0.05) :translate (0.05 0.75)
+        (ref thermometer-model)
+        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
+        
+        (transform :scale (,(+ 1.0 (sin time)) 0.3) :translate (0.8 0)
+         (color :rgb (,(+ 0.5 (* 0.5 (sin (+ 0.0 time))))
+                      0
+                      ,(+ 0.5 (* 0.5 (sin (+ 1.5 time))))
+                      )
+          (ref square-model)))
+        )
+       (transform :scale (0.05 0.05) :translate (0.05 0.65)
+        (ref happy-fox-model)
+        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
+        
+        (transform :scale (,(+ 1.0 (sin time)) 0.3) :translate (0.8 0)
+         (color :rgb (0.9 0.5 0.2) 
+          (ref square-model)))
+        )
+       
+       (transform :scale (0.05 0.05) :translate (0.05 0.45)
+        ;(ref dollar-model)
+        )
+       (transform :scale (0.1 0.1) :translate (0.1 0.1)
+        (transform :rotate (0 0 ,time)
+        (ref dial-model)
+        
+         ))
+       (transform :scale (0.1 0.1) :translate (0.3 0.1)
+               (transform :rotate (0 0 ,(- 0.0 time))
+        (ref dial-model)
+        
+                ))
+       (transform :scale (0.1 0.1) :translate (0.6 0.1)
+        (transform :rotate (0 0 ,(- 0.0 time))
+         (ref dial-model)))
+       
        )
     
       ))))
