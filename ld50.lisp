@@ -1,6 +1,6 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
-;(thread-start swank:start-server)
+(thread-start swank:start-server)
 
 (define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
 
@@ -92,11 +92,97 @@
                     ,square-model))
       ))
 
+(defmacro pop (place)
+  `(let ((v (car ,place)))
+    (set! ,place (cdr ,place))
+    v))
+    
+
+(define test-bezier '(0.0 0.0
+                      1.0 1.0
+                      2.0 1.5
+                      3.0 2.0
+                      3.0 3.0 ))
+(defun bezier-to-polygon (curve)
+  (let ((points nil))
+    (loop (cddr curve)
+          (let ((ax (pop curve))
+                (ay (pop curve))
+                (bx (pop curve))
+                (by (pop curve))
+                (cx (car curve))
+                (cy (cadr curve))
+                )
+            (println (list ax ay bx by cx cy))
+            (do-times 30
+              (lambda (i)
+                (let* ((d (/ (rational i) 30.0))
+                       (dn (- 1.0 d))
+                       (dn2 (* dn dn))
+                       (d2 (* d d)))
+                  (let ((px (+ bx (+ (* dn2 (- ax bx)) (* d2 (- cx bx)))))
+                        (py (+ by (+ (* dn2 (- ay by)) (* d2 (- cy by))))))
+                    (set! points (cons py (cons px points)))))))))
+    (let ((cx (pop curve))
+          (cy (pop curve)))
+      (set! points (cons cy (cons cx points))))
+    (reverse! points)))
+
+
+(defun v2-len(x y)
+  (math:sqrt (+ (* x x) (* y y))))
+
+(defun points-to-strip (points)
+  (let ((strip nil))
+    (loop (cddr points)
+          (let ((ax (pop points))
+                (ay (pop points))
+                (bx (car points))
+                (by (cadr points)))
+            (let ((dx (- bx ax))
+                  (dy (- by ay)))
+              (let ((len (v2-len dx dy)))
+                (set! dx (/ dx len))
+                (set! dy (/ dy len)))
+              (let ((ty (* dx 0.5))
+                    (tx (* (- 0.0 dy) 0.5)))
+                (let ((nx1 (+ ax tx))
+                      (ny1 (+ ay ty))
+                      (nx2 (- ax tx))
+                      (ny2 (- ay ty)))
+                  (set! strip (list* ny2 nx2 ny1 nx1 strip)))))))
+    (println strip)
+    (reverse! strip)))
+                  
+(println (bezier-to-polygon test-bezier))
+(println (points-to-strip (bezier-to-polygon test-bezier)))
+
+
+
+(define road-model
+    `(transform :scale (20 20 20)d d:tranawslate (0.0 0.0 -1.0)
+      (transform :rotate (,pi_2 0 0)
+       (polygon :2d-triangle-strip ,(points-to-strip (bezier-to-polygon
+                                                      '(0.0 0.0
+                                                        1.0 1.0
+                                                        2.0 1.5
+                                                        3.0 2.0
+                                                        0.0 6.0
+                                                        -3.0 9.0
+                                                        4.0 9.0
+                                                        5.0 9.0
+                                                        6.0 13.0
+                                                        8.0 15.0
+                                                        0.0 16.0
+                                                        -5.0 9.0
+                                                        0.0 0.0
+                                                         
+                                                        )))))))
 (defun world-model ()
   `(world
     (transform :id world-base :translate (0 0 0)
      (color :rgb (0.3 0.3 0.3)
-      (transform :scale (50 1 10) :translate (-15.0 0.0 -1.0) ,tile-model))
+      (ref road-model))
                                         ;,square-model
       (transform :translate (-2 0 -6)
        (ref tree-model))
@@ -377,16 +463,23 @@
        (transform :scale (0.05 0.05) :translate (0.05 0.45)
         (ref dollar-model)
         )
+
        (transform :scale (0.1 0.1) :translate (0.1 0.1)
+        (transform :scale (10.0 2.0) :translate (-1.0 -1)
+         (color :rgb (0.3 0.0 0.0)
+          ,square-model))
         (transform :rotate (0 0 ,time)
-        (ref dial-model)
-        
-         ))
+         (ref dial-model)
+         )
+        (transform :scale (0.015 -0.015) :translate (-0.3 1)
+         (text "AC"))
+        )
        (transform :scale (0.1 0.1) :translate (0.3 0.1)
-               (transform :rotate (0 0 ,(- 0.0 time))
-        (ref dial-model)
-        
-                ))
+        (transform :rotate (0 0 ,(- 0.0 time))
+         (ref dial-model))
+        (transform :scale (0.015 -0.015) :translate (-0.3 1)
+         (text "Radio"))
+        )
        (transform :scale (0.1 0.1) :translate (0.6 0.1)
         (transform :rotate (0 0 ,(- 0.0 time))
          (ref dial-model)))
@@ -426,9 +519,11 @@
     (set! car-rotation (+ car-rotation 0.1))
     )
   (audio:update)
-  (measure
-   (do-times 100 (lambda ()
-                  (render-scene))))
+  (render-scene)
+  (when nil
+    (measure
+     (do-times 1 (lambda ()
+                  (render-scene)))))
   (swap win)
   (poll-events)
   )

@@ -137,6 +137,8 @@ lisp_value lisp_length(lisp_value lst);
 
 lisp_value car(lisp_value v);
 lisp_value cdr(lisp_value v);
+lisp_value cadr(lisp_value v);
+lisp_value cddr(lisp_value v);
 lisp_value pop(lisp_value * v);
 lisp_value lisp_append(lisp_value a, lisp_value b);
 void * lisp_malloc(size_t s);

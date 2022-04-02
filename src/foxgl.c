@@ -11,6 +11,12 @@ lisp_value lisp_pow(lisp_value a, lisp_value b){
   return rational(pow(a.rational, b.rational));
 }
 
+
+lisp_value lisp_sqrt(lisp_value a){
+  type_assert(a, LISP_RATIONAL);
+  return rational(sqrt(a.rational));
+}
+
 lisp_value rect2(lisp_value r, lisp_value g,lisp_value b,lisp_value a){
   blit_rectangle2(r.rational,g.rational,b.rational,a.rational);
   return nil;

@@ -56,6 +56,7 @@
 (define thread:unlock-mutex (load-wrap foxgl2 "foxgl_unlock_mutex" 1))
 
 (define math:pow (load-wrap foxgl2 "lisp_pow" 2))
+(define math:sqrt (load-wrap foxgl2 "lisp_sqrt" 1))
 
                                         ;(define load-polygon (load-wrap foxgl2 "load_polygon" vertexes dims-optional))
 
@@ -412,3 +413,4 @@
          (time-end (timestamp)))
     (println (list "operation took " (/ (rational (- time-end time-start)) 1000000.0)))
     result))
+

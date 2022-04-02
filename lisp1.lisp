@@ -8,6 +8,7 @@
 (define defvar define)
 
 (def list (lambda (&rest x) x))
+
 (def begin progn)
 (def set! set)
 (def display println)
@@ -277,4 +278,17 @@
       r
     )))
 
+(defun list*1(lists)
+  (let ((head (car lists))
+        (tail (cdr lists)))
+    (if tail
+        (cons head (list*1 tail))
+        head)))
+
+(defun list* (&rest lists)
+  (list*1 lists))
+
+(println (list* '1 'b 'c '(1 2 3)))
+
 (define pi 3.141592)
+(define pi_2 (/ pi 2.0))
