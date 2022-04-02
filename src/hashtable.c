@@ -59,6 +59,11 @@ u64 fnv1a_hash(const char * data, size_t count){
   return hash;
 }
 
+u64 hash64(u64 * bytes, size_t _){
+  //return fnv1a_hash(bytes, 8);
+  return *bytes * 0xD371285717693758L + 0x8186734152378301L;
+}
+
 u64 hyper_hash(const void * data, size_t count){
   u64 bias = 0xcbf29ce484222325UL;
   u64 prime1 = 0x100000001b3;
@@ -163,6 +168,7 @@ void ht_init(hash_table * ht){
 	 ht->occupied = ht->alloc_state(ht->capacity * sizeof(ht_state));
   }
 }
+
 void ht_set_mem_values(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr)){
   ht->alloc_values = alloc;
   ht->free_values = free;
@@ -176,6 +182,8 @@ void ht_set_mem_keys(hash_table * ht, void * (* alloc)(size_t s), void (* free)(
 
 hash_table * ht_create2(size_t capacity, size_t key_size, size_t elem_size){
   hash_table * ht = alloc(sizeof(*ht));
+  //if(key_size == 8)
+  //  ht->hash = hash64;
   ht->capacity = capacity;
   ht->key_size = key_size;
   ht->elem_size = elem_size;
@@ -244,10 +252,29 @@ static void ht_grow(hash_table * ht){
   ht_set_capacity(ht, ht->capacity * 2);
 }
 
+
 static i64 ht_find_free_pre_hashed(const hash_table * ht, size_t hash, const void * key){
   size_t key_size = ht->key_size;
   size_t capacity = ht->capacity;
   compare_t compare = ht->compare;
+  // optimization for this concrete case.
+  if(key_size == 8 && compare == NULL){
+    u64 key2 = ((u64 *)key)[0];
+    u64 * keys = ht->keys;
+    for(size_t _i = 0, i = hash % ht->capacity; _i < capacity; _i++, i++){
+      if(i >= capacity) i = 0;
+      switch(ht->occupied[i]){
+      case HT_FREE:
+        return i;
+      case HT_OCCUPIED:
+        {
+          if(keys[i] == key2)
+            return i;
+        }
+      }
+    }
+    return -1;
+  }
 
   // find a free slot using linear probing.
   for(size_t _i = 0, i = hash % ht->capacity; _i < capacity; _i++, i++){
@@ -259,8 +286,9 @@ static i64 ht_find_free_pre_hashed(const hash_table * ht, size_t hash, const voi
     case HT_OCCUPIED:
       {
         let thiskey = ht->keys + i * key_size;
-        if(compare != NULL && compare(key, thiskey, ht->userdata)){
-          return i;
+        if(compare != NULL){
+          if(compare(key, thiskey, ht->userdata))
+             return i;
         }else if(memcmp(thiskey, key, key_size) == 0){
           return i;
         }	
@@ -280,7 +308,7 @@ static i64 ht_find_free(const hash_table * ht, const void * key){
 
 bool ht_set(hash_table * ht, const void * key, const void * nelem){
   ht_init(ht);
-  if(ht->count * 2 > ht->capacity)
+  if(ht->count * 2 >= ht->capacity)
     ht_grow(ht);
   i64 index = ht_find_free(ht, key);
   

@@ -2,6 +2,30 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 
+(defun sine-instrument (freq phase)
+  (sin (* freq phase)))
+
+(defmacro measure(&rest body)
+  `(let ((time-start (timestamp))
+         (result (progn ,@body))
+         (time-end (timestamp)))
+    (println (list "operation took " (/ (rational (- time-end time-start)) 1000000.0)))
+    result))
+         
+
+(define song '(melody 0 2 4 8))
+(define song-buffer (make-vector (* 44100 3) (float32)))
+;; v1 1.17 sec
+(progn
+  (while t
+         (measure
+          (process-song song song-buffer 44100 0.0 1.0))
+         (println 'done))
+  ;;(set! sample1-loaded (audio:load-sample song-buffer))
+ ;(println song-buffer)
+ )
+
+
 ;(thread-start swank:start-server)
 
 (define win (create-window (integer 800) (integer 600)))
@@ -117,28 +141,6 @@
 (define txt nil)
 (define jump nil)
 
-(defun sine-instrument (freq phase)
-  (sin (* freq phase)))
-
-(defmacro measure(&rest body)
-  `(let ((time-start (timestamp))
-         (result (progn ,@body))
-         (time-end (timestamp)))
-    (println (list "operation took " (/ (rational (- time-end time-start)) 1000000.0)))
-    result))
-         
-
-(define song '(melody 0 2 4 8))
-(define song-buffer (make-vector (* 44100 3) (float32)))
-;; v1 1.17 sec
-(progn
-  (while t
-         (measure
-          (process-song song song-buffer 44100 0.0 1.0))
-         (println 'done))
-  ;;(set! sample1-loaded (audio:load-sample song-buffer))
- ;(println song-buffer)
- )
 
 (defun render-scene ()
   ;;(sleep 0.1)

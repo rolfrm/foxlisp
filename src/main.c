@@ -137,7 +137,7 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
 
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
   if(scope->values == NULL)
-	 scope->values = ht_create(sizeof(size_t), sizeof(lisp_value));
+	 scope->values = ht_create2(8, sizeof(size_t), sizeof(lisp_value));
   
   ht_set(scope->values,&sym.integer,&value);
   return nil;
@@ -230,7 +230,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
 
 lisp_value copy_cons(lisp_value a){
   if(a.type == LISP_CONS)
-    return new_cons(car(a), copy_cons(cdr(a)));
+    return new_cons(copy_cons(car(a)), copy_cons(cdr(a)));
   return a;
 }
 
@@ -631,10 +631,10 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   if(lisp_is_in_error())
     return nil;
-  
-  //call_chain = new_cons(value, call_chain);
+  cons c = {.car = value, .cdr = call_chain};
+  call_chain = new_cons((lisp_value){.cons = &c, .type = LISP_CONS}, call_chain);
   var r = lisp_eval2(scope, value);
-  //call_chain = cdr(call_chain);
+  call_chain = c.cdr;
   return r;
 }
 
@@ -958,7 +958,8 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
       if(lisp_scope_try_get_value(scope, value, &r))
         return r;
       else{
-        raise_string("symbol not found.");
+        print(value);
+        raise_string(" symbol not found.");
       }
     }
 		 
@@ -1642,6 +1643,8 @@ int main(int argc, char ** argv){
   lisp_register_native("set-cdr!", 2, set_cdr);
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("length", 1, list_length);
+  lisp_register_native("copy-list", 1, copy_cons);
+  lisp_register_native("copy-list-deep", 1, copy_cons);
 
   lisp_register_native("=", 2, lisp_eq);
   lisp_register_native("string=", 2, string_eq);

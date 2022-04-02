@@ -44,6 +44,7 @@
 (define foxgl:blend (load-wrap foxgl2 "lblit_blend" 1))
 (define foxal:play-sample (load-wrap foxgl2 "foxal_play_sample" 1))
 (define foxgl-get-events (load-wrap foxgl2 "foxgl_get_events" 0))
+(def-wrap foxgl:key-down? foxgl2 "foxgl_key_down" win key)
 
 (define audio:load-sample (load-wrap foxgl2 "foxal_load_sample" 1))
 (define audio:play-sample (load-wrap foxgl2 "foxal_play_sample" 1))
@@ -56,7 +57,10 @@
 
 (define math:pow (load-wrap foxgl2 "lisp_pow" 2))
 
-(define load-polygon (load-wrap foxgl2 "load_polygon" 1))
+                                        ;(define load-polygon (load-wrap foxgl2 "load_polygon" vertexes dims-optional))
+
+(def-wrap load-polygon foxgl2 "load_polygon" vertexes dimensions)
+
 (define blit-polygon (load-wrap foxgl2 "blit_polygon" 1))
 (define delete-polygon (load-wrap foxgl2 "delete_polygon" 1))
 
@@ -114,12 +118,12 @@
 
 (defun plist-rest (lst func)
   (while lst
-    (let ((fst (car lst)))
-      (if (symbol? fst)
-          (set! lst (cddr lst))
-          (do
-           (set! lst (cdr lst))
-           (func fst))))))
+         (let ((fst (car lst)))
+           (if (symbol? fst)
+               (set! lst (cddr lst))
+               (do
+                (set! lst (cdr lst))
+                (func fst))))))
 
 (defun mat4-identity ()
   (let ((m (make-vector 16 (float32 0.0))))
@@ -179,7 +183,7 @@
           (let ((bf (foxgl:create-framebuffer (car size) (cadr size))))
             (hashtable-set! framebuffer-cache model bf)
             bf)))
-                  
+  
   (set!
    render-model
    (lambda (model)
@@ -193,12 +197,15 @@
            )
          
          (match rgb (plookup (cdr model) ':rgb)
-           (set! color rgb)
-           )
+                (set! color rgb)
+                )
          (match rgb (plookup (cdr model) ':rgba)
-           (set! color rgb)
-           )
+                (set! color rgb)
+                )
          )
+       (when (eq sym 'ref)
+
+         (render-model (symbol-value (cadr model))))
        (when (eq sym 'view)
          (match p (plookup (cdr model) :perspective)
                 (let ((fov (car p))
@@ -241,69 +248,80 @@
                 
                 )
          )
+       (when (eq sym 'render-callback)
+         ((cadr model) model)
+         )
        (when (eq sym 'unit-square)
          (blit3d-color color)
          (blit3d-transform (or transform (mat4-identity)))
          (blit3d-square)
          )
-      (when (eq sym 'print)
-        (println (list (cdr model) transform color)))
-      (when (eq sym 'text)
-        (blit3d-color color)
-        (blit3d-transform (or transform (mat4-identity)))
-        (foxgl:blit-text (cadr model)
-                         (mat-mul (mat4-scale 0.02 0.02 1.0)
-                         (or transform (mat4-identity))))
-        )
-      (when (eq sym 'flat)
-        (let ((fb (get-framebuffer model))
-              (prev-transform transform)
-              )
-          (when (null? fb)
-            (let ((s (plookup (cdr model) :size)))
-              (set! fb (load-framebuffer model (or s '(100 100))))))
-          (foxgl:bind-framebuffer fb)
-          (set! transform nil)
-          (push! funcs (lambda ()
-                         (foxgl:unbind-framebuffer fb)
-                         (set! transform prev-transform)
-                         (unless square-buffers
-   
-                           (set! square-buffers
-                                 (list
-                                  (load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
-                                  (load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
-                           
-                           )
-                         (foxgl:bind-texture (foxgl:framebuffer-texture fb))
-                         (blit3d-color color)
-                         (blit3d-transform (or transform (mat4-identity)))
-                         (foxgl:blend t)
-                         (blit-polygon square-buffers)
-                         (foxgl:blend nil)
-                         (foxgl:bind-texture nil)
-                         
-                         ))
-          )
-        )
+       (when (eq sym 'print)
+         (println (list (cdr model) transform color)))
+       (when (eq sym 'blend)
+
+         (foxgl:blend t)
+         (push! funcs (lambda ()
+                        (foxgl:blend nil)
+                        )))
+       (when (eq sym 'text)
+         (blit3d-color color)
+         (blit3d-transform (or transform (mat4-identity)))
+         (foxgl:blit-text (cadr model)
+                          (mat-mul (mat4-scale 0.02 0.02 1.0)
+                                   (or transform (mat4-identity))))
+         )
+       (when (eq sym 'flat)
+         (let ((fb (get-framebuffer model))
+               (prev-transform transform)
+               )
+           (when (null? fb)
+             (let ((s (plookup (cdr model) :size)))
+               (set! fb (load-framebuffer model (or s '(100 100))))))
+           (foxgl:bind-framebuffer fb)
+           (set! transform nil)
+           (push! funcs (lambda ()
+                          (foxgl:unbind-framebuffer fb)
+                          (set! transform prev-transform)
+                          (unless square-buffers
+                            
+                            (set! square-buffers
+                                  (list
+                                   (load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
+                                   (load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
+                            
+                            )
+                          (foxgl:bind-texture (foxgl:framebuffer-texture fb))
+                          (blit3d-color color)
+                          (blit3d-transform (or transform (mat4-identity)))
+                          (foxgl:blend t)
+                          (blit-polygon square-buffers)
+                          (foxgl:blend nil)
+                          (foxgl:bind-texture nil)
+                          
+                          ))
+           )
+         )
        (when (eq sym 'polygon)
-         (match poly (plookup (cdr model) ':2d-triangle-strip)
-                (let ((r (hashtable-ref polygon-cache (cdr model))))
-                  
-                  (unless r
-                    
-                    (println (list 'new-poly r))
-                    (set! r (cons 'poly (load-polygon (list-to-array poly))))
-                    (hashtable-set polygon-cache (cdr model) r)
-                    (register-finalizer r cache-delete)
-                    )
-                  (blit3d-color color)
-                  (blit3d-transform (or transform (mat4-identity)))
-                  (blit-polygon (cdr r))
-                  
-                  )
-                
-                ))
+         (let ((dims 2)
+               (poly (plookup (cdr model) :2d-triangle-strip)))
+           (unless poly
+             (set! poly (plookup (cdr model) :3d-triangle-strip))
+             (set! dims 3)
+             )
+           (when poly
+             (let ((r (hashtable-ref polygon-cache (cdr model))))
+               (unless r
+                 (println (list 'new-poly r))
+                 (set! r (cons 'poly (load-polygon (list-to-array poly) dims)))
+                 (hashtable-set polygon-cache (cdr model) r)
+                 (register-finalizer r cache-delete)
+                 )
+               (blit3d-color color)
+               (blit3d-transform (or transform (mat4-identity)))
+               (blit-polygon (cdr r))
+               )
+             )))
        
        (plist-rest (cdr model) render-model)
        
@@ -355,30 +373,35 @@
         (sample (rational sample-rate))
         (llen (vector-length buffer))
         (phase-incr (/ 1.0 phase)))
-                
-  (defun rec(song)
     
-    (let ((fst (car song))
-          (result 0.0))
-      (when (eq fst 'melody)
-        (let ((lst (cdr song))
-              (p phase))
-          (loop lst
-                (if (< p 0.25)
-                    (progn ;; found note
-                      (set! result (sin (* 6.28 (* p (audio:note-to-frequency (car lst))))))          (set! lst nil)
-            
-                      )
-                    (progn
-                      (set! lst (cdr lst))
-                      (set! p (- p 0.25)))))
+    (defun rec(song)
+      
+      (let ((fst (car song))
+            (result 0.0))
+        (when (eq fst 'melody)
+          (let ((lst (cdr song))
+                (p phase))
+            (loop lst
+                  (if (< p 0.25)
+                      (progn ;; found note
+                        (set! result (sin (* 6.28 (* p (audio:note-to-frequency (car lst))))))          (set! lst nil)
+                        
+                        )
+                      (progn
+                        (set! lst (cdr lst))
+                        (set! p (- p 0.25)))))
+            )
           )
-        )
-      result
-      ))
-  (loop (< i llen)
-        (vector-set! buffer i (float32 (rec song)))
-        (incf phase phase-incr)
-        (incf i 1))
-  ))
+        result
+        ))
+    (loop (< i llen)
+          (vector-set! buffer i (float32 (rec song)))
+          (incf phase phase-incr)
+          (incf i 1))
+    ))
 
+(define foxgl:key-up 264)
+(define foxgl:key-w 87)
+(define foxgl:key-a 65)
+(define foxgl:key-s 83)
+(define foxgl:key-d 68)

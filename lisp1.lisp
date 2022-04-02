@@ -254,6 +254,15 @@
     (reverse! result)))
 
 
+(defun first (f list)
+  (let ((result nil))
+    (loop list
+          (when (f (car list))
+            (set! result (cons (car list) result)))
+            (set! list nil))
+    result))
+
+
 (define hashtable-set! hashtable-set)
 
 (define libc (load-lib "libc.so.6"))
@@ -282,3 +291,16 @@
 (lisp:write-doc define '(define name value))
 (lisp:write-doc vector-set! '(vector-set! vector index value))
 (lisp:write-doc make-vector '(make-vector count default-value ))
+
+(defmacro def-wrap (name lib fname &rest params)
+  (let ((argnum (if (integer? (car params))
+                    (car params)
+                    (length params)))
+        (name2 (if (symbol? fname) (symbol->string fname) fname)))
+    (println name)
+    (let ((r `(def ,name (load-wrap ,lib ,name2 ,argnum))))
+      (unless (integer? (car params))
+        (set! r `(progn ,r
+                  (lisp:write-doc ,name '(,name ,@params)))))
+      r
+    )))

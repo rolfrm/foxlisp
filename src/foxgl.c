@@ -656,15 +656,20 @@ lisp_value lblit_square2(){
   return nil;
 }
 
-lisp_value load_polygon (lisp_value val){
+lisp_value load_polygon (lisp_value val, lisp_value dim){
   if(blit3d_current_context == NULL) return nil;
   type_assert(val, LISP_VECTOR);
   type_assert(val.vector->default_value, LISP_FLOAT32);
+  int dimensions = 2;
+  if(dim.type != LISP_NIL){
+    type_assert(dim, LISP_INTEGER);
+    dimensions = dim.integer;
+  }
   var pts = (float *) val.vector->data;
 
   var poly = blit3d_polygon_new();
   blit3d_polygon_load_data(poly, pts,  val.vector->count * val.vector->elem_size);
-  blit3d_polygon_configure(poly, 2);
+  blit3d_polygon_configure(poly, dimensions);
 
   return native_pointer(poly);
 }
@@ -846,4 +851,10 @@ lisp_value lblit_blend(lisp_value blend){
     glEnable(GL_BLEND);
   else
     glDisable(GL_BLEND);
+}
+
+lisp_value foxgl_key_down(lisp_value window, lisp_value keyid){
+  if(gl_window_get_key_state(window.native_pointer, keyid.integer))
+    return t;
+  return nil;
 }
