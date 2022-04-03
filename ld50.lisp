@@ -427,6 +427,8 @@
         ))))
 
 (define bg-color '( 0.15 0.3 0.1))
+(define bg-color '( 0.9 0.9 0.9))
+(define bg-color '( 0.9 0.9 0.6))
 (define time 0.0)
 (define vx 0.0)
 ;(define world (world-model))
@@ -468,6 +470,15 @@
 (define car-offset 0.0)
 (define car-y-offset 0.0)
 (define car-road-location 0)
+(define gas-level 100.0)
+(define health-level 100.0)
+(define temperature 7.0)
+(define ambient-temperature 100.0)
+(define ac-state :heat)
+(define radio-state :off)
+(define fox-happiness 100.0)
+(define traveled 0.0)
+(define end-state nil)
 (progn
   (set! car-road-location 22)
                                         ; car-y-offset car-offset
@@ -490,19 +501,221 @@
     (lambda (i) (vector-set!  v1 i (float32  (+ (rational (vector-ref v1 i)) (rational (vector-ref v2 i)))))))
   v1)
 
+(defun abs(x)
+  (if (< x 0.0)
+      (- 0 x)
+      x))
+
 (defun render-scene()
   
+  
+  (render-model
+   `(root
+     (transform :scale (2.0 2.0)
+      (transform :translate (-0.5 -0.5)
+       
+       (color :rgb ,bg-color
+        ,square-model)
+
+       ;; setting up the view
+       (view :perspective (1.0 1.0 0.01 1000.0)
+        (transform :translate (0 -4 -4)
+         (transform :rotate (0.4 0.0 0)
+          (transform :translate (-0.5 -0.5 -10)
+           :scale (0.5 0.5 0.5)
+           
+           
+           (ref world-model) ))))
+       ;health meter
+       (transform :scale (0.05 0.05) :translate (0.05 0.95)
+        (ref heart-model)
+        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
+        (transform :scale (,(/ health-level 50.0) 0.3) :translate (0.8 0)
+         (color :rgb (1 0 0)
+          (ref square-model)))
+        )
+       ;; gas
+       (transform :scale (0.05 0.05) :translate (0.05 0.85)
+        (ref gas-model)
+        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
+        (transform :scale (,(/ gas-level 50.0 ) 0.3) :translate (0.8 0)
+         (color :rgb (0 0 0)
+          (ref square-model)))
+        )
+       ;;thermometer
+       (transform :scale (0.05 0.05) :translate (0.05 0.75)
+        (ref thermometer-model)
+        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
+        
+        (transform :scale (,(/ temperature 50.0) 0.3) :translate (0.8 0)
+         (color :rgb (,(+ 0.5 (- (* 0.5 (/ temperature 50.0)) 0.5))
+                      ,(- 1 (abs (- (* 0.5 (/ temperature 50.0) 0.5))))
+                      ,(- 0.5 (- (* 0.5 (/ temperature 50.0)) 0.5)))
+                      
+          (ref square-model)))
+        )
+       (transform :scale (0.05 0.05) :translate (0.05 0.65)
+        (ref happy-fox-model)
+        (transform :scale (2.0 0.3) :translate (0.8 0) (ref square-model))
+        
+        (transform :scale (,(/ fox-happiness 50.0) 0.3) :translate (0.8 0)
+         (color :rgb (0.9 0.5 0.2) 
+          (ref square-model)))
+        )
+       
+       (transform :scale (0.05 0.05) :translate (0.05 0.55)
+        (transform :scale (0.03 -0.03)
+         (color :rgb (0 0 0)
+         (text "traveled: ")
+         (transform :translate (100.0 0.0)
+          (text ,(value->string (integer traveled)))
+          ))))
+
+       (transform :scale (0.05 0.05) :translate (0.25 0.85)
+        (transform :scale (0.1 -0.1)
+         (color :rgb (0 0 0)
+          (text ,(if end-state
+                     (value->string end-state) ""))
+         )))
+              
+       (transform :scale (0.05 0.05) :translate (0.05 0.45)
+        (ref dollar-model)
+        )
+
+       (transform :scale (0.1 0.1) :translate (0.1 0.1)
+        (transform :scale (10.0 2.0) :translate (-1.0 -1)
+         (color :rgb (0.3 0.0 0.0)
+          ,square-model))
+        (transform :rotate (0 0 ,(if (eq ac-state :heat) -1.0
+                                     (if (eq ac-state :cool)
+                                         1.0
+                                         0.0)))
+         (ref dial-model)
+         )
+        (transform :scale (0.015 -0.015) :translate (-0.3 1)
+         (text "AC"))
+        )
+       ;; radio
+       (transform :scale (0.1 0.1) :translate (0.3 0.1)
+        (transform :rotate (0 0 ,(if (eq? radio-state :off) 1.0 -1.0))
+         (ref dial-model))
+        (transform :scale (0.015 -0.015) :translate (-0.3 1)
+         (text "Radio"))
+        )
+       (transform :scale (0.1 0.1) :translate (0.6 0.1)
+        (transform :rotate (0 0 ,(- 0.0 time))
+         (ref dial-model)))
+       (transform :scale (0.1 0.1) :translate (0.0 0.0)
+
+        (transform :scale (0.015 -0.015) :translate (-0.0 1)
+         (text ,(value->string (list fox-happiness)))
+        ))
+       )
+      
+    
+      ))))
+(defun poll-events2 ()
+  (let ((evts (foxgl-get-events)))
+    (let ((evts2 (map evts (lambda (evt)
+                             (let* ((tsl (cddr evt))
+                                    (ts (car tsl))
+                                    (tsl (cdr tsl))
+                                    (e (car tsl)))
+                               (cons e (cdr tsl)))))))
+      evts2
+      )))
+
+(defun entities-update ()
+  (let ((evts (poll-events2)))
+    (when evts
+      
+      (println evts))
+    (when (first (lambda (x) (equals? '(char e) x)) evts)
+      (set! ac-state
+            (cond ((eq ac-state :cool) :heat)
+                  ((eq ac-state :heat) :off)
+                  ((eq ac-state :off) :cool)
+                  (else :cool))))
+    (when (first (lambda (x) (equals? '(char r) x)) evts)
+      (set! radio-state
+            (cond ((eq radio-state :off) :on)
+                  (else :off))))
+    )
+  (when nil
+    (do-times 320 (lambda (i) (when (> i 31)
+                                (when (foxgl:key-down? win i)
+                                  (println (list 'yes i)))))))
+  (when (foxgl:key-down? win foxgl:key-w)
+    (set! vx (+ vx 0.1))
+    )
+  (when (foxgl:key-down? win foxgl:key-s)
+    (set! vx (- vx 0.1))
+    )
+  (set! car-turn 0.0)
+  (when (foxgl:key-down? win foxgl:key-a)
+    (incf car-turn -0.3)
+    )
+  (when (foxgl:key-down? win foxgl:key-d)
+    (incf car-turn  0.3)
+    )
   (incf car-rotation (* 1.5 car-turn))
   (incf car-y-offset (- 0.0 car-turn))
-
   (incf time 0.1)
+  (when (> vx 1.0)
+    (set! vx 1.0))
   ;(set! vx 1.0)
-  ;(set! vx (* vx 0.9))
+                                        ;(set! vx (* vx 0.9))
+  (define out-of-gas nil)
+  (when (or end-state (< gas-level 0.00))
+    (set! vx 0.0)
+    (set! out-of-gas t)
+    )
   (define road-part (list-offset road-line (* car-road-location 2)))
-  (incf car-offset vx)
+  (unless (or end-state out-of-gas)
+    (when (eq ac-state :heat)
+      (incf temperature 0.1))
+    (when (eq ac-state :cool)
+      (incf temperature -0.1))
+    (when (not (eq ac-state :off))
+      (incf gas-level -0.001))
+    (when (eq radio-state :on)
+      (incf gas-level -0.001))
+  
+    (if (and (eq radio-state :on) (< fox-happiness 100.0))
+        (incf fox-happiness 0.05)
+        (incf fox-happiness -0.05))
+
+    (incf car-offset vx)
+    (incf traveled vx)
+    )
+  
+  (incf temperature (* 0.001 (- ambient-temperature temperature)))
+  
+  (if (< vx 0.0)
+      (set! vx 0.0))
+         
+  (when (> vx 0.0)
+    (incf gas-level -0.01)
+    )
+  (when (< temperature 20.0)
+    (incf health-level -0.1))
+  (when (> temperature 80.0)
+    (incf health-level -0.1))
+  (when (< fox-happiness 20.0)
+    (incf health-level -0.1))
+  (when (> fox-happiness 80.0)
+    (incf health-level 0.05))
+  
+  (when (< gas-level 0.001)
+    (set! end-state :out-of-gas))
+  (when (< health-level 0.001)
+    (set! end-state :dead))
+
+  
   (define p1 (vec2-scale (list->vec2 road-part) 20.0))
   (define car-object (model-find-elem world-model 'car))
   (define coin-object (model-find-elem world-model 'coin))
+
   ;(println coin-object)
   (pset! coin-object :rotate `(0.0 ,time 0.0))
   (unless (cdddr road-part)
@@ -536,126 +749,14 @@
     (pset! car-object :rotate `( 0.0 ,car-rotation 0.0))
     (pset! car-object :translate `(,(rational (vec2-x cpos)) 0.0 ,(rational (vec2-y cpos))))
     (pset! world-base :translate `(,(- 0.0 (vec2-x cpos)) 0.0 ,(- 0.0 (vec2-y cpos 1))))
-    ))
-    
+    )))
 
-  (render-model
-   `(root
-     (transform :scale (2.0 2.0)
-      (transform :translate (-0.5 -0.5)
-       
-       (color :rgb ,bg-color
-        ,square-model)
-
-       ;; setting up the view
-       (view :perspective (1.0 1.0 0.01 1000.0)
-        (transform :translate (0 -4 -4)
-         (transform :rotate (0.4 0.0 0)
-          (transform :translate (-0.5 -0.5 -10)
-           :scale (0.5 0.5 0.5)
-           
-         
-           (ref world-model) ))))
-       (transform :scale (0.05 0.05) :translate (0.05 0.95)
-        (ref heart-model)
-        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
-        (transform :scale (,(+ 1.0 (sin (+ 0.5 time))) 0.3) :translate (0.8 0)
-         (color :rgb (1 0 0)
-          (ref square-model)))
-        )
-       (transform :scale (0.05 0.05) :translate (0.05 0.85)
-        (ref gas-model)
-        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
-        (transform :scale (,(+ 1.0 (sin time)) 0.3) :translate (0.8 0)
-         (color :rgb (0 0 0)
-          (ref square-model)))
-        )
-       (transform :scale (0.05 0.05) :translate (0.05 0.75)
-        (ref thermometer-model)
-        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
-        
-        (transform :scale (,(+ 1.0 (sin time)) 0.3) :translate (0.8 0)
-         (color :rgb (,(+ 0.5 (* 0.5 (sin (+ 0.0 time))))
-                      0
-                      ,(+ 0.5 (* 0.5 (sin (+ 1.5 time))))
-                      )
-          (ref square-model)))
-        )
-       (transform :scale (0.05 0.05) :translate (0.05 0.65)
-        (ref happy-fox-model)
-        (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
-        
-        (transform :scale (,(+ 1.0 (sin time)) 0.3) :translate (0.8 0)
-         (color :rgb (0.9 0.5 0.2) 
-          (ref square-model)))
-        )
-       
-       (transform :scale (0.05 0.05) :translate (0.05 0.45)
-        (ref dollar-model)
-        )
-
-       (transform :scale (0.1 0.1) :translate (0.1 0.1)
-        (transform :scale (10.0 2.0) :translate (-1.0 -1)
-         (color :rgb (0.3 0.0 0.0)
-          ,square-model))
-        (transform :rotate (0 0 ,time)
-         (ref dial-model)
-         )
-        (transform :scale (0.015 -0.015) :translate (-0.3 1)
-         (text "AC"))
-        )
-       (transform :scale (0.1 0.1) :translate (0.3 0.1)
-        (transform :rotate (0 0 ,(- 0.0 time))
-         (ref dial-model))
-        (transform :scale (0.015 -0.015) :translate (-0.3 1)
-         (text "Radio"))
-        )
-       (transform :scale (0.1 0.1) :translate (0.6 0.1)
-        (transform :rotate (0 0 ,(- 0.0 time))
-         (ref dial-model)))
-       (transform :scale (0.1 0.1) :translate (0.0 0.0)
-
-        (transform :scale (0.015 -0.015) :translate (-0.0 1)
-         (text ,(value->string (list car-road-location car-y-offset car-offset)))
-        ))
-       )
-      
-    
-      ))))
-(defun poll-events2 ()
-  (let ((evts (foxgl-get-events)))
-    (let ((evts2 (map evts (lambda (evt)
-                             (let* ((tsl (cddr evt))
-                                    (ts (car tsl))
-                                    (tsl (cdr tsl))
-                                    (e (car tsl)))
-                               (cons e (cdr tsl)))))))
-      evts2
-      )))
 (defun game-update ()
   ;(sleep 0.1)
-  (let ((evts (poll-events2)))
-    (when evts
-      (println evts)))
-  (when nil
-    (do-times 320 (lambda (i) (when (> i 31)
-                                (when (foxgl:key-down? win i)
-                                  (println (list 'yes i)))))))
-  (when (foxgl:key-down? win foxgl:key-w)
-    (set! vx (+ vx 0.1))
-    )
-  (when (foxgl:key-down? win foxgl:key-s)
-    (set! vx (- vx 0.1))
-    )
-  (set! car-turn 0.0)
-  (when (foxgl:key-down? win foxgl:key-a)
-    (incf car-turn -0.3)
-    )
-  (when (foxgl:key-down? win foxgl:key-d)
-    (incf car-turn  0.3)
-    )
+  
   (audio:update)
   (foxgl:clear)
+  (entities-update)
   (render-scene)
   (when nil
     (measure

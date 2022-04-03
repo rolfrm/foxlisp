@@ -50,18 +50,23 @@ lisp_value lisp_error(lisp_value value){
   return nil;
 }
 
-void type_assert(lisp_value val, lisp_type type){
+bool type_assert(lisp_value val, lisp_type type){
   if(val.type != type){
     char buffer[1000];
 	 sprintf(buffer, "Invalid type, expected %s, but got %s\n",
 			  lisp_type_to_string(type),
 			  lisp_type_to_string(val.type));
 	 raise_string(gc_clone(buffer, strlen(buffer)));
+    return false;
   }
+  return true;
 }
-void elem_type_assert(lisp_value vector, lisp_type type){
-  type_assert(vector.vector->default_value, type);
+
+bool elem_type_assert(lisp_value vector, lisp_type type){
+  return type_assert(vector.vector->default_value, type);
 }
+
+#define TYPE_ASSERT(v, t) if(!type_assert(v, t)) return nil;
 
 #define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
 
@@ -249,14 +254,14 @@ lisp_value cadr(lisp_value v){
 }
 
 lisp_value set_cdr(lisp_value cons, lisp_value value){
-  type_assert(cons, LISP_CONS);
+  TYPE_ASSERT(cons, LISP_CONS);
   var old = cons.cons->cdr;
   cons.cons->cdr = value;
   return old;
 }
 
 lisp_value set_car(lisp_value cons, lisp_value value){
-  type_assert(cons, LISP_CONS);
+  TYPE_ASSERT(cons, LISP_CONS);
   var old = cons.cons->car;
   cons.cons->car = value;
   return old;
@@ -405,19 +410,19 @@ const char * symbol_name(int64_t id){
 }
 
 lisp_value string_to_symbol(lisp_value string){
-  type_assert(string, LISP_STRING);
+  TYPE_ASSERT(string, LISP_STRING);
   return get_symbol(string.string);
 }
 
 lisp_value symbol_to_string(lisp_value sym){
-  type_assert(sym, LISP_SYMBOL);
+  TYPE_ASSERT(sym, LISP_SYMBOL);
   char * sym_string = (char *) symbol_name(sym.integer);
   return (lisp_value) {.type = LISP_STRING, .string = sym_string};
 }
 
 lisp_value string_starts_with(lisp_value str, lisp_value str2){
-  type_assert(str, LISP_STRING);
-  type_assert(str2, LISP_STRING);
+  TYPE_ASSERT(str, LISP_STRING);
+  TYPE_ASSERT(str2, LISP_STRING);
   if(strncmp(str.string, str2.string, strlen(str2.string)) == 0)
     return t;
   return nil;
@@ -1374,7 +1379,7 @@ lisp_value gc_heap(){
 }
 
 lisp_value load_lib(lisp_value str){
-  type_assert(str, LISP_STRING);
+  TYPE_ASSERT(str, LISP_STRING);
   printf("Loading: %s\n", str.string);
 #ifndef EMSCRIPTEN
   void * handle = dlopen(str.string, RTLD_GLOBAL |RTLD_NOW);
@@ -1466,7 +1471,7 @@ lisp_value lisp_type_of(lisp_value v){
 }
 
 lisp_value lisp_load(lisp_value v){
-  type_assert(v, LISP_STRING);
+  TYPE_ASSERT(v, LISP_STRING);
   return lisp_eval_file(v.string);
 }
 
@@ -1481,7 +1486,7 @@ size_t lisp_type_size(lisp_type type){
 }
 
 lisp_value make_vector(lisp_value len, lisp_value _default){
-  type_assert(len, LISP_INTEGER);
+  TYPE_ASSERT(len, LISP_INTEGER);
   size_t l = (size_t)len.integer;
   size_t elem_size = lisp_type_size(_default.type);
   void * data = GC_malloc(l * elem_size);
@@ -1499,13 +1504,13 @@ lisp_value make_vector(lisp_value len, lisp_value _default){
 }
 
 lisp_value vector_length(lisp_value v){
-  type_assert(v, LISP_VECTOR);
+  TYPE_ASSERT(v, LISP_VECTOR);
   return integer(v.vector->count);
 }
 
 lisp_value vector_ref(lisp_value _vector, lisp_value k){
-  type_assert(_vector, LISP_VECTOR);
-  type_assert(k, LISP_INTEGER);
+  TYPE_ASSERT(_vector, LISP_VECTOR);
+  TYPE_ASSERT(k, LISP_INTEGER);
   var vector = _vector.vector;
   var v = vector->default_value;
   void * src = vector->data + k.integer * vector->elem_size;
@@ -1522,8 +1527,8 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
   return v;
 }
 lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
-  type_assert(_vector, LISP_VECTOR);
-  type_assert(k, LISP_INTEGER);
+  TYPE_ASSERT(_vector, LISP_VECTOR);
+  TYPE_ASSERT(k, LISP_INTEGER);
   
   var vector = _vector.vector;
   var v = value;
@@ -1536,7 +1541,7 @@ lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
   if(vector->default_value.type == LISP_NIL)
 	 ((lisp_value *) vector->data)[k.integer] = value;
   else{
-	 type_assert(value, vector->default_value.type);
+	 TYPE_ASSERT(value, vector->default_value.type);
 	 src = &v.integer;
 	 if(vector->default_value.type == LISP_FLOAT32){
 		((float *) src)[0] = v.rational;
@@ -1548,16 +1553,12 @@ lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
 }
 
 lisp_value vector_resize(lisp_value vector, lisp_value k){
-  type_assert(vector, LISP_VECTOR);
-  type_assert(k, LISP_INTEGER);
+  TYPE_ASSERT(vector, LISP_VECTOR);
+  TYPE_ASSERT(k, LISP_INTEGER);
 
   size_t l = (size_t)k.integer;
-  size_t elem_size;
-  if(vector.vector->default_value.type == LISP_NIL){
-	 elem_size = sizeof(lisp_value);
-  }else{
-	 elem_size = sizeof(double);
-  }
+  size_t elem_size = lisp_type_size(vector.vector->default_value.type);
+  
   void * new_data = GC_malloc(l * elem_size);
   size_t prevCount = MIN(l, vector.vector->count);   
   memcpy(new_data, vector.vector->data, prevCount * elem_size);
@@ -1571,12 +1572,12 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
 }
 
 lisp_value vector_elem_type(lisp_value vector){
-  type_assert(vector, LISP_VECTOR);
+  TYPE_ASSERT(vector, LISP_VECTOR);
   return lisp_type_of(vector.vector->default_value);
 }
 
 lisp_value vector_copy(lisp_value vector){
-  type_assert(vector, LISP_VECTOR);
+  TYPE_ASSERT(vector, LISP_VECTOR);
   let vector2 = make_vector(integer(vector.vector->count), vector.vector->default_value);
   memcpy(vector2.vector->data, vector.vector->data, vector2.vector->count * vector2.vector->elem_size);
   return vector2;
@@ -1601,7 +1602,7 @@ lisp_value vector_to_string(lisp_value vector){
 }
 
 lisp_value string_to_vector(lisp_value str){
-  type_assert(str, LISP_STRING);
+  TYPE_ASSERT(str, LISP_STRING);
   char * strbuf = str.string;
   size_t l = strlen(strbuf) + 1;
   size_t elem_size = 1;
@@ -1616,8 +1617,8 @@ lisp_value string_to_vector(lisp_value str){
 }
 
 lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
-  type_assert(vector, LISP_VECTOR);
-  type_assert(k, LISP_INTEGER);
+  TYPE_ASSERT(vector, LISP_VECTOR);
+  TYPE_ASSERT(k, LISP_INTEGER);
   
   void * ptr = vector.vector->data + k.integer * vector.vector->elem_size;
   
@@ -1626,7 +1627,7 @@ lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
 
 
 lisp_value parse_hex(lisp_value str){
-  type_assert(str, LISP_STRING);
+  TYPE_ASSERT(str, LISP_STRING);
   char * tp = NULL;
   int64_t o = strtoll(str.string, &tp, 16);
   if(tp != str.string )
@@ -1664,8 +1665,8 @@ void item_finalizer(void * obj, void * data){
 }
 
 lisp_value lisp_register_finalizer(lisp_value item, lisp_value func){
-  type_assert(item, LISP_CONS);
-  type_assert(func, LISP_FUNCTION);
+  TYPE_ASSERT(item, LISP_CONS);
+  TYPE_ASSERT(func, LISP_FUNCTION);
   GC_REGISTER_FINALIZER(item.cons, item_finalizer, func.function, 0, 0);
   return nil;
 }
@@ -1682,14 +1683,14 @@ lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
 }
 
 lisp_value lisp_hashtable_set(lisp_value _ht, lisp_value key, lisp_value value){
-  type_assert(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
   hash_table * ht = _ht.native_pointer;
   ht_set(ht, &key, &value);
   return nil;
 }
 
 lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
-  type_assert(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
   hash_table * ht = _ht.native_pointer;
   lisp_value value;
   if(ht_get(ht, &key, &value))
@@ -1712,7 +1713,7 @@ lisp_value lisp_all_symbols(){
 }
 
 lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
-  type_assert(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
   hash_table * ht = _ht.native_pointer;
   if(ht_remove(ht, &key))
 	 return t;
@@ -1720,7 +1721,7 @@ lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
 }
 
 lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
-  type_assert(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
   hash_table * ht = _ht.native_pointer;
   lisp_value value;
   if(ht_get(ht, &key, &value))

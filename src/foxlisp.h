@@ -169,8 +169,8 @@ bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
 lisp_value lisp_error(lisp_value v);
 void raise_string(const char * str);
-void type_assert(lisp_value val, lisp_type type);
-void elem_type_assert(lisp_value vector, lisp_type type);
+bool type_assert(lisp_value val, lisp_type type);
+bool elem_type_assert(lisp_value vector, lisp_type type);
 
 lisp_scope * lisp_scope_new(lisp_scope * super);
 lisp_scope * lisp_scope_new2(lisp_scope * super, cons * argsbuffer, size_t cnt);
