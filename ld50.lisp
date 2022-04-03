@@ -1,5 +1,6 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
+(load "vec2.lisp")
 (thread-start swank:start-server)
 
 (define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
@@ -19,6 +20,14 @@
                                                  1 0 1
                                                  1 1 0
                                                  1 1 1
+                                                 ;; step to side 2
+                                                 0 1 1
+                                                 ;; side 2
+                                                 0 1 1
+                                                 0 0 1
+                                                 0 1 0
+                                                 0 0 0
+                                                 
                                                  )))
 
 (define tile-model '(polygon :3d-triangle-strip (0 0 0
@@ -31,7 +40,7 @@
 (define wheel-model
     `(color :rgb (0.1 0.1 0.1)
       (transform :scale (0.5 0.5 0.8)
-       ,cube-model)))
+       (ref cube-model))))
 
 (define car-model
     `(car
@@ -50,21 +59,21 @@
 
       (color :rgb (1 0 0)
        (transform :scale (2 1 4)
-        ,cube-model))
+        (ref cube-model)))
       
       (color :rgb (0 0 0)
        (transform :translate (0.25 1.0 0.5)
         :scale (1.5 0.8 2.0)
-        ,cube-model))
+        (ref cube-model)))
 
        ;; sun roof
        (color :rgb (1 0 0)
-        (transform :translate (0.25 2.0 0.5)
+        (transform :translate (0.25 1.9 0.5)
                    :scale (1.5 0.8 2.0)
          ,tile-model)
         )
        (color :rgb (0 0 0)
-        (transform :translate (0.4 2.0 1.2)
+        (transform :translate (0.4 2.002 1.2)
                    :scale (1.2 0.8 0.9)
          ,tile-model)
         )
@@ -92,17 +101,12 @@
                     ,square-model))
       ))
 
-(defmacro pop (place)
-  `(let ((v (car ,place)))
-    (set! ,place (cdr ,place))
-    v))
-    
-
 (define test-bezier '(0.0 0.0
                       1.0 1.0
                       2.0 1.5
                       3.0 2.0
                       3.0 3.0 ))
+
 (defun bezier-to-polygon (curve)
   (let ((points nil))
     (loop (cddr curve)
@@ -113,7 +117,6 @@
                 (cx (car curve))
                 (cy (cadr curve))
                 )
-            (println (list ax ay bx by cx cy))
             (do-times 30
               (lambda (i)
                 (let* ((d (/ (rational i) 30.0))
@@ -144,8 +147,8 @@
               (let ((len (v2-len dx dy)))
                 (set! dx (/ dx len))
                 (set! dy (/ dy len)))
-              (let ((ty (* dx 0.5))
-                    (tx (* (- 0.0 dy) 0.5)))
+              (let ((ty (* dx 0.25))
+                    (tx (* (- 0.0 dy) 0.25)))
                 (let ((nx1 (+ ax tx))
                       (ny1 (+ ay ty))
                       (nx2 (- ax tx))
@@ -153,36 +156,103 @@
                   (set! strip (list* ny2 nx2 ny1 nx1 strip)))))))
     (println strip)
     (reverse! strip)))
-                  
+(println (list-to-array '(1 2 3)))
+(defun extrude-2d-path (strip thickness)
+  (let ((out nil)
+        (len (/ (length strip) 2))
+        (strip2 (list-to-array strip))
+        (z (- 0.0 thickness)))
+    (do-times len
+      (lambda (x)
+        (let ((i2 (* x 2))
+              (x (vector-ref strip2 i2))
+              (y (vector-ref strip2 (+ i2 1))))
+          (set! out (list* z y x 0.0 y x out)))))
+    (reverse! out)
+    ))
+
+(println (extrude-2d-path '(0.0 0.0
+                   1.0 0.0
+                   1.0 1.0
+                   0.0 1.0)
+                 1.0))
+                 
 (println (bezier-to-polygon test-bezier))
 (println (points-to-strip (bezier-to-polygon test-bezier)))
 
+(define coin-model
+    `(coin
+      (transform :rotate (0 1.0 0)
+       (color :rgb (1 1 0)
+        (color :rgb (0.4 0.4 0.35)
+         (transform :translate (-0.95 -0.7 -0.35)
+          :scale (1.9 1.0 0.3)
+          
+          ,tile-model))
+      (polygon :2d-triangle-strip
+       (-0.3 1.0
+        0.3 1.0
+        -1 0.5
+        1 0.5
+        -1 -0
+        1 -0
+        -0.25 -0.5
+        0.25 -0.5
+        ))
+       (polygon :3d-triangle-strip
+        ,(println (extrude-2d-path '(-0.3 1.0
+                            0.3 1.0
+                            1.0 0.5
+                            1.0 0.0
+                            0.25 -0.5
+                            -0.25 -0.5
+                            -1.0 0.0
+                                     -1.0 0.5
+                                     -0.3 1.0)
+                   0.3)))
 
+       ))))
 
+(define road-line ())
 (define road-model
-    `(transform :scale (20 20 20)d d:tranawslate (0.0 0.0 -1.0)
+    `(transform :scale (20 20 20)))
+(define start-road-location 0)
+(let ((points '(0.0 0.0
+                  2.0 1.0
+                3.0 3.0
+                  6.0 7.0
+                9.0 0.0
+                  12.0 1.0
+                13.0 2.0
+                15.0 0.0
+                16.0 0.0
+                18.0 0.0
+                20.0 0.0
+                25.0 1.0
+                30.0 0.0
+                33.0 -3.0
+                40.0 -5.0
+                45.0 -10.0
+                45.0 -20.0
+                50.0 -25.0
+                55.0 -20.0
+                
+                
+                
+     )))
+  (set! road-line (bezier-to-polygon points))
+  
+  (set! road-model
+    `(transform :scale (20 20 20)
       (transform :rotate (,pi_2 0 0)
-       (polygon :2d-triangle-strip ,(points-to-strip (bezier-to-polygon
-                                                      '(0.0 0.0
-                                                        1.0 1.0
-                                                        2.0 1.5
-                                                        3.0 2.0
-                                                        0.0 6.0
-                                                        -3.0 9.0
-                                                        4.0 9.0
-                                                        5.0 9.0
-                                                        6.0 13.0
-                                                        8.0 15.0
-                                                        0.0 16.0
-                                                        -5.0 9.0
-                                                        0.0 0.0
-                                                         
-                                                        )))))))
-(defun world-model ()
+       (polygon :2d-triangle-strip ,(points-to-strip road-line)))))
+  )
+
+(println road-model)
+(println road-line)
+(define world-model
   `(world
     (transform :id world-base :translate (0 0 0)
-     (color :rgb (0.3 0.3 0.3)
-      (ref road-model))
                                         ;,square-model
       (transform :translate (-2 0 -6)
        (ref tree-model))
@@ -194,9 +264,28 @@
        (ref tree-model))
       (transform :translate (4.3 0 -3)
        (ref tree-model))
-     
+
+     (transform :translate (493.3 0 0)
+      (ref tree-model))
+     (transform :translate (612.3 0 -17)
+      (ref tree-model))
+
+     (transform :translate (0 0 3)
+      (color :rgb (0.3 0.3 0.3)
+       (ref road-model))
+      )
+     (depth     
      (transform :id car :translate (0 0 0) :rotate (0.0 1.5 0.0)
-      (ref car-model))
+      (ref car-model))     
+
+      (transform :translate (49.7 0.0 45) :id coin
+                 :rotate (0 0 0)
+       (ref coin-model)))
+
+       
+
+     (transform :translate (351.3 0 12)
+      (ref tree-model))
      ))
   )
 
@@ -339,9 +428,8 @@
 
 (define bg-color '( 0.15 0.3 0.1))
 (define time 0.0)
-(define mx 0.0)
 (define vx 0.0)
-(define world (world-model))
+;(define world (world-model))
 (defun model-find-elem(obj id)
   
   (let ((result nil)
@@ -362,10 +450,6 @@
             (else
              (set! model (println (cdr model))))))
     result))
-(define car-object (model-find-elem world 'car))
-(define world-base (model-find-elem world 'world-base))
-(assert car-object)
-(assert world-base)
 
 (defun pset! (list key value)
   (loop list
@@ -378,37 +462,83 @@
 (define test-obj '(car :a 2 :b 2))
 (pset! test-obj :a 3)
 (println test-obj)
-(println car-object)
-(pset! car-object :rotate '(0.0 -0.5 0.0))
+
+;(pset! car-object :rotate '(0.0 -0.5 0.0))
 (define car-rotation 0.0);
-(define car-position (make-vector 3 (float32 0.0)))
+(define car-offset 0.0)
+(define car-y-offset 0.0)
+(define car-road-location 0)
+(progn
+  (set! car-road-location 22)
+                                        ; car-y-offset car-offset
+  (set! car-y-offset -3.9)
+  (set! car-offset 1.3)
+  (set! vx 0.0)
+  )
+(define car-turn 0.0)
 (define forward (let ((v (make-vector 3 (float32 0.0))))
                   (vector-set! v 2 (float32 1.0))
                   v))
+
+(defun list-offset(lst i)
+  (do-times i (lambda (x) (pop lst)))
+  lst)
+    
 (define scale-down (mat4-scale 0.1 0.1 0.1))
 (defun mat:add-inplace(v1 v2)
   (do-times (vector-length v1)
     (lambda (i) (vector-set!  v1 i (float32  (+ (rational (vector-ref v1 i)) (rational (vector-ref v2 i)))))))
   v1)
+
 (defun render-scene()
   
-  (incf time 0.1)
-  (incf mx vx)
-  (set! vx (* vx 0.9))
-  (pset! car-object :rotate `( 0.0 ,car-rotation 0.0))
-  (pset! car-object :translate `(,(vector-ref car-position 0) 0.0 ,(vector-ref car-position 2)))
+  (incf car-rotation (* 1.5 car-turn))
+  (incf car-y-offset (- 0.0 car-turn))
 
-  (pset! world-base :translate `(,(- 0.0 (vector-ref car-position 0)) 0.0 ,(- 0.0 (vector-ref car-position 2))))
-  
-  (let ((car-direction (mat4:rotate 0.0 car-rotation 0.0)))
-    (let ((vd (mat-mul (mat4-scale vx vx vx) (mat-mul car-direction forward))))
-                                        ;      (println vd)
-      (mat:add-inplace car-position vd)
-;      (println car-position)
+  (incf time 0.1)
+  ;(set! vx 1.0)
+  ;(set! vx (* vx 0.9))
+  (define road-part (list-offset road-line (* car-road-location 2)))
+  (incf car-offset vx)
+  (define p1 (vec2-scale (list->vec2 road-part) 20.0))
+  (define car-object (model-find-elem world-model 'car))
+  (define coin-object (model-find-elem world-model 'coin))
+  ;(println coin-object)
+  (pset! coin-object :rotate `(0.0 ,time 0.0))
+  (unless (cdddr road-part)
+    (set! car-offset 0.0)
+    (set! car-road-location start-road-location))
+  (when (cdddr road-part)
+          
+    (define p2 (vec2-scale (list->vec2 (list-offset road-part 2)) 20.0))
+    (let* ((dv (vec2- p2 p1))
+           (dvn (vec2-normalize dv))
+           (dvt (vec2-90 dvn))
+           (dvns (vec2-scale dvn car-offset))
+           (cpos (vec2+ p1 dvns))
+           
+           (world-base (model-find-elem world-model 'world-base))
+           )
+      (when (> (vec2-len (vec2- cpos p1)) (vec2-len dv))
+        (set! car-offset 0.0)
+        (incf car-road-location 1)
+        )
+      (set! cpos (vec2+ cpos (vec2-scale dvt car-y-offset)))
       
+      (let* ((car-dir (vec2-rotate (vec2 -1 0) car-rotation))
+             (ang (vec2-dot car-dir dvn)))
+        (set! car-rotation (+ car-rotation  (* (float32 0.5) ang)))
+        ;;(println dvt)
+        )
+        
     
-    
+      ;(println (list p1 dvn car-offset (* (float32 3.0) (float32 4.0 ))))
+    (pset! car-object :rotate `( 0.0 ,car-rotation 0.0))
+    (pset! car-object :translate `(,(rational (vec2-x cpos)) 0.0 ,(rational (vec2-y cpos))))
+    (pset! world-base :translate `(,(- 0.0 (vec2-x cpos)) 0.0 ,(- 0.0 (vec2-y cpos 1))))
     ))
+    
+
   (render-model
    `(root
      (transform :scale (2.0 2.0)
@@ -418,14 +548,14 @@
         ,square-model)
 
        ;; setting up the view
-       (view :perspective (1.0 1.0 0.01 100.0)
+       (view :perspective (1.0 1.0 0.01 1000.0)
         (transform :translate (0 -4 -4)
          (transform :rotate (0.4 0.0 0)
           (transform :translate (-0.5 -0.5 -10)
            :scale (0.5 0.5 0.5)
            
          
-           ,world ))))
+           (ref world-model) ))))
        (transform :scale (0.05 0.05) :translate (0.05 0.95)
         (ref heart-model)
         (transform :scale (2 0.3) :translate (0.8 0) (ref square-model))
@@ -483,8 +613,13 @@
        (transform :scale (0.1 0.1) :translate (0.6 0.1)
         (transform :rotate (0 0 ,(- 0.0 time))
          (ref dial-model)))
-       
+       (transform :scale (0.1 0.1) :translate (0.0 0.0)
+
+        (transform :scale (0.015 -0.015) :translate (-0.0 1)
+         (text ,(value->string (list car-road-location car-y-offset car-offset)))
+        ))
        )
+      
     
       ))))
 (defun poll-events2 ()
@@ -512,13 +647,15 @@
   (when (foxgl:key-down? win foxgl:key-s)
     (set! vx (- vx 0.1))
     )
+  (set! car-turn 0.0)
   (when (foxgl:key-down? win foxgl:key-a)
-    (set! car-rotation (- car-rotation 0.1))
+    (incf car-turn -0.3)
     )
   (when (foxgl:key-down? win foxgl:key-d)
-    (set! car-rotation (+ car-rotation 0.1))
+    (incf car-turn  0.3)
     )
   (audio:update)
+  (foxgl:clear)
   (render-scene)
   (when nil
     (measure

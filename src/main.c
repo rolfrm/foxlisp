@@ -12,7 +12,9 @@
 #include <dlfcn.h>
 
 #include "foxlisp.h"
-
+bool is_float(lisp_value a){
+  return a.type == LISP_RATIONAL || a.type == LISP_FLOAT32;
+}
 lisp_value rest_sym = {.type = LISP_SYMBOL};
 lisp_value if_sym = {.type = LISP_SYMBOL};
 lisp_value quote_sym = {.type = LISP_SYMBOL};
@@ -73,7 +75,7 @@ bool is_integer(lisp_value v){
 
 bool  _lisp_eq(lisp_value a, lisp_value b){
   if(a.type != b.type) return false;
-  if(a.type == LISP_RATIONAL) return a.rational == b.rational;
+  if(is_float(a)) return a.rational == b.rational;
   return a.integer == b.integer;
 }
 
@@ -882,6 +884,8 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
       cons args[10] = {0};
       size_t argcnt = 0;
 		lisp_value things = lisp_sub_eval(scope, cdr(value), args, &argcnt);
+      if(lisp_is_in_error())
+        return nil;
 		if(first_value.type == LISP_FUNCTION_NATIVE){
       
 		  var n = first_value.nfunction;
@@ -1243,7 +1247,7 @@ void lisp_register_macro(const char * name, lisp_builtin builtin){
 }
 
 lisp_value lisp_add(lisp_value a, lisp_value b){
-  if(a.type == LISP_RATIONAL)
+  if(is_float(a))
 	 a.rational += b.rational;
   else if(a.type == LISP_INTEGER)
 	 a.integer += b.integer;
@@ -1251,7 +1255,7 @@ lisp_value lisp_add(lisp_value a, lisp_value b){
 }
 
 lisp_value lisp_sub(lisp_value a, lisp_value b){
-  if(a.type == LISP_RATIONAL)
+  if(is_float(a))
 	 a.rational -= b.rational;
   else if(a.type == LISP_INTEGER)
 	 a.integer -= b.integer;
@@ -1259,14 +1263,14 @@ lisp_value lisp_sub(lisp_value a, lisp_value b){
 }
 
 lisp_value lisp_mul(lisp_value a, lisp_value b){
-  if(a.type == LISP_RATIONAL)
+  if(is_float(a))
 	 a.rational *= b.rational;
   else if(a.type == LISP_INTEGER)
 	 a.integer *= b.integer;
   return a;
 }
 lisp_value lisp_div(lisp_value a, lisp_value b){
-  if(a.type == LISP_RATIONAL)
+  if(is_float(a))
 	 a.rational /= b.rational;
   else if(a.type == LISP_INTEGER)
 	 a.integer /= b.integer;
@@ -1274,14 +1278,14 @@ lisp_value lisp_div(lisp_value a, lisp_value b){
 }
 
 lisp_value lisp_less(lisp_value a, lisp_value b){
-  if(a.type == LISP_RATIONAL && a.rational < b.rational)
+  if(is_float(a) && a.rational < b.rational)
 	 return t;
   if(a.type == LISP_INTEGER && a.integer < b.integer)
 	 return t;
   return nil;
 }
 lisp_value lisp_greater(lisp_value a, lisp_value b){
-  if(a.type == LISP_RATIONAL && a.rational > b.rational)
+  if(is_float(a) && a.rational > b.rational)
 	 return t;
   if(a.type == LISP_INTEGER && a.integer > b.integer)
 	 return t;
@@ -1335,6 +1339,9 @@ lisp_value lisp_rational(lisp_value v){
 
 lisp_value rational(double v){
   return (lisp_value){.rational = v, .type = LISP_RATIONAL};
+}
+lisp_value float32(float v){
+  return (lisp_value){.rational = v, .type = LISP_FLOAT32};
 }
 
 lisp_value lisp_float32(lisp_value v){
@@ -1552,7 +1559,7 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
 	 elem_size = sizeof(double);
   }
   void * new_data = GC_malloc(l * elem_size);
-  size_t prevCount = vector.vector->count;   
+  size_t prevCount = MIN(l, vector.vector->count);   
   memcpy(new_data, vector.vector->data, prevCount * elem_size);
   vector.vector->data = GC_realloc(vector.vector->data, l * elem_size);
   vector.vector->count = l;

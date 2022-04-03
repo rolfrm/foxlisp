@@ -288,6 +288,12 @@
 (defun list* (&rest lists)
   (list*1 lists))
 
+(defmacro pop (place)
+  `(let ((v (car ,place)))
+    (set! ,place (cdr ,place))
+    v))
+    
+
 (println (list* '1 'b 'c '(1 2 3)))
 
 (define pi 3.141592)

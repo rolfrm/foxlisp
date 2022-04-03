@@ -42,6 +42,8 @@
 (define foxgl:bind-texture (load-wrap foxgl2 "lblit_bind_texture" 1))
 (define foxgl:blit-text (load-wrap foxgl2 "lblit_blit_text" 2))
 (define foxgl:blend (load-wrap foxgl2 "lblit_blend" 1))
+(define foxgl:depth (load-wrap foxgl2 "lblit_depth" 1))
+(define foxgl:clear (load-wrap foxgl2 "lblit_clear" 0))
 (define foxal:play-sample (load-wrap foxgl2 "foxal_play_sample" 1))
 (define foxgl-get-events (load-wrap foxgl2 "foxgl_get_events" 0))
 (def-wrap foxgl:key-down? foxgl2 "foxgl_key_down" win key)
@@ -57,6 +59,7 @@
 
 (define math:pow (load-wrap foxgl2 "lisp_pow" 2))
 (define math:sqrt (load-wrap foxgl2 "lisp_sqrt" 1))
+(define math:sqrtf (load-wrap foxgl2 "lisp_sqrtf" 1))
 
                                         ;(define load-polygon (load-wrap foxgl2 "load_polygon" vertexes dims-optional))
 
@@ -260,10 +263,16 @@
        (when (eq sym 'print)
          (println (list (cdr model) transform color)))
        (when (eq sym 'blend)
-
          (foxgl:blend t)
          (push! funcs (lambda ()
                         (foxgl:blend nil)
+                        )))
+       (when (eq sym 'depth)
+
+         (foxgl:depth t)
+         ;(println (glerror))
+         (push! funcs (lambda ()
+                        (foxgl:depth nil)
                         )))
        (when (eq sym 'text)
          (blit3d-color color)
@@ -323,8 +332,8 @@
                (blit-polygon (cdr r))
                )
              )))
-       
-       (plist-rest (cdr model) render-model)
+       (unless (eq sym 'hidden)
+         (plist-rest (cdr model) render-model))
        
        (map! funcall funcs)  
        ))))

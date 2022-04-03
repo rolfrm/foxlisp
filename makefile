@@ -1,4 +1,4 @@
-OPT = -O2 -g3
+OPT = -O0 -g3
 LIB_SOURCES1 = main.c hashtable.c gc.c
 
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
@@ -32,7 +32,7 @@ libmicroio.bc:
 	emcc -Ilibmicroio/include -c libmicroio/src/microio.c -o libmicroio.bc
 
 foxgl.so: src/foxgl.c src/tcp.c libiron.so src/foxal.c
-	gcc src/foxgl.c src/tcp.c src/foxal.c -I.. -L.  -g3 -O2 -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
+	gcc src/foxgl.c src/tcp.c src/foxal.c -I.. -L.  $(OPT) -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
 	gcc -DGC_PTHREADS -DGC_THREADS -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
@@ -60,6 +60,7 @@ clean:
 	rm -f $(LIB_OBJECTS) $(ALL) src/*.o.depends src/*.o src/*.bc
 	rm libcrypto.bc libiron.bc
 	rm libcrypto.a libiron.a
+	rm foxgl.so
 	make -C iron clean
 .PHONY: test
 test: $(TARGET)

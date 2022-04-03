@@ -17,6 +17,12 @@ lisp_value lisp_sqrt(lisp_value a){
   return rational(sqrt(a.rational));
 }
 
+
+lisp_value lisp_sqrtf(lisp_value a){
+  return float32(sqrtf(lisp_float32(a).rational));
+}
+
+
 lisp_value rect2(lisp_value r, lisp_value g,lisp_value b,lisp_value a){
   blit_rectangle2(r.rational,g.rational,b.rational,a.rational);
   return nil;
@@ -816,6 +822,12 @@ lisp_value lblit_bind_framebuffer(lisp_value fb){
   return nil;
 }
 
+lisp_value lblit_clear(){
+  glClearColor(0,0,0,0);
+  glClear(GL_COLOR_BUFFER_BIT |GL_DEPTH_BUFFER_BIT);
+  return nil;
+}
+
 lisp_value lblit_unbind_framebuffer(lisp_value fb){
   //printf("Unuse fb\n");
   type_assert(fb, LISP_NATIVE_POINTER);
@@ -863,7 +875,18 @@ lisp_value lblit_blend(lisp_value blend){
     glEnable(GL_BLEND);
   else
     glDisable(GL_BLEND);
+  return nil;
 }
+
+
+lisp_value lblit_depth(lisp_value blend){
+  if(!is_nil(blend))
+    glEnable(GL_DEPTH_TEST);
+  else
+    glDisable(GL_DEPTH_TEST);
+  return nil;
+}
+
 
 lisp_value foxgl_key_down(lisp_value window, lisp_value keyid){
   if(gl_window_get_key_state(window.native_pointer, keyid.integer))
