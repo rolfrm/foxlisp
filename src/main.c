@@ -9,7 +9,6 @@
 #define GC_REDIRECT_TO_LOCAL
 #define GC_THREADS
 #include <gc.h>
-#include <dlfcn.h>
 
 #include "foxlisp.h"
 bool is_float(lisp_value a){
@@ -66,7 +65,6 @@ bool elem_type_assert(lisp_value vector, lisp_type type){
   return type_assert(vector.vector->default_value, type);
 }
 
-#define TYPE_ASSERT(v, t) if(!type_assert(v, t)) return nil;
 
 #define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
 
@@ -202,8 +200,11 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
       }
     }
   }
-  if(scope->values == NULL)
-	 scope->values = ht_create2(8, sizeof(size_t), sizeof(lisp_value));
+  if(scope->values == NULL){
+	 scope->values = ht_create2(scope->super == NULL ? 100000 :4, sizeof(size_t), sizeof(lisp_value));
+    //if(scope->super != NULL)
+    //  raise(SIGINT);
+  }
   
   ht_set(scope->values,&sym.integer,&value);
   return nil;
@@ -314,6 +315,13 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
 }
 
 lisp_value copy_cons(lisp_value a){
+  if(a.type == LISP_CONS)
+    return new_cons(car(a), copy_cons(cdr(a)));
+  return a;
+}
+
+
+lisp_value copy_cons_deep(lisp_value a){
   if(a.type == LISP_CONS)
     return new_cons(copy_cons(car(a)), copy_cons(cdr(a)));
   return a;
@@ -598,7 +606,10 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   lisp_value head_value = lisp_scope_get_value(scope, head);
   if(head_value.type != LISP_FUNCTION_MACRO) return value;
   lisp_function * f = head_value.function;
-  var function_scope = lisp_scope_new(f->closure);
+  let argcnt = lisp_length(f->args).integer;
+  cons args3[argcnt];
+  memset(args3, 0, sizeof(args3[0]) * argcnt);
+  var function_scope = lisp_scope_new2(f->closure, args3, argcnt);
   var args = f->args;
   var args2 = cdr(value);
   while(args.type != LISP_NIL){
@@ -688,6 +699,7 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
   case LISP_CONS:
 	 {
 		var fst = car(value);
+      
 		if(_lisp_eq(fst, unquote_sym))
 		  return lisp_eval(scope, cadr(value));
 		if(_lisp_eq(fst, unquote_splice_sym)){
@@ -731,6 +743,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
   case LISP_CONS:
 	 {
       var first = car(value);
+      //println(first);
       lisp_value first_value = lisp_eval(scope, first);
 		if(first_value.type == LISP_MACRO_BUILTIN){
 		  switch(first_value.builtin){
@@ -850,6 +863,9 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
               printf("Not a symbol\n");
               return nil;
             }
+            if(caddr(value).type != LISP_NIL)
+              while(scope->super != NULL)
+                scope = scope->super;
             if(lisp_scope_try_get_value(scope, sym, &value))
               return value;
             return nil;
@@ -889,6 +905,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
       cons args[10] = {0};
       size_t argcnt = 0;
 		lisp_value things = lisp_sub_eval(scope, cdr(value), args, &argcnt);
+      argcnt += 1;
       if(lisp_is_in_error())
         return nil;
 		if(first_value.type == LISP_FUNCTION_NATIVE){
@@ -929,7 +946,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 		  
 		  var f = first_value.function;
         cons args3[argcnt];
-        memset(args3, 0, sizeof(args3[0]) * argcnt);
+        memset(args3, 0, sizeof(args3[0]) * (argcnt));
         //cons * args3 = NULL;
         /*if(argcnt > 0){
           args3 = GC_malloc(argcnt * sizeof(cons));
@@ -1378,53 +1395,6 @@ lisp_value gc_heap(){
   return integer(GC_get_heap_size());
 }
 
-lisp_value load_lib(lisp_value str){
-  TYPE_ASSERT(str, LISP_STRING);
-  printf("Loading: %s\n", str.string);
-#ifndef EMSCRIPTEN
-  void * handle = dlopen(str.string, RTLD_GLOBAL |RTLD_NOW);
-#else
-  void * handle = NULL;
-#endif
-  char * err = dlerror();
-  if(err != NULL) printf("DL error: %s\n", err);
-  if(handle == NULL) return nil;
-  return (lisp_value){.type = LISP_NATIVE_POINTER, .integer = (int64_t) handle};
-}
-
-lisp_value lisp_alien_func(lisp_value lib, lisp_value str, lisp_value return_example, lisp_value arg_example){
-  
-  void * handle = (void *) lib.integer;
-  void * sym = dlsym(handle, str.string);
-  if(sym == NULL) {
-	 printf("No such function %s\n", str.string);
-	 return nil;
-  }
-  alien_function * f = GC_MALLOC(sizeof(*f));
-  f->func = sym;
-  f->return_example = return_example;
-  f->arg_example = arg_example;
-  if(sym != NULL)
-	 return (lisp_value){.type = LISP_ALIEN_FUNCTION, .alien_func = f};
-  return nil;
-}
-
-lisp_value lisp_wrap_func(lisp_value lib, lisp_value str, lisp_value argcnt){
-  
-  void * handle = (void *) lib.integer;
-  void * sym = dlsym(handle, str.string);
-  if(sym == NULL) {
-	 printf("No such function %s\n", str.string);
-	 return nil;
-  }
-  native_function * f = GC_MALLOC(sizeof(*f));
-  f->fptr = sym;
-  f->nargs = argcnt.integer;
-  if(sym != NULL)
-	 return (lisp_value){.type = LISP_FUNCTION_NATIVE, .nfunction = f};
-  return nil;
-}
-
 lisp_value lisp_sin(lisp_value v){
   var p = lisp_rational(v);
   p.rational = sin(p.rational);
@@ -1769,6 +1739,12 @@ lisp_value lisp_exit(){
   exit(0);
   return nil;
 }
+void foxgl_register();
+
+void load_modules(){
+  foxgl_register();
+
+}
 
 //void setup_signal_handler();
 lisp_value run_gc();
@@ -1800,7 +1776,7 @@ int main(int argc, char ** argv){
   lisp_register_native("copy-list", 1, copy_cons);
   lisp_register_native("copy-list-deep", 1, copy_cons);
   lisp_register_native("plookup", 2, lisp_plookup);
-  lisp_register_native("map!", 2, lisp_mapn);
+  //lisp_register_native("map!", 2, lisp_mapn);
 
   lisp_register_native("=", 2, lisp_eq);
   lisp_register_native("string=", 2, string_eq);
@@ -1812,9 +1788,6 @@ int main(int argc, char ** argv){
   lisp_register_native("sin", 1, lisp_sin);
   lisp_register_native("type-of", 1, lisp_type_of);
   
-  lisp_register_native("load-lib", 1, load_lib);
-  lisp_register_native("load-alien", 4, lisp_alien_func);
-  lisp_register_native("load-wrap", 3, lisp_wrap_func);
   lisp_register_native("read-string", 1, lisp_read);
   lisp_register_native("panic", 1, lisp_panic);
   lisp_register_native("load", 1, lisp_load);
@@ -1867,10 +1840,13 @@ int main(int argc, char ** argv){
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 #ifndef EMSCRIPTEN
   GC_allow_register_threads();
+  lisp_register_value("lisp:*web-environment*", t);
+#else
+  lisp_register_value("lisp:*web-environment*", nil);
 #endif
-  for(int i = 1; i < argc; i++)
-	 lisp_eval_file(argv[i]);
-  printf("Foxlisp finished\n");
+
+  load_modules();
+  lisp_eval_file("./ld50.lisp");
   return 0;
 }
 
@@ -1884,67 +1860,3 @@ lisp_value run_gc(){
   gc_collect_garbage(current_context);
   return t;
 }
-#include <execinfo.h>
-int str_index_of_last(const char * str, char symbol){
-  int idx = -1;
-  
-  for(int i = 0; str[i] != 0; i++){
-    if(str[i] == symbol)
-      idx = i;
-  }
-  return idx;
-}
-
-void log_stacktrace(void)
-{
-  static const char start[] = "BACKTRACE ------------\n";
-  static const char end[] = "----------------------\n";
-  
-  void *bt[1024];
-  int bt_size;
-  char **bt_syms;
-  int i;
-  
-  bt_size = backtrace(bt, 1024);
-  bt_syms = backtrace_symbols(bt, bt_size);
-  printf(start);
-  for (i = 1; i < bt_size; i++) {
-
-    //char syscom[256];
-    int itemidx = str_index_of_last(bt_syms[i], '(');
-    char filename[itemidx + 1];
-    strncpy(filename, bt_syms[i],itemidx);
-    filename[itemidx] = 0;
-
-    printf("#%d (%s) %s\n", i, filename, bt_syms[i]);
-    //sprintf(syscom,"addr2line -j text  -e %s %p", filename, bt[i]); //last parameter is the name of this app
-    //system(syscom);
-  }
-  printf(end);
-  free(bt_syms);
-}
-
-/*
-#include <signal.h>
-static void handler(int sig, siginfo_t *dont_care, void *dont_care_either)
-{
-  printf("segfault");
-
-  log_stacktrace();
-  exit(1);
-}
-
-void setup_signal_handler(){
-  struct sigaction sa;
-
-  memset(&sa, 0, sizeof(sigaction));
-  sigemptyset(&sa.sa_mask);
-
-  sa.sa_flags     = SA_NODEFER;
-  sa.sa_sigaction = handler;
-
-  sigaction(SIGSEGV, &sa, NULL);
-
-}
-
-*/

@@ -149,6 +149,7 @@ bool eq(lisp_value a, lisp_value b);
 const char * symbol_name(int64_t id);
 
 lisp_context * lisp_context_new();
+lisp_value make_vector(lisp_value len, lisp_value _default);
 lisp_value vector_length(lisp_value v);
 lisp_value vector_ref(lisp_value _vector, lisp_value k);
 lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
@@ -196,3 +197,4 @@ void lisp_register_native(const char * name, int nargs, void * fptr);
 #define caddddddr(x) car(cddddddr(x))
 #define cadddddddr(x) car(cdddddddr(x))
 
+#define TYPE_ASSERT(v, t) if(!type_assert(v, t)) return nil;

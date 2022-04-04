@@ -1,38 +1,34 @@
-OPT = -O0 -g3
-LIB_SOURCES1 = main.c hashtable.c gc.c
-
+OPT = -O3 -g3
+LIB_SOURCES1 = main.c hashtable.c gc.c foxgl.c tcp.c foxal.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 BCOBJECTS =$(LIB_SOURCES:.c=.bc)
 LDFLAGS= -L. $(OPT) -rdynamic
-LIBS= -lpthread -ldl libmicroio.a -lm
-BCLIBS = -lpthread -ldl -lm
+LIBS= -lpthread -ldl libmicroio.a -lm -lGL -lglfw3 -lX11 -lopenal
+BCLIBS = -lpthread -lm
 ALL= $(TARGET)
 CFLAGS = -Isrc/  -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall -shared -fPIC
 
 all: libmicroio.a
 all: $(TARGET)
 
-$(TARGET): $(LIB_OBJECTS) gc.o foxgl.so
-	$(CC) $(LDFLAGS) $(LIB_OBJECTS) gc.o $(LIBS)  -o $(TARGET)
+$(TARGET): $(LIB_OBJECTS) gc.o libiron.a
+	$(CC) $(LDFLAGS) $(LIB_OBJECTS) libiron.a gc.o $(LIBS)  -o $(TARGET)
 
 .FORCE:
 iron/libiron.so: .FORCE
 	make -C iron
 
-libiron.so: iron/libiron.so
-	cp iron/libiron.so libiron.so
+libiron.a: iron/libiron.a
+	cp iron/libiron.a libiron.a
 
 libmicroio/libmicroio.a:
 	make -C libmicroio
 
 libmicroio.bc:
 	emcc -Ilibmicroio/include -c libmicroio/src/microio.c -o libmicroio.bc
-
-foxgl.so: src/foxgl.c src/tcp.c libiron.so src/foxal.c
-	gcc src/foxgl.c src/tcp.c src/foxal.c -I.. -L.  $(OPT) -liron -fPIC -shared -o foxgl.so -Wl,-rpath,.
 
 gc.o: gc/bdwgc/extra/gc.c
 	gcc -DGC_PTHREADS -DGC_THREADS -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include

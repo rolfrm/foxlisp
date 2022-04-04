@@ -32,3 +32,11 @@ lisp_value foxal_update(){
     audio_update_streams(audio);
   return nil;
 }
+
+void lrn(const char * l, int args, void * f);
+
+void foxal_register(){
+  lrn("audio:update", 0, foxal_update);
+  lrn("audio:play-sample", 1, foxal_play_sample);
+  lrn("audio:load-sample", 1, foxal_load_sample);
+}

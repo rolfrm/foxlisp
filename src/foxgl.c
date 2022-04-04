@@ -1,64 +1,37 @@
 #include <iron/full.h>
 #include <iron/gl.h>
+#include <iron/utf8.h>
 #include "foxlisp.h"
 #include <GL/gl.h>
 #include <math.h>
 #undef POP
 
-lisp_value lisp_pow(lisp_value a, lisp_value b){
+lisp_value math_pow(lisp_value a, lisp_value b){
   type_assert(a, LISP_RATIONAL);
   type_assert(b, LISP_RATIONAL);
   return rational(pow(a.rational, b.rational));
 }
 
-
-lisp_value lisp_sqrt(lisp_value a){
+lisp_value math_sqrt(lisp_value a){
   type_assert(a, LISP_RATIONAL);
   return rational(sqrt(a.rational));
 }
 
 
-lisp_value lisp_sqrtf(lisp_value a){
+lisp_value math_sqrtf(lisp_value a){
   return float32(sqrtf(lisp_float32(a).rational));
 }
 
-
-lisp_value rect2(lisp_value r, lisp_value g,lisp_value b,lisp_value a){
-  blit_rectangle2(r.rational,g.rational,b.rational,a.rational);
+lisp_value math_random(lisp_value range){
+  if(range.type == LISP_INTEGER){
+    return integer(randu32((u32)range.integer));
+  }
+  if(range.type == LISP_RATIONAL || range.type == LISP_FLOAT32)
+    return rational(randf64() * range.rational);
   return nil;
 }
 
-lisp_value scale(lisp_value x, lisp_value y){
-  blit_scale(x.rational, y.rational);
-  return nil;
-}
-
-lisp_value translate(lisp_value x, lisp_value y){
-  blit_translate(x.rational, y.rational);
-  return nil;
-}
-
-lisp_value color(lisp_value r, lisp_value g, lisp_value b, lisp_value a){
-  blit_color(r.rational, g.rational, b.rational, a.rational);
-  return nil;
-}
-
-lisp_value set_texture(lisp_value r){
-  blit_bind_texture((texture *)r.native_pointer);
-  return nil;
-}
-
-lisp_value quad(){
-  blit_quad();
-  return nil;
-}
-
-lisp_value text(lisp_value str){
-  blit_text(str.string);
-  return nil;
-}
-
-lisp_value load_font(lisp_value str, lisp_value size){
+lisp_value foxgl_load_font(lisp_value str, lisp_value size){
   const char * fontfile_init = str.string;
   //printf("Load font: %s %i\n", str.string, size.integer);
   var fnt0 =  blit_load_font_file(fontfile_init,  size.integer);
@@ -66,7 +39,7 @@ lisp_value load_font(lisp_value str, lisp_value size){
   return nil;
 }
 
-lisp_value load_texture_from_path(lisp_value str){
+lisp_value foxgl_load_texture_from_path(lisp_value str){
   image img2 = image_from_file(str.string);
   if(img2.source == NULL) return nil;
 
@@ -77,417 +50,7 @@ lisp_value load_texture_from_path(lisp_value str){
   return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = t};
 }
 
-typedef enum{
-				 DF_NULL,
-				 DF_COLOR,
-				 DF_SPHERE,
-				 DF_TRIANGLE,
-				 DF_TRANSFORM
-}df_type;
-
-typedef struct{
-  int color_rgba;
-}df_color;
-
-typedef struct{
-  vec3 center;
-  float radius;
-}df_sphere;
-
-typedef struct{
-  vec3 a, b, c;
-}df_triangle;
-
-typedef struct{
-  mat4 transform;
-}df_transform;
-
-typedef struct _df_value df_value;
-struct _df_value{
-  df_type type;
-  union{
-	 df_color color;
-	 df_sphere sphere;
-	 df_triangle triangle;
-	 df_transform transform;
-  };
-  df_value * sub_items;
-  size_t count;
-};
-
-df_value df_null = {.type = DF_NULL};
-
-lisp_value plist_find(lisp_value cons, lisp_value sym){
-  while(cons.type == LISP_CONS){
-	 if(eq(car(cons), sym))
-		return cadr(cons);
-	 if(car(cons).type == LISP_SYMBOL){
-		cons = cddr(cons);
-	 }else{
-		cons = cdr(cons);
-	 }
-  }
-  return nil;
-}
-
-bool try_rational(float * out, lisp_value v){
-  if(v.type == LISP_RATIONAL){
-	 *out = v.rational;
-  }else if(v.type == LISP_INTEGER){
-	 *out = v.integer;
-  }else return false;
-  printf("YES: %f\n", *out);
-  return true;
-}
-#define POP(x) pop(&x)
-bool list_vec3(lisp_value c, vec3 * out){
-  
-  vec3 v;
-  if(try_rational(&v.x, POP(c)) && try_rational(&v.y, POP(c)) && try_rational(&v.z, POP(c))){
-	 printf("%f %f %f\n",v.x,v.y,v.z);printf("\n");
-	 *out = v;
-	 return true;
-  }
-  return false;  
-}
-
-
-bool list_vec4(lisp_value c, vec4 * out){
-  
-  vec4 v;
-  if(try_rational(&v.x, POP(c)) && try_rational(&v.y, POP(c)) && try_rational(&v.z, POP(c)) && try_rational(&v.w, POP(c))){
-	 *out = v;
-	 return true;
-  }
-  return false;  
-}
-bool plist_vec3(lisp_value c, lisp_value sym, vec3 * out){
-  c = plist_find(c, sym);
-  if(is_nil(c)) return false;
-  return list_vec3(c, out);	
-}
-
-
-bool plist_rgb(lisp_value c, lisp_value sym, int * out){
-  c = plist_find(c, sym);
-  if(is_nil(c)) return false;
-  vec3 p = {0};
-  if(!list_vec3(c, &p)) return false;
-  union{
-	 unsigned char bytes[4];
-	 int integer;
-  }color;
-  color.bytes[0] = (unsigned char) (p.x * 255);
-  color.bytes[1] = (unsigned char) (p.y * 255);
-  color.bytes[2] = (unsigned char) (p.z * 255);
-  color.bytes[3] = 0xFF;
-  *out = color.integer;
-  return true;
-}
-
-bool plist_rgba(lisp_value c, lisp_value sym, int * out){
-  c = plist_find(c, sym);
-  if(is_nil(c)) return false;
-  vec4 p = {0};
-  if(!list_vec4(c, &p)) return false;
-  union{
-	 unsigned char bytes[4];
-	 int integer;
-  }color;
-  color.bytes[0] = (unsigned char) (p.x * 255);
-  color.bytes[1] = (unsigned char) (p.y * 255);
-  color.bytes[2] = (unsigned char) (p.z * 255);
-  color.bytes[3] = (unsigned char) (p.w * 255);
-  *out = color.integer;
-  return true;
-}
-bool plist_f32(lisp_value c, lisp_value sym, float * out){
-  c = plist_find(c, sym);
-  if(is_nil(c)) return false;
-  return try_rational(out, c);
-}
-
-lisp_value sphere_sym;
-lisp_value color_sym;
-lisp_value center_sym, radius_sym, rgb_sym, rgba_sym;
-lisp_value triangle_sym, transform_sym;
-lisp_value a_sym, b_sym, c_sym;
-lisp_value translate_sym;
-df_value build_df(lisp_value v){
-  printf("build df\n");
-  var c = car(v);
-  v = cdr(v);
-  df_value value = {0};
-
-  if(eq(c, sphere_sym)){
-	 value.type = DF_SPHERE;
-	 plist_vec3(v, center_sym, &value.sphere.center);
-	 plist_f32(v, radius_sym, &value.sphere.radius);
-	 printf("--- %f \n", value.sphere.radius);
-  }else if(eq(c, color_sym)){
-	 value.type = DF_COLOR;
-	 plist_rgb(v, rgb_sym, &value.color.color_rgba);
-	 plist_rgba(v, rgba_sym, &value.color.color_rgba);
-  }else if(eq(c, triangle_sym)){
-	 value.type = DF_TRIANGLE;
-	 plist_vec3(v, a_sym, &value.triangle.a);
-	 plist_vec3(v, b_sym, &value.triangle.b);
-	 plist_vec3(v, c_sym, &value.triangle.c);
-	 
-  }else if(eq(c, transform_sym)) {
-	 vec3 translate;
-	 if(plist_vec3(v, translate_sym, &translate)){
-		value.transform.transform = mat4_translate(translate.x ,translate.y, translate.y);
-	 }
-  }
-  df_value * subs = NULL;
-  size_t subcnt = 0;
-  while(!is_nil(v)){
-
-	 if(car(v).type == LISP_CONS){
-		df_value sub = build_df(car(v));
-		v = cdr(v);
-		subcnt += 1;
-      raise_string("lisp_realloc not defined.");
-      //		subs = lisp_realloc(subs, subcnt * sizeof(subs[0]));
-		subs[subcnt - 1] = sub;
-		continue;
-	 }
-	 
-	 if(car(v).type == LISP_SYMBOL){
-		v = cddr(v);
-	 }else{
-		v = cdr(v);
-	 }
-  }
-  value.sub_items = subs;
-  value.count = subcnt;
-  return value;
-}
-
-lisp_value lisp_build_df(lisp_value v){
-  sphere_sym = get_symbol("sphere");
-  color_sym = get_symbol("color");
-  center_sym = get_symbol(":center");
-  radius_sym = get_symbol(":radius");
-  rgb_sym = get_symbol(":rgb");
-  rgba_sym = get_symbol(":rgba");
-  center_sym = get_symbol(":center");
-  radius_sym = get_symbol(":radius");
-  triangle_sym = get_symbol("triangle");
-  transform_sym = get_symbol("transform");
-  a_sym = get_symbol(":a");
-  b_sym = get_symbol(":b");
-  c_sym = get_symbol(":c");
-  var c = car(v);
-  df_value d = build_df(v);
-  df_value * p = lisp_malloc(sizeof(d));
-  *p = d;
-  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = p};
-}
-
-void df_print(df_value * df){
-  printf("(");
-  switch(df->type){
-  case DF_SPHERE:
-	 {
-		var center = df->sphere.center;
-		var radius = df->sphere.radius;
-		printf("sphere (%f %f %f) %f ", center.x , center.y, center.z, radius);
-		break;
-	 }
-	 
-  case DF_COLOR:
-	 {
-		var color = df->color.color_rgba;
-		printf("color %p ", color);
-	 }
-	 break;
-  case DF_TRIANGLE:{
-	 printf("triangle ");
-  }
-	 break;
-  }
-  for(size_t i = 0; i < df->count;  i++)
-	 df_print(df->sub_items + i);
-
-  printf(")");
-}
-
-lisp_value lisp_print_df(lisp_value v){
-  if(v.type != LISP_NATIVE_POINTER) return nil;
-  var df = (df_value *) v.native_pointer;
-  df_print(df);
-  return nil;
-}
-
-float vec3_dot(vec3 a, vec3 b){
-  return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-float vec3_dot2(vec3 a){
-  return vec3_dot(a, a);
-}
-
-
-float sign(float x){
-  if(x < 0) return -1;
-  return 1;
-}
-float clampf(float a, float minv, float maxv){
-  return MAX(MIN(a, maxv), minv);
-}
-float minf(float a, float b){
-  return MIN(a,b);
-}
-float dist_triangle(df_triangle * t, float x, float y, float z){
-  vec3 a = t->a, b = t->b, c = t->c;
-  vec3 p = vec3_new(x, y, z);
-  vec3 ba = vec3_sub(b, a); vec3 pa = vec3_sub(p, a);
-  vec3 cb = vec3_sub(c, b); vec3 pb = vec3_sub(p, b);
-  vec3 ac = vec3_sub(a, c); vec3 pc = vec3_sub(p, c);
-  vec3 nor = vec3_mul_cross( ba, ac );
-  
-  return sqrtf(
-					(sign(vec3_dot(vec3_mul_cross(ba,nor),pa)) +
-					 sign(vec3_dot(vec3_mul_cross(cb,nor),pb)) +
-					 sign(vec3_dot(vec3_mul_cross(ac,nor),pc))<2.0)
-	 ?
-	 minf( minf(
-				 vec3_dot2(vec3_sub(vec3_scale(ba,clampf(vec3_dot(ba,pa)/vec3_dot2(ba),0.0,1.0)),pa)),
-				 vec3_dot2(vec3_sub(vec3_scale(cb, clampf(vec3_dot(cb,pb)/vec3_dot2(cb),0.0,1.0)),pb)) ),
-			vec3_dot2(vec3_sub(vec3_scale(ac,clampf(vec3_dot(ac,pc)/vec3_dot2(ac),0.0,1.0)),pc)) )
-     :
-     vec3_dot(nor,pa)*vec3_dot(nor,pa)/vec3_dot2(nor) );
-}
-
-float df_dist(df_value * df, float x, float y, float z, int * color){
-  float d = 100000;
-  if(df->type == DF_SPHERE){
-	 var c = df->sphere.center;
-	 c.x = x - c.x;
-	 c.y = y - c.y;
-	 c.z = z - c.z;
-	 c.x *= c.x;
-	 c.y *= c.y;
-	 c.z *= c.z;
-	 float d2 = sqrtf(c.x + c.y + c.z) - df->sphere.radius;
-	 d = MIN(d, d2);
-  }
-  if(df->type == DF_COLOR){
-	 *color = df->color.color_rgba;
-  }
-  if(df->type == DF_TRIANGLE){
-	 float d2 = dist_triangle(&df->triangle, x, y, z);
-	 d = MIN(d, d2);
-  }
-  
-  for(size_t i = 0; i < df->count; i++){
-	 int c = *color;
-	 float d2 = df_dist(df->sub_items + i, x, y, z, &c);
-	 if(d2 < d){
-		*color = c;
-		d = d2;
-	 }
-  }
-  return d;
-}
-
-float df_ray(df_value * df, float dx, float dy, float dz, int * color){
-  float x = 0, y = 0, z = 0;
-  float d = 0;
-  for(int i = 0; i < 32; i++){
-	 float d1 = df_dist(df, x, y, z, color);
-	 if(d1 <= 0.1)
-		return d1;
-	 if(d1 > 1000)
-		return d1;
-	 d += d1;
-	 x += d1 * dx;
-	 y += d1 * dy;
-	 z += d1 * dz;
-  }
-  return d;
-}
-
-lisp_value lisp_blit_distance_field(lisp_value tex, lisp_value _w, lisp_value _h, lisp_value df){
-  //type_assert(tex, LISP_NATIVE_POINTER);
-  type_assert(df, LISP_NATIVE_POINTER);
-  type_assert(_w, LISP_INTEGER);
-  type_assert(_h, LISP_INTEGER);
-  int w = _w.integer;
-  int h = _h.integer;
-  df_value * d = df.native_pointer;
-  image img = image_new(w, h, 4);
-  u32 * data = image_data(&img);
-  for(int i = 0; i < h; i++){
-	 for(int j = 0; j < w; j++){
-		int index = j + i * w;
-		float dx = 2.0 * (float)j / w - 1.0;
-		float dy = 2.0 * (float)i / h - 1.0;
-		float dz = 0.5;
-		float n = sqrtf(dx * dx + dy * dy + dz * dz);
-		dx /= n;
-		dy /= n;
-		dz /= n;
-		int color = 0;
-		float dist = df_ray(d, dx, dy, dz, &color);
-		if(dist <= 0.3)
-		  data[index] = (u32)color;
-		else
-		  data[index] = 0x00000000;
-	 }
-  }
-  image_save(&img, "test.img.png");
-  image_delete(&img);
-}
-
-typedef enum {
-				  MODEL_NONE = 0,
-				  MODEL_TRANSFORM = 1,
-				  MODEL_COLOR,
-				  MODEL_TEXT,
-				  MODEL_TRIANGLE,
-				  MODEL_POLYGON,
-				  MODEL_TEXTURE
-}lisp_model_type;
-
-const char * model_type_names[] =
-  {"transform", "color", "text", "triangle", "polygon", "texture"};
-
-lisp_model_type lisp_model_type_from_symbol(lisp_value c){
-  static lisp_scope * model_type_lookup;
-  ASSERT(c.type == LISP_SYMBOL);
-  if(model_type_lookup == NULL){
-	 model_type_lookup = lisp_scope_new(NULL);
-	 for(int i = 0; i < array_count(model_type_names); i++){
-       lisp_scope_set_value(model_type_lookup, get_symbol(model_type_names[i]), integer(i + 1));
-    }
-  }
-  lisp_value r = {0};
-  if(lisp_scope_try_get_value(model_type_lookup, c, &r))
-	 return r.integer;
-  return 0;
-  
-}
-
-lisp_value lisp_blit_model(lisp_value model){
-  var c = car(model);
-  var v = cdr(model);
-  lisp_model_type type = lisp_model_type_from_symbol(c);
-  switch(type){
-  case MODEL_COLOR:
-	 
-	 break;
-
-  default:
-	 break;
-  }
-
-  return nil;
-}
-
-lisp_value lmat4_mul(lisp_value a, lisp_value b){
+lisp_value math_mul(lisp_value a, lisp_value b){
   type_assert(a, LISP_VECTOR);
   type_assert(b, LISP_VECTOR);
   type_assert(a.vector->default_value, LISP_FLOAT32);
@@ -523,7 +86,7 @@ lisp_value lmat4_mul(lisp_value a, lisp_value b){
   return a;
 }
 lisp_value mat4_to_lisp (mat4 a);
-lisp_value lmat4_rotate(lisp_value x, lisp_value y, lisp_value z){
+lisp_value math_mat4_rotate(lisp_value x, lisp_value y, lisp_value z){
   mat4 m1 = mat4_identity();
   if(is_nil(y)){
     m1 = mat4_rotate_Z(m1, z.rational);
@@ -536,9 +99,7 @@ lisp_value lmat4_rotate(lisp_value x, lisp_value y, lisp_value z){
   return mat4_to_lisp(m1);
 }
 
-#define TYPE_ASSERT(val, tp) type_assert(val, tp);
-
-lisp_value lmat4_perspective(lisp_value fov, lisp_value aspect, lisp_value near, lisp_value far){
+lisp_value math_mat4_perspective(lisp_value fov, lisp_value aspect, lisp_value near, lisp_value far){
   TYPE_ASSERT(fov, LISP_RATIONAL);
   TYPE_ASSERT(aspect, LISP_RATIONAL);
   TYPE_ASSERT(near, LISP_RATIONAL);
@@ -547,7 +108,7 @@ lisp_value lmat4_perspective(lisp_value fov, lisp_value aspect, lisp_value near,
   return mat4_to_lisp(p);
 }
            
-lisp_value lmat4_orthographic(lisp_value w, lisp_value h, lisp_value z){
+lisp_value math_mat4_orthographic(lisp_value w, lisp_value h, lisp_value z){
   TYPE_ASSERT(w, LISP_RATIONAL);
   TYPE_ASSERT(h, LISP_RATIONAL);
   TYPE_ASSERT(z, LISP_RATIONAL);
@@ -561,27 +122,20 @@ mat4 lisp_to_mat4(lisp_value a){
   if(a.vector->count == 16){
 	 mat4 * m1 = a.vector->data;
 	 return *m1;
-  }else if(a.vector->count == 9){
-	 //mat3 * m1 = a.vector->data;
-	 
-	 //return m0;
   }
-
   raise_string("Invalid number of rows and columns");
   return mat4_identity();
 }
-lisp_value make_vector(lisp_value len, lisp_value _default);
+
 
 lisp_value mat4_to_lisp (mat4 a){
   lisp_value vec = make_vector(integer(16), (lisp_value){.type = LISP_FLOAT32, .rational = 0.0f});
-  float * data = &a.m00;
   mat4 * v = vec.vector->data;
   *v = a;
   return vec;
 }
 
-
-lisp_value lmat4_print(lisp_value a){
+lisp_value math_mat4_print(lisp_value a){
   type_assert(a, LISP_VECTOR);
   type_assert(a.vector->default_value, LISP_FLOAT32);
   if(a.vector->count == 16){
@@ -637,23 +191,51 @@ vec4 lisp_to_color(lisp_value color){
   }
   return r;
 }
+
+lisp_value foxgl_create_window(lisp_value w, lisp_value h){
+  TYPE_ASSERT(w, LISP_INTEGER);
+  TYPE_ASSERT(h, LISP_INTEGER);
+  return native_pointer(gl_window_open(w.integer, h.integer));
+}
+lisp_value foxgl_make_current(lisp_value win){
+  TYPE_ASSERT(win, LISP_NATIVE_POINTER);
+  gl_window_make_current(win.native_pointer);
+  return nil;
+}
+lisp_value foxgl_set_title(lisp_value win, lisp_value title){
+  TYPE_ASSERT(win, LISP_NATIVE_POINTER);
+  gl_window_set_title(win.native_pointer, title.string);
+  return nil;
+}
+
+lisp_value foxgl_swap(lisp_value win){
+  TYPE_ASSERT(win, LISP_NATIVE_POINTER);
+  gl_window_swap(win.native_pointer);
+  return nil;
+}
+
+lisp_value foxgl_poll_events(){
+  gl_window_poll_events();
+  return nil;
+}
+
 blit3d_context * blit3d_current_context = NULL;
 
-lisp_value lblit_color(lisp_value color){
+lisp_value foxgl_color(lisp_value color){
   vec4 col = lisp_to_color(color);
   if(blit3d_current_context != NULL)
 	 blit3d_color(blit3d_current_context, col);
   return nil;
 }
 
-lisp_value lblit_transform(lisp_value tform1){
+lisp_value foxgl_transform(lisp_value tform1){
   mat4 tform = lisp_to_mat4(tform1);
   if(blit3d_current_context != NULL)
 	 blit3d_view(blit3d_current_context, tform);
   return nil;
 }
 
-lisp_value lblit_init(){
+lisp_value foxgl_init(){
   if(blit3d_current_context == NULL)
 	 blit3d_current_context = blit3d_context_new();
   blit3d_context_load(blit3d_current_context);
@@ -661,7 +243,7 @@ lisp_value lblit_init(){
   return nil;
 }
 
-lisp_value lblit_square2(){
+lisp_value foxgl_square2(){
   static blit3d_polygon * square;
   if(blit3d_current_context == NULL) return nil;
   if(square == NULL){
@@ -716,15 +298,6 @@ lisp_value delete_polygon (lisp_value val){
   blit3d_polygon * poly = val.native_pointer;
   blit3d_polygon_destroy(&poly);
   return nil;
-}
-
-lisp_value foxgl_create_window(lisp_value width, lisp_value height){
-  type_assert(width, LISP_INTEGER);
-  type_assert(height, LISP_INTEGER);
-  gl_window * win = gl_window_open(width.integer, height.integer);
-  
-  
-  return native_pointer(win);
 }
 
 lisp_value foxgl_get_events(){
@@ -791,16 +364,7 @@ lisp_value foxgl_get_events(){
   return evts;
 }
 
-void foxgl_register(){
-  lisp_register_native("blit-rect", 4, rect2);
-}
-
-//(define foxgl:create-framebuffer (load-wrap foxgl2 "lblit_create_framebuffer"))
-//(define foxgl:bind-framebuffer (load-wrap foxgl2 "lblit_bind_framebuffer"))
-//(define foxgl:destroy-framebuffer (load-wrap foxgl2 "lblit_destroy_framebuffer"))
-//(define foxgl:framebuffer-texture (load-wrap foxgl2 "lblit_framebuffer_texture"))
-
-lisp_value lblit_create_framebuffer (lisp_value width, lisp_value height){
+lisp_value foxgl_create_framebuffer (lisp_value width, lisp_value height){
   type_assert(width, LISP_INTEGER);
   type_assert(height, LISP_INTEGER);
   blit_framebuffer * b = lisp_malloc(sizeof(*b));
@@ -813,7 +377,7 @@ lisp_value lblit_create_framebuffer (lisp_value width, lisp_value height){
   return native_pointer(b);
 }
 
-lisp_value lblit_bind_framebuffer(lisp_value fb){
+lisp_value foxgl_bind_framebuffer(lisp_value fb){
   //printf("Use fb\n");
   type_assert(fb, LISP_NATIVE_POINTER);
   blit_use_framebuffer(fb.native_pointer);
@@ -822,26 +386,26 @@ lisp_value lblit_bind_framebuffer(lisp_value fb){
   return nil;
 }
 
-lisp_value lblit_clear(){
+lisp_value foxgl_clear(){
   glClearColor(0,0,0,0);
   glClear(GL_COLOR_BUFFER_BIT |GL_DEPTH_BUFFER_BIT);
   return nil;
 }
 
-lisp_value lblit_unbind_framebuffer(lisp_value fb){
+lisp_value foxgl_unbind_framebuffer(lisp_value fb){
   //printf("Unuse fb\n");
   type_assert(fb, LISP_NATIVE_POINTER);
   blit_unuse_framebuffer(fb.native_pointer);
   return nil;
 }
 
-lisp_value lblit_destroy_framebuffer(lisp_value fb){
+lisp_value foxgl_destroy_framebuffer(lisp_value fb){
   type_assert(fb, LISP_NATIVE_POINTER);
   blit_delete_framebuffer(fb.native_pointer);
   return nil;
 }
 
-lisp_value lblit_framebuffer_texture(lisp_value fb){
+lisp_value foxgl_framebuffer_texture(lisp_value fb){
   type_assert(fb, LISP_NATIVE_POINTER);
   texture * tx = lisp_malloc(sizeof(*tx));
   *tx = blit_framebuffer_as_texture(fb.native_pointer);
@@ -849,7 +413,7 @@ lisp_value lblit_framebuffer_texture(lisp_value fb){
 }
 
 //blit3d_bind_texture(blit3d_context * ctx, texture * tex){
-lisp_value lblit_bind_texture(lisp_value tex){
+lisp_value foxgl_bind_texture(lisp_value tex){
   if(is_nil(tex)){
     blit3d_bind_texture(blit3d_current_context, NULL);
     return nil;
@@ -860,7 +424,7 @@ lisp_value lblit_bind_texture(lisp_value tex){
   return nil;
 }
 
-lisp_value lblit_blit_text(lisp_value text, lisp_value matrix){
+lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
   type_assert(text, LISP_STRING);
   type_assert(matrix, LISP_VECTOR);
   mat4 * m1 = matrix.vector->data;
@@ -870,7 +434,7 @@ lisp_value lblit_blit_text(lisp_value text, lisp_value matrix){
   return nil;
 }
 
-lisp_value lblit_blend(lisp_value blend){
+lisp_value foxgl_blend(lisp_value blend){
   if(!is_nil(blend))
     glEnable(GL_BLEND);
   else
@@ -879,7 +443,7 @@ lisp_value lblit_blend(lisp_value blend){
 }
 
 
-lisp_value lblit_depth(lisp_value blend){
+lisp_value foxgl_depth(lisp_value blend){
   if(!is_nil(blend))
     glEnable(GL_DEPTH_TEST);
   else
@@ -892,4 +456,59 @@ lisp_value foxgl_key_down(lisp_value window, lisp_value keyid){
   if(gl_window_get_key_state(window.native_pointer, keyid.integer))
     return t;
   return nil;
+}
+
+lisp_value foxgl_timestamp(){
+  return integer(timestamp());
+}
+
+
+void lrn(const char * l, int args, void * f){
+  lisp_register_native(l, args, f);
+}
+void tcp_register();
+void foxal_register();
+void foxgl_register(){
+  lrn("math:pow", 2, math_pow);
+  lrn("math:sqrt", 1, math_sqrt);
+  lrn("math:sqrtf", 1, math_sqrtf);
+  lrn("math:random", 1, math_random);
+  lrn("foxgl:load-font", 2, foxgl_load_font);
+  lrn("foxgl:load-texture-from-path", 1, foxgl_load_texture_from_path);
+  lrn("foxgl:create-window", 2, foxgl_create_window);
+  lrn("foxgl:make-current", 1, foxgl_make_current);
+  lrn("foxgl:set-title", 2, foxgl_set_title);
+  lrn("foxgl:swap", 1, foxgl_swap);
+  lrn("foxgl:poll-events", 0, foxgl_poll_events);
+  
+  lrn("math:*", 2, math_mul);
+  lrn("mat4:rotate", 3, math_mat4_rotate);
+  lrn("mat4:perspective", 4, math_mat4_perspective);
+  lrn("mat4:orthographic", 3, math_mat4_orthographic);
+  lrn("mat4:print", 1, math_mat4_print);
+  lrn("foxgl:timestamp", 0, timestamp);
+  lrn("foxgl:clear", 0, foxgl_clear);
+  lrn("foxgl:get-events", 0, foxgl_get_events);
+  
+  lrn("foxgl:color", 1, foxgl_color);
+  lrn("foxgl:transform", 1, foxgl_transform);
+  lrn("foxgl:init", 0, foxgl_init);
+  lrn("foxgl:quad", 1, foxgl_square2);
+  lrn("foxgl:load-polygon", 2, load_polygon);
+  lrn("foxgl:blit-polygon", 1, blit_polygon);
+  lrn("foxgl:delete-polygon", 1, delete_polygon);
+  
+  lrn("foxgl:create-framebuffer", 2, foxgl_create_framebuffer);
+  lrn("foxgl:bind-framebuffer", 1, foxgl_bind_framebuffer);
+  lrn("foxgl:unbind-framebuffer", 1, foxgl_unbind_framebuffer);
+  lrn("foxgl:destroy-framebuffer", 1, foxgl_destroy_framebuffer);
+
+  lrn("foxgl:frame-buffer-texture", 1, foxgl_framebuffer_texture);
+  lrn("foxgl:bind-texture", 1, foxgl_bind_texture);
+  lrn("foxgl:blit-text", 2, foxgl_blit_text);
+  lrn("foxgl:blend", 1, foxgl_blend);
+  lrn("foxgl:depth", 1, foxgl_depth);
+  lrn("foxgl:key-down?", 2, foxgl_key_down);
+  tcp_register();
+  foxal_register();
 }

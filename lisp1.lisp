@@ -37,6 +37,11 @@
     (cons (f2 (car lst))
           (map (cdr lst) f2))))
 
+(defun map! (f2 lst)
+  (loop lst
+        (f2 (car lst))
+        (set! lst (cdr lst))))
+
 (defun do-times (n f2)
   (let ((x 0))
     (loop (< x n)
@@ -238,16 +243,6 @@
 
 (define hashtable-set! hashtable-set)
 
-(define libc (load-lib "libc.so.6"))
-(define fopen (load-alien libc "fopen" native-null-pointer (list "pathname" "mode")))
-(define fclose (load-alien libc "fclose" (integer 0) (list native-null-pointer)))
-(define fwrite (load-alien libc "fwrite" (integer 0) (list native-null-pointer (integer 0) (integer 0) native-null-pointer)))
-
-(define fread (load-alien libc "fread" 0 (list native-null-pointer 0 0 native-null-pointer)))
-
-(define malloc (load-alien libc "malloc" native-null-pointer (list (integer 0))))
-(define free (load-alien libc "free" nil (list native-null-pointer)))
-
 (define lisp:descriptions (make-hashtable))
 
 (defun lisp:write-doc (item signature)
@@ -264,7 +259,8 @@
 (lisp:write-doc define '(define name value))
 (lisp:write-doc vector-set! '(vector-set! vector index value))
 (lisp:write-doc make-vector '(make-vector count default-value ))
-
+(lisp:write-doc plookup '(plookup list sym))
+(lisp:write-doc map! '(map! f list))
 (defmacro def-wrap (name lib fname &rest params)
   (let ((argnum (if (integer? (car params))
                     (car params)
@@ -292,8 +288,27 @@
   `(let ((v (car ,place)))
     (set! ,place (cdr ,place))
     v))
-    
 
+(defun concat-2 (head lst lists)
+  (cons head
+        (if lst
+            (concat-2 (car lst) (cdr lst) lists)
+            (concat-1 lists))))
+
+(defun concat-1 (lists)
+  (let ((head (car lists))
+        (tail (cdr lists)))
+    (if tail
+        (if head
+            (concat-2 (car head) (cdr head) tail)
+            (concat-1 (cdr lists)))
+            
+        head)))
+        
+(defun concat (&rest lists) (concat-1 lists) )
+
+(defun  min (a b)
+  (if (< a b) a b))
 (println (list* '1 'b 'c '(1 2 3)))
 
 (define pi 3.141592)

@@ -76,7 +76,7 @@ lisp_value tcp_accept(lisp_value l)
   return new_cons(get_symbol("tcp-client"), integer(connfd));
 }
 
-lisp_value lisp_close(lisp_value con){
+lisp_value lisp_close_fd(lisp_value con){
   var fd = get_fd(con);
   if(fd == -1)
 	 return nil;
@@ -84,7 +84,7 @@ lisp_value lisp_close(lisp_value con){
   return t;
 }
 
-lisp_value lisp_read(lisp_value item, lisp_value buffer){
+lisp_value lisp_read_fd(lisp_value item, lisp_value buffer){
   var fd = get_fd(item);
   if(fd == -1){
     printf("NO FD\n");
@@ -98,7 +98,7 @@ lisp_value lisp_read(lisp_value item, lisp_value buffer){
 }
 
 
-lisp_value lisp_write(lisp_value item, lisp_value buffer){
+lisp_value lisp_write_fd(lisp_value item, lisp_value buffer){
   var fd = get_fd(item);
   if(fd == -1)
 	 return nil;
@@ -129,7 +129,7 @@ lisp_value thread_join(lisp_value func){
   return nil;
 }
 
-lisp_value lisp_sleep(lisp_value time){
+lisp_value thread_sleep(lisp_value time){
   var t = lisp_rational(time).rational;
   
   iron_usleep((int)(t * 1000000.0));
@@ -137,14 +137,14 @@ lisp_value lisp_sleep(lisp_value time){
 }
 
 
-lisp_value foxgl_create_mutex(){
+lisp_value thread_create_mutex(){
   pthread_mutex_t *lock = lisp_malloc(sizeof(*lock));
   *lock = (pthread_mutex_t){0};
   pthread_mutex_init(lock, NULL);
   return new_cons(get_symbol("mutex"), native_pointer(lock));
 }
 
-lisp_value foxgl_lock_mutex(lisp_value lock){
+lisp_value thread_lock_mutex(lisp_value lock){
   type_assert(lock, LISP_CONS);
   type_assert(cdr(lock), LISP_NATIVE_POINTER);
   
@@ -154,7 +154,7 @@ lisp_value foxgl_lock_mutex(lisp_value lock){
 }
 
 
-lisp_value foxgl_unlock_mutex(lisp_value lock){
+lisp_value thread_unlock_mutex(lisp_value lock){
   type_assert(lock, LISP_CONS);
   type_assert(cdr(lock), LISP_NATIVE_POINTER);
   
@@ -163,10 +163,30 @@ lisp_value foxgl_unlock_mutex(lisp_value lock){
   return t;
 }
 
-lisp_value foxgl_destroy_mutex(lisp_value lock){
+lisp_value thread_destroy_mutex(lisp_value lock){
   type_assert(lock, LISP_CONS);
   type_assert(cdr(lock), LISP_NATIVE_POINTER);
   pthread_mutex_t * l = lock.native_pointer;
   pthread_mutex_destroy(l);
  return t;
+}
+
+void lrn(const char * l, int args, void * f);
+void tcp_register(){
+
+  lrn("tcp:listen", 1, tcp_listen);
+  lrn("tcp:connect", 2, tcp_connect);
+  lrn("tcp:accept", 1, tcp_accept);
+  lrn("fd:close", 1, lisp_close_fd);
+  lrn("fd:read", 2, lisp_read_fd);
+  lrn("fd:write", 2, lisp_write_fd);
+  
+  lrn("thread:start", 1, thread_start);
+  lrn("thread:join", 1, thread_join);
+  lrn("thread:sleep", 1, thread_sleep);
+  lrn("thread:create-mutex", 0, thread_create_mutex);
+  lrn("thread:lock-mutex", 1, thread_lock_mutex);
+  lrn("thread:unlock-mutex", 1, thread_unlock_mutex);
+  lrn("thread:destroy-mutex", 1, thread_destroy_mutex);
+  
 }

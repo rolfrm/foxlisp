@@ -1,11 +1,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
+#include <signal.h>
 #include <iron/utils.h>
 typedef int8_t i8;
 
@@ -291,7 +289,8 @@ static i64 ht_find_free_pre_hashed(const hash_table * ht, size_t hash, const voi
              return i;
         }else if(memcmp(thiskey, key, key_size) == 0){
           return i;
-        }	
+        }
+        
       }
     }
   }
