@@ -10,7 +10,13 @@
 #define GC_THREADS
 #include <gc.h>
 
+#ifdef EMSCRIPTEN
+#include "emscripten.h"
+#endif
+
 #include "foxlisp.h"
+
+extern bool debug_set;
 bool is_float(lisp_value a){
   return a.type == LISP_RATIONAL || a.type == LISP_FLOAT32;
 }
@@ -201,7 +207,7 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
     }
   }
   if(scope->values == NULL){
-	 scope->values = ht_create2(scope->super == NULL ? 100000 :4, sizeof(size_t), sizeof(lisp_value));
+	 scope->values = ht_create(sizeof(u64), sizeof(lisp_value));
     //if(scope->super != NULL)
     //  raise(SIGINT);
   }
@@ -213,10 +219,11 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
 lisp_context * current_context;
 
 lisp_context * lisp_context_new(){
+  printf("LISP NEW CONTEXT\n");
   lisp_context * ctx = GC_MALLOC(sizeof(ctx[0]));
   ctx->next_symbol = 1;
-  ctx->symbols = ht_create_strkey(sizeof(size_t));
-  ctx->symbols_reverse = ht_create(sizeof(size_t), sizeof(char *));
+  ctx->symbols = ht_create_strkey(sizeof(u64));
+  ctx->symbols_reverse = ht_create(sizeof(u64), sizeof(char *));
   ctx->globals = lisp_scope_new(NULL);
   var prev_ctx = current_context;
   current_context = ctx;
@@ -385,14 +392,19 @@ lisp_value read_token_string(io_reader * rd){
 }
 
 bool is_keyword(lisp_value sym){
-  return sym.type == LISP_SYMBOL && sym.integer >= 0x10000000;
+  return sym.type == LISP_SYMBOL && sym.integer >= 0x100000;
 }
 
 int64_t get_symbol_id(const char * s){
   int64_t id = 0;
   
-  if(ht_get(current_context->symbols, &s, &id))
-	 return id;
+  if(ht_get(current_context->symbols, &s, &id)){
+    if(debug_set) printf("found id");
+    return id;
+  }
+  if(debug_set){
+    printf("set id");
+  }
   s = gc_clone(s, strlen(s) + 1);
   id = current_context->next_symbol++;
   if(s[0] == ':'){
@@ -744,6 +756,11 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 	 {
       var first = car(value);
       //println(first);
+      if(first.type == LISP_NIL){
+        raise_string("called with nil");
+        return nil;
+      }
+
       lisp_value first_value = lisp_eval(scope, first);
 		if(first_value.type == LISP_MACRO_BUILTIN){
 		  switch(first_value.builtin){
@@ -873,7 +890,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         case LISP_BOUND:
           {
             var the_scope = scope;
-            if(!is_nil(cddr(value)) & !is_nil(lisp_eval(scope, caddr(value)))){
+            if(!is_nil(cddr(value)) && !is_nil(lisp_eval(scope, caddr(value)))){
               the_scope = current_context->globals;
             }
               
@@ -908,9 +925,14 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
       argcnt += 1;
       if(lisp_is_in_error())
         return nil;
+
 		if(first_value.type == LISP_FUNCTION_NATIVE){
       
 		  var n = first_value.nfunction;
+        if(n->fptr == NULL){
+          raise_string("function is null");
+          return nil;
+        }
 		  union{
 			 lisp_value (* n0)();
 			 lisp_value (* n1)(lisp_value);
@@ -921,6 +943,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 			 lisp_value (* n6)(lisp_value, lisp_value, lisp_value, lisp_value, lisp_value, lisp_value);
 			 
 		  }f;
+
 		  f.n0 = n->fptr;
 		  switch(n->nargs){
 		  case 0:
@@ -1081,6 +1104,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
       if(is_keyword(value))
         return value;
       lisp_value r;
+
       if(lisp_scope_try_get_value(scope, value, &r))
         return r;
       else{
@@ -1642,13 +1666,13 @@ lisp_value lisp_register_finalizer(lisp_value item, lisp_value func){
 }
 
 lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
-  bool weak_keys = !is_nil(weak_key);
+    bool weak_keys = !is_nil(weak_key);
   bool weak_values = !is_nil(weak_value);
   hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
-  if(weak_keys)
+  /*if(weak_keys)
 	 ht_set_mem_keys(ht, GC_malloc_atomic, GC_free);
   if(weak_values)
-	 ht_set_mem_values(ht, GC_malloc_atomic, GC_free);
+  ht_set_mem_values(ht, GC_malloc_atomic, GC_free);*/
   return native_pointer(ht);
 }
 
@@ -1746,9 +1770,21 @@ void load_modules(){
 
 }
 
+
+void web_update(){
+  debug_set = true;
+  var sym = get_symbol("lisp:*web-update*");
+  debug_set = false;
+  println(sym);
+  lisp_eval(current_context->globals, new_cons(sym, nil));
+  //lisp_eval_string("(lisp:*web-update*)");
+  printf("Web update\n");
+}
+
 //void setup_signal_handler();
 lisp_value run_gc();
 int main(int argc, char ** argv){
+  printf("starting..\n");
   //setup_signal_handler();
   ht_mem_malloc = GC_malloc;
   ht_mem_free = GC_free;
@@ -1838,15 +1874,22 @@ int main(int argc, char ** argv){
   lisp_register_macro("with-exception-handler", LISP_WITH_EXCEPTION_HANDLER);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
-#ifndef EMSCRIPTEN
+#ifndef WASM
   GC_allow_register_threads();
-  lisp_register_value("lisp:*web-environment*", t);
-#else
   lisp_register_value("lisp:*web-environment*", nil);
+#else
+  lisp_register_value("lisp:*web-environment*", t);
+  lisp_register_value("lisp:*web-update*", nil);
+
 #endif
 
   load_modules();
-  lisp_eval_file("./ld50.lisp");
+  var code =read_file_to_string("ld50.lisp");
+  printf(">>%s\n", code);
+  lisp_eval_file("ld50.lisp");
+#ifdef WASM
+  emscripten_set_main_loop(web_update, 0, 1);
+#endif
   return 0;
 }
 

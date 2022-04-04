@@ -110,7 +110,7 @@ void * lisp_perform_work(void * args){
   lisp_eval(current_context->globals, new_cons(eval, nil));
   return NULL;
 }
-
+#ifndef WASM
 pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data);
 
 lisp_value thread_start(lisp_value func){
@@ -126,13 +126,6 @@ lisp_value thread_join(lisp_value func){
   
   pthread_t thread = (pthread_t) cdr(func).native_pointer;
   pthread_join(thread, NULL);
-  return nil;
-}
-
-lisp_value thread_sleep(lisp_value time){
-  var t = lisp_rational(time).rational;
-  
-  iron_usleep((int)(t * 1000000.0));
   return nil;
 }
 
@@ -171,6 +164,16 @@ lisp_value thread_destroy_mutex(lisp_value lock){
  return t;
 }
 
+#endif
+
+lisp_value thread_sleep(lisp_value time){
+  var t = lisp_rational(time).rational;
+  
+  iron_usleep((int)(t * 1000000.0));
+  return nil;
+}
+
+
 void lrn(const char * l, int args, void * f);
 void tcp_register(){
 
@@ -180,13 +183,15 @@ void tcp_register(){
   lrn("fd:close", 1, lisp_close_fd);
   lrn("fd:read", 2, lisp_read_fd);
   lrn("fd:write", 2, lisp_write_fd);
-  
+
+  #ifndef WASM
   lrn("thread:start", 1, thread_start);
   lrn("thread:join", 1, thread_join);
-  lrn("thread:sleep", 1, thread_sleep);
   lrn("thread:create-mutex", 0, thread_create_mutex);
   lrn("thread:lock-mutex", 1, thread_lock_mutex);
   lrn("thread:unlock-mutex", 1, thread_unlock_mutex);
   lrn("thread:destroy-mutex", 1, thread_destroy_mutex);
-  
+  #endif
+
+  lrn("thread:sleep", 1, thread_sleep);
 }

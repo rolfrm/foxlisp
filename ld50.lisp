@@ -1,3 +1,4 @@
+(println "starting ld50 game")
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 (load "vec2.lisp")
@@ -291,10 +292,10 @@
 (let ((points '(0.0 0.0
                   2.0 1.0
                 3.0 3.0
-                  6.0 7.0
+                6.0 7.0
                 9.0 0.0
                   12.0 1.0
-                13.0 2.0
+               13.0 2.0
                 15.0 0.0
                 16.0 0.0
                 18.0 0.0
@@ -317,10 +318,11 @@
                 40.0 -60.0
                 20.0 -65.0
                 30.0 -70.0
-                20.0 -80.0
+               20.0 -80.0
                 10.0 -70.0
                 -10.0 -75.0
                 -20.0  -60.0
+
      )))
   (set! road-line (bezier-to-polygon points))
   
@@ -699,6 +701,7 @@
       (- 0.0 x)
       x))
 
+
 (defun render-scene()
   
   (render-model
@@ -708,7 +711,6 @@
        
        (color :rgb ,bg-color
         ,square-model)
-
        ;; setting up the view
        (view :perspective (1.0 1.0 0.01 1000.0)
         (transform :translate (0 -4 -4)
@@ -716,8 +718,9 @@
           (transform :translate (-0.5 -0.5 -10)
            :scale (0.5 0.5 0.5)
            
-           
+
            (ref world-model) ))))
+
        ;health meter
        (transform :scale (0.05 0.05) :translate (0.05 0.95)
         (ref heart-model)
@@ -779,6 +782,7 @@
          )
         ))
 
+       
        (transform :scale (0.1 0.1) :translate (0.1 0.1)
         (transform :scale (10.0 2.0) :translate (-1.0 -1)
          (color :rgb (0.3 0.0 0.0)
@@ -1079,34 +1083,59 @@ Restart by pressing [Enter]"))
 (defun game-update ()
   ;(sleep 0.1)
   
-  (audio:update)
+  ;(audio:update)
   (foxgl:clear)
   (entities-update)
   (render-scene)
-  (when nil
-    (measure
-     (do-times 1 (lambda ()
-                  (render-scene)))))
   (foxgl:swap win)
   (foxgl:poll-events)
   )
 
-(define win (foxgl:create-window (integer 800) (integer 800)))
-(foxgl:set-title win "Fox Driver")
-(foxgl:make-current win)
-(foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
+(define ld50:initialized nil)
+(define win nil)
 
-(loop t
-     (when swank-loaded
-       (thread:lock-mutex *swank-mutex*))
-     (with-exception-handler
-         (game-update)
-       (lambda (x)
-         (println x)
-         (thread:sleep 0.5)
-         ))
+(defun ld50:initialize()
+  (set! win (foxgl:create-window (integer 800) (integer 800)))
+  ;(foxgl:set-title win "Fox Driver")
+  (foxgl:make-current win)
+  (foxgl:load-font "DejaVuSans.ttf" (integer 22))
+  )
+
+(defun lisp:*web-update*()
+  (unless ld50:initialized
+    (set! ld50:initialized t)
+    (ld50:initialize))
+  (foxgl:make-current win)
+  (with-exception-handler
+      (progn                            ;(game-update)
+
+        (game-update)
+        )
+    
+    (lambda (x)
+      (println x)
+      (thread:sleep 0.5)
+      ))
+
+  )
+
+(unless lisp:*web-environment*
+  (define win (foxgl:create-window (integer 800) (integer 800)))
+  (foxgl:set-title win "Fox Driver")
+  (foxgl:make-current win)
+  (foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
+
+  (loop t
+       (when swank-loaded
+         (thread:lock-mutex *swank-mutex*))
+       (with-exception-handler
+           (game-update)
+         (lambda (x)
+           (println x)
+           (thread:sleep 0.5)
+           ))
      (when swank-loaded
        (thread:unlock-mutex *swank-mutex*))
-     ;(lisp:exit)
-     )
+                                        ;(lisp:exit)
+       )
 

@@ -309,7 +309,7 @@
 
 (defun  min (a b)
   (if (< a b) a b))
-(println (list* '1 'b 'c '(1 2 3)))
+;(println (list* '1 'b 'c '(1 2 3)))
 
 (define pi 3.141592)
 (define pi_2 (/ pi 2.0))

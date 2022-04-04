@@ -1,4 +1,4 @@
-(println (foxgl:timestamp))
+;(println (foxgl:timestamp))
 
 (defun plist-rest (lst func)
   (while lst
@@ -162,8 +162,7 @@
          (foxgl:color color)
          (foxgl:transform (or transform (mat4-identity)))
 
-         (foxgl:blit-text (cadr model)
-                          (or transform (mat4-identity)))
+         (foxgl:blit-text (cadr model)(or transform (mat4-identity)))
          )
        (when (eq sym 'flat)
          (let ((fb (get-framebuffer model))
@@ -209,7 +208,7 @@
                  (println (list 'new-poly r))
                  (set! r (cons 'poly (foxgl:load-polygon (list-to-array poly) dims)))
                  (hashtable-set polygon-cache (cdr model) r)
-                 (register-finalizer r cache-delete)
+                 ;(register-finalizer r cache-delete)
                  )
                (foxgl:color color)
                (foxgl:transform (or transform (mat4-identity)))
@@ -235,25 +234,27 @@
   )
 
 (println (math:* (mat3-scale 2 3) (mat3-scale 4 5)))
-
-(thread:join (thread:start (lambda () (println 'thread!))))
-(thread:join (thread:start (lambda () (println 'thread!))))
-
-(let ((srv (tcp:listen 8893))
-      (cli (tcp:connect "127.0.0.1" 8893)))
-  (let ((cli2 (tcp:accept srv))
+(println lisp:*web-environment*)
+(unless lisp:*web-environment*
+  (thread:join (thread:start (lambda () (println 'thread!))))
+  (thread:join (thread:start (lambda () (println 'thread!))))
+  
+  (let ((srv (tcp:listen 8893))
+        (cli (tcp:connect "127.0.0.1" 8893)))
+    (let ((cli2 (tcp:accept srv))
         (v (make-vector 4 1))
-        (v2 (make-vector 10 (byte 0)))
+          (v2 (make-vector 10 (byte 0)))
         )
-    (vector-set! v 0 10101010101010)
-    (fd:write cli2 v)
-    (println (list 'read (fd:read cli v2)))
-    (println (list srv cli cli2 v2))
-    
-    (fd:close cli2)
-    (fd:close cli)
-    (fd:close srv)
-    ))
+      (vector-set! v 0 10101010101010)
+      (fd:write cli2 v)
+      (println (list 'read (fd:read cli v2)))
+      (println (list srv cli cli2 v2))
+      
+      (fd:close cli2)
+      (fd:close cli)
+      (fd:close srv)
+      ))
+  )
 
 (defvar audio:note-low (* 12.0 8.0))
 (defun audio:note-to-frequency(note)
