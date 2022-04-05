@@ -126,20 +126,19 @@
              (math:*! new-transform new-transform transform))
            
          (match tlate (plookup (cdr model) ':translate)
-                (math:*! new-transform new-transform
-                         (mat4-translation (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))
-                )
+                (math:translate! new-transform
+                         (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))
+                
          
          (match scale (plookup (cdr model) ':scale)
-                (math:*! new-transform new-transform 
-                         (mat4-scale (car scale) (cadr scale) (or (caddr scale) 1.0)))
+                (math:scale! new-transform 
+                             (car scale) (cadr scale) (or (caddr scale) 1.0)))
                 
-                )
          (match rotation (plookup (cdr model) ':rotate)
                 
-                (math:*! new-transform new-transform (mat4:rotate (car rotation)
-                                                                  (or (cadr rotation) 0.0)
-                                                                  (or (caddr rotation) 0.0))))
+                (math:rotate!  new-transform  (car rotation)
+                               (or (cadr rotation) 0.0)
+                               (or (caddr rotation) 0.0)))
          (set! transform new-transform)
          (set! render-sub nil)
          (render-sub-models model)

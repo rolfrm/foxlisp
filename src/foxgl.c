@@ -128,18 +128,40 @@ lisp_value math_mul(lisp_value a, lisp_value b){
   return a;
 }
 lisp_value mat4_to_lisp (mat4 a);
-lisp_value math_mat4_rotate(lisp_value x, lisp_value y, lisp_value z){
-  mat4 m1 = mat4_identity();
-  if(is_nil(y)){
-    m1 = mat4_rotate_Z(m1, z.rational);
-  }else{
-    m1 = mat4_rotate_X(m1, x.rational);
-    m1 = mat4_rotate_Y(m1, y.rational);
-    m1 = mat4_rotate_Z(m1, z.rational);
-  }
+lisp_value math_rotate_in_place(lisp_value m, lisp_value x, lisp_value y, lisp_value z){
+  var m1 = (mat4 *) m.vector->data;
+  *m1 = mat4_rotate_X(*m1, as_rational(x));
+  *m1 = mat4_rotate_Y(*m1, as_rational(y));
+  *m1 = mat4_rotate_Z(*m1, as_rational(z));
+  
   //mat4_print(m1);printf(" %f %f %f \n", x.rational, y.rational, z.rational);
+  return nil;
+}
+
+lisp_value math_mat4_rotate(lisp_value x, lisp_value y, lisp_value z){
+  var m1 = mat4_identity();
+  
+  m1 = mat4_rotate_X(m1, x.rational);
+  m1 = mat4_rotate_Y(m1, y.rational);
+  m1 = mat4_rotate_Z(m1, z.rational);
+  
   return mat4_to_lisp(m1);
 }
+
+lisp_value math_translate_in_place(lisp_value m, lisp_value x, lisp_value y, lisp_value z){
+  TYPE_ASSERT(m, LISP_VECTOR);
+
+  var m1 = (mat4 *) m.vector->data;
+  *m1 = mat4_mul(*m1, mat4_translate(as_rational(x), as_rational(y), as_rational(z)));
+  return nil;
+}
+
+lisp_value math_scale_in_place(lisp_value m, lisp_value x, lisp_value y, lisp_value z){
+  var m1 = (mat4 *) m.vector->data;
+  *m1 = mat4_mul(*m1, mat4_scaled(as_rational(x), as_rational(y), as_rational(z)));
+  return nil;
+}
+
 
 lisp_value math_mat4_perspective(lisp_value fov, lisp_value aspect, lisp_value near, lisp_value far){
   TYPE_ASSERT(fov, LISP_RATIONAL);
@@ -525,6 +547,9 @@ void foxgl_register(){
   
   lrn("math:*", 2, math_mul);
   lrn("math:*!", 3, math_mul_in_place);
+  lrn("math:rotate!", 4, math_rotate_in_place);
+  lrn("math:scale!", 4, math_scale_in_place);
+  lrn("math:translate!", 4, math_translate_in_place);
   lrn("mat4:rotate", 3, math_mat4_rotate);
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);

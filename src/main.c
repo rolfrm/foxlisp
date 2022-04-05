@@ -1262,10 +1262,13 @@ int print2(char * buffer, int l2, lisp_value v){
 }
 
 lisp_value print(lisp_value v){
+  char buffer[100];
   int l = print2(NULL,0,  v);
-  char * str = lisp_malloc(l + 1);
+  char * str = l > 95 ? malloc(l + 1) : buffer;
   print2(str, l+ 1, v);
   printf("%s", str);
+  if(l >= 95)
+    free(str);
   return integer(l);
 }
 
@@ -1393,6 +1396,14 @@ lisp_value lisp_rational(lisp_value v){
 lisp_value rational(double v){
   return (lisp_value){.rational = v, .type = LISP_RATIONAL};
 }
+
+double as_rational(lisp_value v){
+  if(v.type == LISP_RATIONAL || v.type == LISP_FLOAT32)
+    return v.rational;
+  return (double) v.integer;
+
+}
+
 lisp_value float32(float v){
   return (lisp_value){.rational = v, .type = LISP_FLOAT32};
 }
@@ -1438,16 +1449,9 @@ lisp_value lisp_read(lisp_value v){
   return lisp_read_string(v.string);
 }
 
-size_t alloc_total = 0;
 void * lisp_malloc(size_t v){
-  alloc_total += v;
-  //printf("allocate %i / %i kB\n", v, alloc_total / 1000);
-  //if((alloc_total & 0xFFFFF) == 0xFFFFF){
-    //printf("allocate %i / %i kB\n", v, alloc_total / 1000);
-    //raise(SIGINT);
-    //}
-  return calloc(v, 1);
-  //return GC_malloc(v);
+  var p = calloc(v, 1);
+  return p;
 }
 
 void * lisp_malloc_atomic(size_t v){

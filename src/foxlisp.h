@@ -163,7 +163,7 @@ lisp_value vector_copy(lisp_value vector);
 lisp_value integer(int64_t v);
 lisp_value rational(double v);
 lisp_value float32(float v);
-
+double as_rational(lisp_value v);
 lisp_value byte(unsigned char v);
 lisp_value native_pointer(void * ptr);
 lisp_value lisp_rational(lisp_value value);
