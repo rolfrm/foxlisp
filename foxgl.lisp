@@ -61,6 +61,9 @@
                       (println 'delete-poly)
                       (delete-polygon (cdr x))))
       (square-buffers nil)
+      (render-sub-models
+       (lambda (model)
+         (plist-rest (cdr model) render-model2)))
       (test-tex nil)
       )
   (set! get-framebuffer
@@ -78,19 +81,21 @@
 
      (let ((sym (car model))
            (funcs ())
+           (render-sub t)
            )
        (when (eq sym 'color)
          (let ((prev-color color))
-           (push! funcs (lambda () (set! color prev-color)))
-           )
          
-         (match rgb (plookup (cdr model) ':rgb)
-                (set! color rgb)
-                )
-         (match rgb (plookup (cdr model) ':rgba)
-                (set! color rgb)
-                )
-         )
+           (match rgb (plookup (cdr model) ':rgb)
+                  (set! color rgb)
+                  )
+           (match rgb (plookup (cdr model) ':rgba)
+                  (set! color rgb)
+                  )
+           (set! render-sub nil)
+           (render-sub-models model)
+           (set! color prev-color)
+         ))
        (when (eq sym 'ref)
 
          (render-model2 (symbol-value (cadr model) t)))
@@ -111,31 +116,36 @@
                   (set! transform (mat4:orthographic w h z))
                   (push! funcs (lambda () (set! transform prev-tform)))))
          
+         
          )
        
        (when (eq sym 'transform)
-         (let ((prev-tform transform))
-           (push! funcs (lambda () (set! transform prev-tform))))
+         (let ((prev-tform transform)
+               (new-transform (mat4-identity)))
+           (when transform
+             (math:*! new-transform new-transform transform))
+           
          (match tlate (plookup (cdr model) ':translate)
-                (set! transform (math:* (or transform (mat4-identity))
-                                         (mat4-translation (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))))
-
+                (math:*! new-transform new-transform
+                         (mat4-translation (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))
+                )
+         
          (match scale (plookup (cdr model) ':scale)
-                
-                (set! transform (math:* (or transform (mat4-identity))
-                                         (mat4-scale (car scale) (cadr scale) (or (caddr scale) 1.0))))
+                (math:*! new-transform new-transform 
+                         (mat4-scale (car scale) (cadr scale) (or (caddr scale) 1.0)))
                 
                 )
          (match rotation (plookup (cdr model) ':rotate)
                 
-                (set! transform
-                      (math:* (or transform (mat4-identity))
-                               (mat4:rotate (car rotation)
-                                            (or (cadr rotation) 0.0)
-                                            (or (caddr rotation) 0.0))))
-                
-                )
-         )
+                (math:*! new-transform new-transform (mat4:rotate (car rotation)
+                                                                  (or (cadr rotation) 0.0)
+                                                                  (or (caddr rotation) 0.0))))
+         (set! transform new-transform)
+         (set! render-sub nil)
+         (render-sub-models model)
+         (set! transform prev-tform)
+
+         ))
        (when (eq sym 'render-callback)
          ((cadr model) model)
          )
@@ -148,16 +158,18 @@
          (println (list (cdr model) transform color)))
        (when (eq sym 'blend)
          (foxgl:blend t)
-         (push! funcs (lambda ()
-                        (foxgl:blend nil)
-                        )))
+         (set! render-sub nil)
+         (render-sub-models model)
+         (foxgl:blend nil)
+         )
        (when (eq sym 'depth)
 
          (foxgl:depth t)
-         ;(println (glerror))
-         (push! funcs (lambda ()
-                        (foxgl:depth nil)
-                        )))
+                                        ;(println (glerror))
+         (set! render-sub nil)
+         (render-sub-models model)
+         (foxgl:depth nil)
+         )
        (when (eq sym 'text)
          (foxgl:color color)
          (foxgl:transform (or transform (mat4-identity)))
@@ -208,14 +220,16 @@
                  (println (list 'new-poly r))
                  (set! r (cons 'poly (foxgl:load-polygon (list-to-array poly) dims)))
                  (hashtable-set polygon-cache (cdr model) r)
-                 ;(register-finalizer r cache-delete)
+                 (register-finalizer r cache-delete)
                  )
                (foxgl:color color)
                (foxgl:transform (or transform (mat4-identity)))
                (foxgl:blit-polygon (cdr r))
                )
              )))
-       (unless (eq sym 'hidden)
+       (when (eq sym 'hidden)
+         (set! render-sub nil))
+       (when render-sub
          (plist-rest (cdr model) render-model2))
        
        (map! funcall funcs)  

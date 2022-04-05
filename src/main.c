@@ -95,13 +95,13 @@ bool  string_eq(lisp_value a, lisp_value b){
 }
 
 void * gc_clone(const void * mem, size_t s){
-  void * d = GC_MALLOC(s);
+  void * d = lisp_malloc(s);
   memcpy(d, mem, s);
   return d;
 }
 
 lisp_scope * lisp_scope_new(lisp_scope * super){
-  lisp_scope * s = GC_MALLOC(sizeof(*super));
+  lisp_scope * s = lisp_malloc(sizeof(*super));
   s->super = super;
   s->values = NULL;
   return s;
@@ -223,7 +223,7 @@ lisp_context * current_context;
 
 lisp_context * lisp_context_new(){
   printf("LISP NEW CONTEXT\n");
-  lisp_context * ctx = GC_MALLOC(sizeof(ctx[0]));
+  lisp_context * ctx = lisp_malloc(sizeof(ctx[0]));
   ctx->next_symbol = 1;
   ctx->symbols = ht_create_strkey(sizeof(u64));
   ctx->symbols_reverse = ht_create(sizeof(u64), sizeof(char *));
@@ -319,7 +319,7 @@ lisp_value lisp_length(lisp_value lst){
 size_t conses_allocated = 0;
 
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
-  lisp_value v = {.type = LISP_CONS, .cons = GC_MALLOC(sizeof(cons))};
+  lisp_value v = {.type = LISP_CONS, .cons = lisp_malloc(sizeof(cons))};
   v.cons->car = _car;
   v.cons->cdr = _cdr;
   conses_allocated += 1;
@@ -667,14 +667,13 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 }
 
 
-lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf, size_t * argcnt){
+lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
   if(c.type == LISP_NIL) return nil;
   var next = cdr(c);
-  *argcnt += 1;
   if(next.type != LISP_NIL){
 
 	 var value = lisp_eval(scope, car(c));
-	 var nextr = lisp_sub_eval(scope, next, cons_buf + 1, argcnt);
+	 var nextr = lisp_sub_eval(scope, next, cons_buf + 1);
     lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
 	 cns.cons->car =value;
     cns.cons->cdr = nextr;
@@ -844,7 +843,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 			 {
 				var args = cadr(value);
 				var body = cddr(value);
-				lisp_function * f = GC_MALLOC(sizeof(*f));
+				lisp_function * f = lisp_malloc(sizeof(*f));
 				f->code = body;
 				f->args = args;
             scope = lisp_scope_unstack(scope);
@@ -926,10 +925,9 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
           }
         }
       }
-
-      cons args[10] = {0};
-      size_t argcnt = 0;
-		lisp_value things = lisp_sub_eval(scope, cdr(value), args, &argcnt);
+      size_t argcnt = lisp_length(cdr(value)).integer;
+      cons args[argcnt];
+		lisp_value things = lisp_sub_eval(scope, cdr(value), args);
       argcnt += 1;
       if(lisp_is_in_error())
         return nil;
@@ -957,19 +955,18 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 		  case 0:
 			 return f.n0();
 		  case 1:
-			 return f.n1(car(things));
+			 return f.n1(args[0].car);
 		  case 2:
-			 return f.n2(car(things), cadr(things));
-          
+			 return f.n2(args[0].car, args[1].car);
         case 3:
-			 return f.n3(car(things), cadr(things), caddr(things));       
+			 return f.n3(args[0].car, args[1].car, args[2].car);       
 		  case 4:
-			 return f.n4(car(things), cadr(things), caddr(things), cadddr(things));
+			 return f.n4(args[0].car, args[1].car, args[2].car, args[3].car);
 		  case 5:
-			 return f.n5(car(things), cadr(things), caddr(things), cadddr(things), caddddr(things));
+			 return f.n5(args[0].car, args[1].car, args[2].car, args[3].car, args[4].car);
           
 		  case 6:
-			 return f.n6(car(things), cadr(things), caddr(things), cadddr(things), caddddr(things), cadddddr(things));
+			 return f.n6(args[0].car, args[1].car, args[2].car, args[3].car, args[4].car, args[5].car);
         default:
 			 raise_string("Unsupported number of args");
         }
@@ -980,7 +977,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         memset(args3, 0, sizeof(args3[0]) * (argcnt));
         //cons * args3 = NULL;
         /*if(argcnt > 0){
-          args3 = GC_malloc(argcnt * sizeof(cons));
+          args3 = lisp_malloc(argcnt * sizeof(cons));
           memset(args3, 0, sizeof(cons) * argcnt);
           }*/
         
@@ -1266,7 +1263,7 @@ int print2(char * buffer, int l2, lisp_value v){
 
 lisp_value print(lisp_value v){
   int l = print2(NULL,0,  v);
-  char * str = GC_malloc(l + 1);
+  char * str = lisp_malloc(l + 1);
   print2(str, l+ 1, v);
   printf("%s", str);
   return integer(l);
@@ -1274,7 +1271,7 @@ lisp_value print(lisp_value v){
 
 lisp_value value_to_string(lisp_value v){
   int l = print2(NULL,0,  v);
-  char * str = GC_malloc(l+ 1);
+  char * str = lisp_malloc(l+ 1);
   print2(str, l + 1, v);
   return (lisp_value){.type = LISP_STRING, .string = str};
 }
@@ -1283,7 +1280,7 @@ void lisp_register_value(const char * name, lisp_value value){
   lisp_scope_create_value(current_context->globals, get_symbol(name), value);
 }
 void lisp_register_native(const char * name, int nargs, void * fptr){
-  native_function *nf= GC_MALLOC(sizeof(*nf));
+  native_function *nf= lisp_malloc(sizeof(*nf));
   nf->nargs = nargs;
   nf->fptr = fptr;
   lisp_value v = {
@@ -1441,10 +1438,26 @@ lisp_value lisp_read(lisp_value v){
   return lisp_read_string(v.string);
 }
 
+size_t alloc_total = 0;
 void * lisp_malloc(size_t v){
-  return GC_malloc(v);
+  alloc_total += v;
+  //printf("allocate %i / %i kB\n", v, alloc_total / 1000);
+  //if((alloc_total & 0xFFFFF) == 0xFFFFF){
+    //printf("allocate %i / %i kB\n", v, alloc_total / 1000);
+    //raise(SIGINT);
+    //}
+  return calloc(v, 1);
+  //return GC_malloc(v);
 }
 
+void * lisp_malloc_atomic(size_t v){
+  return lisp_malloc(v);
+  //return GC_malloc_atomic(v);
+}
+
+void lisp_free(void * p){
+  free(p);
+}
 
 const char * lisp_type_to_string(lisp_type t){
   switch(t){
@@ -1493,9 +1506,9 @@ lisp_value make_vector(lisp_value len, lisp_value _default){
   TYPE_ASSERT(len, LISP_INTEGER);
   size_t l = (size_t)len.integer;
   size_t elem_size = lisp_type_size(_default.type);
-  void * data = GC_malloc(l * elem_size);
+  void * data = lisp_malloc(l * elem_size);
 
-  lisp_vector * vector = GC_malloc(sizeof(*vector));
+  lisp_vector * vector = lisp_malloc(sizeof(*vector));
   vector->data = data;
   vector->count = l;
   vector->elem_size = elem_size;
@@ -1563,7 +1576,7 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
   size_t l = (size_t)k.integer;
   size_t elem_size = lisp_type_size(vector.vector->default_value.type);
   
-  void * new_data = GC_malloc(l * elem_size);
+  void * new_data = lisp_malloc(l * elem_size);
   size_t prevCount = MIN(l, vector.vector->count);   
   memcpy(new_data, vector.vector->data, prevCount * elem_size);
   vector.vector->data = GC_realloc(vector.vector->data, l * elem_size);
@@ -1611,7 +1624,7 @@ lisp_value string_to_vector(lisp_value str){
   size_t l = strlen(strbuf) + 1;
   size_t elem_size = 1;
 
-  lisp_vector * vector = GC_malloc(sizeof(*vector));
+  lisp_vector * vector = lisp_malloc(sizeof(*vector));
   vector->data = strbuf;
   vector->count = l - 1;
   vector->elem_size = elem_size;
@@ -1645,7 +1658,7 @@ lisp_value hex_string(lisp_value i, lisp_value dec){
   int cnt = snprintf(NULL, 0, "%x", v);
   if(is_nil(dec))
     l = cnt;
-  char * buf = GC_malloc(l + 1);
+  char * buf = lisp_malloc(l + 1);
   printf("%i %i %i\n", v, l, cnt);
   snprintf(buf + MAX(0, l - cnt), MIN(cnt, l) + 1, "%x", v);
   buf[l] = 0;
@@ -1669,6 +1682,7 @@ void item_finalizer(void * obj, void * data){
 }
 
 lisp_value lisp_register_finalizer(lisp_value item, lisp_value func){
+  return nil;
   TYPE_ASSERT(item, LISP_CONS);
   TYPE_ASSERT(func, LISP_FUNCTION);
   GC_REGISTER_FINALIZER(item.cons, item_finalizer, func.function, 0, 0);
@@ -1680,9 +1694,9 @@ lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
   bool weak_values = !is_nil(weak_value);
   hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
   if(weak_keys)
-	 ht_set_mem_keys(ht, GC_malloc_atomic, GC_free);
+	 ht_set_mem_keys(ht, lisp_malloc_atomic, lisp_free);
   if(weak_values)
-  ht_set_mem_values(ht, GC_malloc_atomic, GC_free);
+  ht_set_mem_values(ht, lisp_malloc_atomic, lisp_free);
   return native_pointer(ht);
 }
 
@@ -1800,8 +1814,8 @@ int main(int argc, char ** argv){
   GC_INIT();
   printf("starting..\n");
   //setup_signal_handler();
-  ht_mem_malloc = GC_malloc;
-  ht_mem_free = GC_free;
+  ht_mem_malloc = lisp_malloc;
+  ht_mem_free = lisp_free;
   current_context = lisp_context_new();
   lisp_register_native("gc-heap", 0, gc_heap);
   lisp_register_native("lisp:exit", 0, lisp_exit);

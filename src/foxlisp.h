@@ -131,6 +131,7 @@ lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
 lisp_value lisp_len(lisp_value lst);
+lisp_value lisp_length(lisp_value lst);
 const char * lisp_type_to_string(lisp_type t);
 
 lisp_value new_cons(lisp_value a, lisp_value b);
@@ -144,6 +145,8 @@ lisp_value cddr(lisp_value v);
 lisp_value pop(lisp_value * v);
 lisp_value lisp_append(lisp_value a, lisp_value b);
 void * lisp_malloc(size_t s);
+void * lisp_malloc_atomic(size_t s);
+void lisp_free(void * p);
 //void * lisp_realloc(void * p, size_t v);
 
 lisp_value get_symbol(const char * s);

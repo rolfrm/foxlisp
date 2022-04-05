@@ -1102,7 +1102,7 @@ Restart by pressing [Enter]"))
 
 (defun ld50:initialize()
   (set! win (foxgl:create-window (integer 800) (integer 800)))
-  ;(foxgl:set-title win "Fox Driver")
+  (foxgl:set-title win "Fox Driver")
   (foxgl:make-current win)
   (foxgl:load-font "DejaVuSans.ttf" (integer 22))
   )

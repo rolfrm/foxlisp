@@ -50,6 +50,48 @@ lisp_value foxgl_load_texture_from_path(lisp_value str){
   return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = t};
 }
 
+lisp_value math_mul_in_place(lisp_value target, lisp_value a, lisp_value b){
+  type_assert(target, LISP_VECTOR);
+  type_assert(a, LISP_VECTOR);
+  type_assert(b, LISP_VECTOR);
+  type_assert(a.vector->default_value, LISP_FLOAT32);
+  type_assert(b.vector->default_value, LISP_FLOAT32);
+  if(a.vector->count == 16){
+	 mat4 * m1 = a.vector->data;
+	 if(b.vector->count == 16){
+		mat4 * m2 = b.vector->data;
+		
+		mat4 * m3 = target.vector->data;
+      ASSERT(target.vector->count == 16);
+      
+      *m3 = mat4_mul(*m1, *m2);
+		return nil;
+	 }
+    if(b.vector->count == 3){
+      vec3 * m2 = b.vector->data;
+      vec3 *m3 = ((vec3 *) target.vector->data);
+      
+      *m3 = mat4_mul_vec3(*m1, *m2);
+      return nil;
+    }
+	 raise_string("Invalid number of rows and columns");	
+  }else if(a.vector->count == 9){
+    ASSERT(target.vector->count == 9);
+    
+	 mat3 * m1 = a.vector->data;
+	 if(b.vector->count == 9){
+		mat3 * m2 = b.vector->data;
+		mat3 * m3 = target.vector->data;
+		*m3 = mat3_mul(*m1, *m2);
+		return nil;
+	 }
+  }
+
+  raise_string("Invalid number of rows and columns");
+  return a;
+}
+
+
 lisp_value math_mul(lisp_value a, lisp_value b){
   type_assert(a, LISP_VECTOR);
   type_assert(b, LISP_VECTOR);
@@ -482,6 +524,7 @@ void foxgl_register(){
   lrn("foxgl:poll-events", 0, foxgl_poll_events);
   
   lrn("math:*", 2, math_mul);
+  lrn("math:*!", 3, math_mul_in_place);
   lrn("mat4:rotate", 3, math_mat4_rotate);
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);
