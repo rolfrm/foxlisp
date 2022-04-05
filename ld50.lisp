@@ -3,10 +3,11 @@
 (load "foxgl.lisp")
 (load "vec2.lisp")
 (define swank-loaded nil)
-(unless lisp:*web-environment*
+(unless (or t lisp:*web-environment*)
   (load "swank.lisp")
   (set! swank-loaded t)
-  (thread:start swank:start-server))
+  (thread:start swank:start-server)
+  )
 
 (define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
 
@@ -710,7 +711,7 @@
       (transform :translate (-0.5 -0.5)
        
        (color :rgb ,bg-color
-        ,square-model)
+        (ref square-model))
        ;; setting up the view
        (view :perspective (1.0 1.0 0.01 1000.0)
         (transform :translate (0 -4 -4)
@@ -786,7 +787,7 @@
        (transform :scale (0.1 0.1) :translate (0.1 0.1)
         (transform :scale (10.0 2.0) :translate (-1.0 -1)
          (color :rgb (0.3 0.0 0.0)
-          ,square-model))
+          (ref square-model)))
         (transform :rotate (0 0 ,(if (eq ac-state :heat) -1.0
                                      (if (eq ac-state :cool)
                                          1.0
@@ -814,7 +815,7 @@
          (text "Radio [R]"))
         )
        )
-)))
+      )))
   (when show-help
     (render-model
      '(intro
@@ -825,8 +826,8 @@
           (color :rgba (0 0 0 0.7)
            (ref square-model))))
         (transform :scale (0.1 0.1) :translate (-0.2 0.1)
-        (transform :scale (0.015 -0.015) :translate (-0.3 1)
-         (text "Welcome to Fox Driver.
+         (transform :scale (0.015 -0.015) :translate (-0.3 1)
+          (text "Welcome to Fox Driver.
 You have to avoid dying.
 You die by being too cold or too hot.
 When you loose health, listen to the radio...
@@ -1080,8 +1081,13 @@ Restart by pressing [Enter]"))
 
       ))))
 
+(define last-conses-allocated 0);
 (defun game-update ()
-  ;(sleep 0.1)
+  (let ((nc (lisp:get-conses-allocated)))
+    (println (- nc last-conses-allocated))
+    (set! last-conses-allocated nc)
+    )
+                                        ;(sleep 0.1)
   
   ;(audio:update)
   (foxgl:clear)

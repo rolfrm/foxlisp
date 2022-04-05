@@ -107,25 +107,28 @@ lisp_scope * lisp_scope_new(lisp_scope * super){
   return s;
 }
 
-lisp_scope * lisp_scope_new2(lisp_scope * super, cons * lookup, size_t cnt){
-  lisp_scope * s = GC_MALLOC(sizeof(*super));
+void lisp_scope_stack(lisp_scope * s, lisp_scope * super, cons * lookup, size_t cnt){
   s->super = super;
   s->values = NULL;
   s->lookup = lookup;
+  s->stack_scope = true;
   s->lookup_on_stack = true;
   s->argcnt = cnt;
-  return s;
 }
-void lisp_scope_unstack(lisp_scope * scope){
+lisp_scope * lisp_scope_unstack(lisp_scope * scope){
 
-  while(scope){
-    if(scope->lookup_on_stack){
-      scope->lookup = gc_clone(scope->lookup, sizeof(scope->lookup[0]) * scope->argcnt);
-      scope->lookup_on_stack = false;
-    }
-    scope = scope->super;
+  if(scope->super == NULL)
+    return scope;
+  if(scope->stack_scope == false)
+    return scope;
+  scope->super = lisp_scope_unstack(scope->super);
+  if(scope->lookup_on_stack){
+    scope->lookup_on_stack = false;
+    scope->lookup = gc_clone(scope->lookup, sizeof(scope->lookup[0]) * scope->argcnt);
   }
-
+  var newscope = (lisp_scope *) gc_clone(scope, sizeof(*scope));
+  newscope->stack_scope = false;
+  return newscope;
 }
 
 lisp_value lisp_scope_get_value(lisp_scope * scope, lisp_value sym){
@@ -313,12 +316,18 @@ lisp_value lisp_length(lisp_value lst){
   return integer(c);
 }
 
+size_t conses_allocated = 0;
 
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   lisp_value v = {.type = LISP_CONS, .cons = GC_MALLOC(sizeof(cons))};
   v.cons->car = _car;
   v.cons->cdr = _cdr;
+  conses_allocated += 1;
   return v;
+}
+
+lisp_value get_conses_allocated (){
+  return integer(conses_allocated);
 }
 
 lisp_value copy_cons(lisp_value a){
@@ -397,14 +406,9 @@ bool is_keyword(lisp_value sym){
 
 int64_t get_symbol_id(const char * s){
   int64_t id = 0;
-  
-  if(ht_get(current_context->symbols, &s, &id)){
-    if(debug_set) printf("found id");
+  if(ht_get(current_context->symbols, &s, &id))
     return id;
-  }
-  if(debug_set){
-    printf("set id");
-  }
+  
   s = gc_clone(s, strlen(s) + 1);
   id = current_context->next_symbol++;
   if(s[0] == ':'){
@@ -621,7 +625,8 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   let argcnt = lisp_length(f->args).integer;
   cons args3[argcnt];
   memset(args3, 0, sizeof(args3[0]) * argcnt);
-  var function_scope = lisp_scope_new2(f->closure, args3, argcnt);
+  lisp_scope function_scope[1] = {0};
+  lisp_scope_stack(function_scope, f->closure, args3, argcnt);
   var args = f->args;
   var args2 = cdr(value);
   while(args.type != LISP_NIL){
@@ -789,9 +794,12 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				var argform = cadr(value);
             var argcnt = lisp_length(argform).integer;
             cons argsbuf[argcnt];
+
             memset(argsbuf, 0, sizeof(argsbuf[0]) * argcnt);
-				scope = lisp_scope_new2(scope, argsbuf, argcnt);
-				while(argform.type != LISP_NIL){
+            lisp_scope scope1[1] = {0};
+            lisp_scope_stack(scope1, scope, argsbuf, argcnt);
+            scope = scope1;
+            while(argform.type != LISP_NIL){
 				  var arg = car(argform);
 				  var sym = car(arg);
 				  var value = lisp_eval(scope, cadr(arg));
@@ -839,7 +847,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				lisp_function * f = GC_MALLOC(sizeof(*f));
 				f->code = body;
 				f->args = args;
-            lisp_scope_unstack(scope);
+            scope = lisp_scope_unstack(scope);
 				f->closure = scope;
 
 				if(first_value.builtin == LISP_LAMBDA)
@@ -976,7 +984,9 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
           memset(args3, 0, sizeof(cons) * argcnt);
           }*/
         
-		  var function_scope = lisp_scope_new2(f->closure, args3, argcnt);
+		  lisp_scope function_scope[1];
+        
+        lisp_scope_stack(function_scope, f->closure,  args3, argcnt);
 		  var args = f->args;
 		  var args2 = things;
 
@@ -1669,10 +1679,10 @@ lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
     bool weak_keys = !is_nil(weak_key);
   bool weak_values = !is_nil(weak_value);
   hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
-  /*if(weak_keys)
+  if(weak_keys)
 	 ht_set_mem_keys(ht, GC_malloc_atomic, GC_free);
   if(weak_values)
-  ht_set_mem_values(ht, GC_malloc_atomic, GC_free);*/
+  ht_set_mem_values(ht, GC_malloc_atomic, GC_free);
   return native_pointer(ht);
 }
 
@@ -1780,10 +1790,14 @@ void web_update(){
   //lisp_eval_string("(lisp:*web-update*)");
   printf("Web update\n");
 }
-
+void warn_gc(char * msg, GC_word arg){
+  printf("%s %i\n", msg, arg);
+}
 //void setup_signal_handler();
-lisp_value run_gc();
 int main(int argc, char ** argv){
+  //GC_no_dls = 1;
+  GC_set_warn_proc(warn_gc);
+  GC_INIT();
   printf("starting..\n");
   //setup_signal_handler();
   ht_mem_malloc = GC_malloc;
@@ -1809,6 +1823,7 @@ int main(int argc, char ** argv){
   lisp_register_native("set-cdr!", 2, set_cdr);
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("length", 1, list_length);
+  lisp_register_native("lisp:get-conses-allocated", 0, get_conses_allocated);
   lisp_register_native("copy-list", 1, copy_cons);
   lisp_register_native("copy-list-deep", 1, copy_cons);
   lisp_register_native("plookup", 2, lisp_plookup);
@@ -1855,7 +1870,6 @@ int main(int argc, char ** argv){
   
   lisp_register_native("register-finalizer", 2, lisp_register_finalizer);
   
-  lisp_register_native("gc-collect", 0, run_gc);
   lisp_register_native("eval", 1, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
@@ -1884,8 +1898,6 @@ int main(int argc, char ** argv){
 #endif
 
   load_modules();
-  var code =read_file_to_string("ld50.lisp");
-  printf(">>%s\n", code);
   lisp_eval_file("ld50.lisp");
 #ifdef WASM
   emscripten_set_main_loop(web_update, 0, 1);
@@ -1897,9 +1909,4 @@ pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
   pthread_t thread;
   GC_pthread_create(&thread, NULL, f, data);
   return thread;
-}
-
-lisp_value run_gc(){
-  gc_collect_garbage(current_context);
-  return t;
 }

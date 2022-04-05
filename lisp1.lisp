@@ -83,14 +83,15 @@
             ,(ior (cdr l))))))
   (ior items))
 
-
 (defmacro and (&rest items)
-  (defun iand(l)
-    (if l
-      `(let ((v ,(car l)))
-        (if v ,(iand (cdr l)) nil))
-      't))
-  (iand items))
+  (let ((iand nil))
+    (set! iand (lambda (l)
+                (if l
+                    `(let ((v ,(car l)))
+                      (if v ,(iand (cdr l)) nil))
+                    't)))
+    (println iand)
+    (iand items)))
 
 (defun symbol-macro? (s) (and (bound? s t) (macro? (symbol-value s) 'FUNCTION_MACRO)))
 (defun symbol-procedure? (s) (and (bound? s t) (procedure? (symbol-value s))))

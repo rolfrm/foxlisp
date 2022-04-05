@@ -78,7 +78,9 @@ struct __lisp_scope{
   hash_table * values;
   cons * lookup;
   size_t argcnt;
+  bool stack_scope;
   bool lookup_on_stack;
+  
 };
 
 typedef struct{
@@ -174,7 +176,7 @@ bool type_assert(lisp_value val, lisp_type type);
 bool elem_type_assert(lisp_value vector, lisp_type type);
 
 lisp_scope * lisp_scope_new(lisp_scope * super);
-lisp_scope * lisp_scope_new2(lisp_scope * super, cons * argsbuffer, size_t cnt);
+void lisp_scope_stack(lisp_scope *stack_scope, lisp_scope * super, cons * argsbuffer, size_t cnt);
 bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out);
 lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 

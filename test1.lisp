@@ -45,34 +45,6 @@
 
 (assert (cons? (cons 1 2 )))
 
-(let ((file (fopen "./test.x" "w+"))
-		(data (make-vector 100 (byte 0)))
-		)
-  (vector-set! data 0 (byte 255))
-  (vector-set! data 1 (byte 1))
-  (vector-set! data 2 (byte 100))
-  (println `(file:  ,file))
-  (fwrite (vector-native-element-pointer data 0) 1024 1 file)
-  (fclose file)
-  )
-
-(println (list '>> (lambda () 2)))
-
-(let ((file (fopen "./test.x" "r"))
-		(data (make-vector 10 (byte 0)))
-		)
-  
-  (let ((read (lambda () (fread (vector-native-element-pointer data 0) 1 10 file)))
-		  (r 0)
-		  )
-	 (loop (not (= 0 (set! r (read))))
-		 (println r)
-		 (println data)
-		 )
-	 )
-  (fclose file)
-  )
-
 (let ((vector (make-vector 3 0)))
   (vector-set! vector 0 10)
   (vector-set! vector 1 555)
