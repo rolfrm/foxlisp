@@ -9,4 +9,5 @@
 	url = git@github.com:ivmai/libatomic_ops.git
 [submodule "iron"]
 	path = iron
-	url = git@github.com:rolfrm/iron.git
+	url = git@github.com:rolfrm/iron
+
