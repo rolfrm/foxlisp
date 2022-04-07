@@ -100,6 +100,7 @@
 
          (render-model2 (symbol-value (cadr model) t)))
        (when (eq sym 'view)
+         
          (match p (plookup (cdr model) :perspective)
                 (let ((fov (car p))
                       (aspect (cadr p))
@@ -107,15 +108,16 @@
                       (far (cadddr p))
                       (prev-tform transform))
                   (set! transform (mat4:perspective fov aspect near far))
-                  (push! funcs (lambda () (set! transform prev-tform)))))
+                  ))
          (match p (plookup (cdr model) :orthographic)
                 (let ((w (car p))
                       (h (cadr p))
                       (z (caddr p))
                       (prev-tform transform))
                   (set! transform (mat4:orthographic w h z))
-                  (push! funcs (lambda () (set! transform prev-tform)))))
-         
+                  ))
+         (set! render-sub nil)
+         (render-sub-models model)
          
          )
        
@@ -172,7 +174,6 @@
        (when (eq sym 'text)
          (foxgl:color color)
          (foxgl:transform (or transform (mat4-identity)))
-
          (foxgl:blit-text (cadr model)(or transform (mat4-identity)))
          )
        (when (eq sym 'flat)

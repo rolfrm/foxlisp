@@ -3,7 +3,10 @@
 	url = git@github.com:rolfrm/libmicroio.git
 [submodule "gc/bdwgc"]
 	path = gc/bdwgc
-	url = git://github.com/ivmai/bdwgc.git
+	url = git@github.com:ivmai/bdwgc.git
 [submodule "gc/libatomic_ops"]
 	path = gc/libatomic_ops
-	url = git://github.com/ivmai/libatomic_ops.git
+	url = git@github.com:ivmai/libatomic_ops.git
+[submodule "iron"]
+	path = iron
+	url = git@github.com:rolfrm/iron.git

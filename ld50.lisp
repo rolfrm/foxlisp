@@ -720,8 +720,12 @@
            :scale (0.5 0.5 0.5)
            
 
-           (ref world-model) ))))
-
+           (ref world-model) ))))))))
+  (render-model
+   `(ui
+    (transform :scale (2.0 2.0)
+               (transform :translate (-0.5 -0.5)
+    
        ;health meter
        (transform :scale (0.05 0.05) :translate (0.05 0.95)
         (ref heart-model)
@@ -835,7 +839,11 @@ Also you have to avoid running out of gas...
 So look at your bars.
 You control the car with WASD.
 Start by pressing W.
-Restart by pressing [Enter]"))
+Restart by pressing [Enter]
+
+NOTE! The web version currently lacks a garbage collector.
+Conside closing the tab when done.
+"))
         )
     
        )
@@ -869,7 +877,10 @@ Restart by pressing [Enter]"))
       (set! radio-state
             (cond ((eq radio-state :off) :on)
                   (else :off))))
-    (when (first (lambda (x) (equals? '(key-down scankey 36) x)) evts)
+    (when (first (lambda (x)
+                   (or (equals? '(key-down key 257) x)
+                       (equals? '(key-down scankey 36) x))) evts)
+      
       (reset))
     
     )
@@ -1083,16 +1094,28 @@ Restart by pressing [Enter]"))
 
 (define last-conses-allocated 0);
 (defun game-update ()
+  (println (list 'allocated (lisp:count-allocated)))
   (let ((nc (lisp:get-conses-allocated)))
-    (println (- nc last-conses-allocated))
+    ;(println (- nc last-conses-allocated))
     (set! last-conses-allocated nc)
     )
                                         ;(sleep 0.1)
   
   ;(audio:update)
   (foxgl:clear)
-  (entities-update)
-  (render-scene)
+  (let ((a1 (lisp:get-allocated)))
+    
+    (entities-update)
+    ;(println (list 'entities-update (- (lisp:get-allocated) a1)))
+    )
+  (let ((a1 (lisp:get-allocated)))
+    ;(lisp:trace-allocations t)
+    
+    (render-scene)
+    ;(lisp:trace-allocations nil)
+  ;(println (list 'render-scene: (- (lisp:get-allocated) a1)))
+    )
+    
   (foxgl:swap win)
   (foxgl:poll-events)
   )

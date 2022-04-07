@@ -94,12 +94,6 @@ bool  string_eq(lisp_value a, lisp_value b){
   return strcmp(a.string, b.string) == 0;
 }
 
-void * gc_clone(const void * mem, size_t s){
-  void * d = lisp_malloc(s);
-  memcpy(d, mem, s);
-  return d;
-}
-
 lisp_scope * lisp_scope_new(lisp_scope * super){
   lisp_scope * s = lisp_malloc(sizeof(*super));
   s->super = super;
@@ -224,6 +218,7 @@ lisp_context * current_context;
 lisp_context * lisp_context_new(){
   printf("LISP NEW CONTEXT\n");
   lisp_context * ctx = lisp_malloc(sizeof(ctx[0]));
+  ctx->gc = gc_context_new();
   ctx->next_symbol = 1;
   ctx->symbols = ht_create_strkey(sizeof(u64));
   ctx->symbols_reverse = ht_create(sizeof(u64), sizeof(char *));
@@ -318,13 +313,6 @@ lisp_value lisp_length(lisp_value lst){
 
 size_t conses_allocated = 0;
 
-lisp_value new_cons(lisp_value _car, lisp_value _cdr){
-  lisp_value v = {.type = LISP_CONS, .cons = lisp_malloc(sizeof(cons))};
-  v.cons->car = _car;
-  v.cons->cdr = _cdr;
-  conses_allocated += 1;
-  return v;
-}
 
 lisp_value get_conses_allocated (){
   return integer(conses_allocated);
@@ -335,7 +323,6 @@ lisp_value copy_cons(lisp_value a){
     return new_cons(car(a), copy_cons(cdr(a)));
   return a;
 }
-
 
 lisp_value copy_cons_deep(lisp_value a){
   if(a.type == LISP_CONS)
@@ -754,12 +741,10 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 }
 
 lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
-
   switch(value.type){
   case LISP_CONS:
 	 {
       var first = car(value);
-      //println(first);
       if(first.type == LISP_NIL){
         raise_string("called with nil");
         return nil;
@@ -1063,7 +1048,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
               r = f.n2d(car(things).rational, cadr(things).rational);
             else
               r = f.n2(car(things).integer, cadr(things).integer);
-				break;
+            break;
 			 case 3:
 				r = f.n3(car(things).integer, cadr(things).integer, caddr(things).integer);
 				break;
@@ -1449,19 +1434,6 @@ lisp_value lisp_read(lisp_value v){
   return lisp_read_string(v.string);
 }
 
-void * lisp_malloc(size_t v){
-  var p = calloc(v, 1);
-  return p;
-}
-
-void * lisp_malloc_atomic(size_t v){
-  return lisp_malloc(v);
-  //return GC_malloc_atomic(v);
-}
-
-void lisp_free(void * p){
-  free(p);
-}
 
 const char * lisp_type_to_string(lisp_type t){
   switch(t){
@@ -1583,7 +1555,7 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
   void * new_data = lisp_malloc(l * elem_size);
   size_t prevCount = MIN(l, vector.vector->count);   
   memcpy(new_data, vector.vector->data, prevCount * elem_size);
-  vector.vector->data = GC_realloc(vector.vector->data, l * elem_size);
+  vector.vector->data = lisp_realloc(vector.vector->data, l * elem_size);
   vector.vector->count = l;
   for(size_t i = prevCount; i < l; i++){
 	 vector_set(vector, integer(i), vector.vector->default_value);
@@ -1800,13 +1772,13 @@ void load_modules(){
 
 
 void web_update(){
-  debug_set = true;
+  //debug_set = true;
   var sym = get_symbol("lisp:*web-update*");
-  debug_set = false;
-  println(sym);
+  //debug_set = false;
+  //println(sym);
   lisp_eval(current_context->globals, new_cons(sym, nil));
   //lisp_eval_string("(lisp:*web-update*)");
-  printf("Web update\n");
+  //printf("Web update\n");
 }
 void warn_gc(char * msg, GC_word arg){
   printf("%s %i\n", msg, arg);
@@ -1822,6 +1794,7 @@ int main(int argc, char ** argv){
   ht_mem_free = lisp_free;
   current_context = lisp_context_new();
   lisp_register_native("gc-heap", 0, gc_heap);
+  lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
   lisp_register_native("+", 2, lisp_add);
   lisp_register_native("symbol?", 1, lisp_is_symbol);
@@ -1842,6 +1815,8 @@ int main(int argc, char ** argv){
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("length", 1, list_length);
   lisp_register_native("lisp:get-conses-allocated", 0, get_conses_allocated);
+  lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);
+  lisp_register_native("lisp:trace-allocations", 1, lisp_trace_allocations);
   lisp_register_native("copy-list", 1, copy_cons);
   lisp_register_native("copy-list-deep", 1, copy_cons);
   lisp_register_native("plookup", 2, lisp_plookup);

@@ -83,11 +83,14 @@ struct __lisp_scope{
   
 };
 
+typedef struct __gc_context gc_context;
+
 typedef struct{
   hash_table * symbols;
   hash_table * symbols_reverse;
   size_t next_symbol;
   lisp_scope * globals;
+  gc_context * gc;
 }lisp_context;
 
 struct __lisp_function{
@@ -108,6 +111,7 @@ struct __lisp_vector{
   size_t count;
   size_t elem_size;
   lisp_value default_value;
+  bool gc_mark;
 };
 
 // globals
@@ -120,9 +124,11 @@ extern lisp_value quote_sym;
 extern lisp_value quasiquote_sym;
 extern lisp_value unquote_sym;
 extern lisp_value unquote_splice_sym;
+extern size_t conses_allocated;
 
 void foxlist_thread_init();
 void gc_collect_garbage(lisp_context * context);
+lisp_value lisp_count_allocated();
 void * gc_clone(const void * mem, size_t s);
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
@@ -145,8 +151,12 @@ lisp_value cddr(lisp_value v);
 lisp_value pop(lisp_value * v);
 lisp_value lisp_append(lisp_value a, lisp_value b);
 void * lisp_malloc(size_t s);
+void * lisp_realloc(void * p, size_t s);
 void * lisp_malloc_atomic(size_t s);
 void lisp_free(void * p);
+lisp_value lisp_trace_allocations(lisp_value c);
+lisp_value lisp_get_allocated();
+gc_context * gc_context_new();
 //void * lisp_realloc(void * p, size_t v);
 
 lisp_value get_symbol(const char * s);
@@ -154,6 +164,7 @@ bool eq(lisp_value a, lisp_value b);
 const char * symbol_name(int64_t id);
 
 lisp_context * lisp_context_new();
+
 lisp_value make_vector(lisp_value len, lisp_value _default);
 lisp_value vector_length(lisp_value v);
 lisp_value vector_ref(lisp_value _vector, lisp_value k);
@@ -164,6 +175,7 @@ lisp_value integer(int64_t v);
 lisp_value rational(double v);
 lisp_value float32(float v);
 double as_rational(lisp_value v);
+
 lisp_value byte(unsigned char v);
 lisp_value native_pointer(void * ptr);
 lisp_value lisp_rational(lisp_value value);
