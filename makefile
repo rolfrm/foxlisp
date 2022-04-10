@@ -16,8 +16,8 @@ CFLAGS = -Isrc/  -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gn
 all: libmicroio.a
 all: $(TARGET)
 
-$(TARGET): $(LIB_OBJECTS) gc.o libiron.a
-	$(CC) $(LDFLAGS) $(LIB_OBJECTS) -lpthread  libiron.a gc.o $(LIBS) -ldl  -o $(TARGET)
+$(TARGET): $(LIB_OBJECTS) libiron.a gc.o
+	$(CC) $(LDFLAGS) $(LIB_OBJECTS) -lpthread gc.o  libiron.a $(LIBS) -ldl  -o $(TARGET)
 
 .FORCE:
 iron/libiron.so: .FORCE
@@ -41,8 +41,8 @@ gc.bc: gc/bdwgc/extra/gc.c
 libiron.bc: iron/libiron.bc
 	cp iron/libiron.bc .
 
-index.js: $(BCOBJECTS) gc.bc libmicroio.bc ld50.lisp foxgl.lisp libiron.bc
-	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc gc.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf
+index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp foxgl.lisp libiron.bc
+	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .

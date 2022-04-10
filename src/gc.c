@@ -7,8 +7,42 @@
 #include <stdio.h>
 #include <iron/full.h>
 #include <dlfcn.h>
+#define GC_REDIRECT_TO_LOCAL
+#define GC_THREADS
+#include <gc.h>
 
 #include "foxlisp.h"
+
+static void * heap_start = NULL;
+static void * heap_end = NULL;
+
+int allccc = 0;
+static void * _alloc(size_t v){
+  allccc += 1;
+  //printf("alloc! %i\n", allccc);
+  if(allccc == 30000)
+    raise(SIGINT);
+  void * ptr = malloc(v);
+  heap_end = MAX(heap_end, ptr + v);
+  if(heap_start == NULL)
+    heap_start = ptr;
+  else
+    heap_start = MIN(ptr, heap_start);
+  
+  return ptr;    
+}
+
+
+static void * _alloc0(size_t v){
+  void * ptr = _alloc(v);
+  memset(ptr, 0, v);
+  return ptr;    
+}
+
+
+bool is_heap_ptr(void * ptr){
+  return ptr >= heap_start && ptr <= heap_end;
+}
 
 typedef struct _cons_buffer cons_buffer;
 
@@ -17,6 +51,7 @@ struct _cons_buffer {
   cons * free_cons;
   cons * buffer;
   bool * gc_mark;
+  size_t size;
 };
 
 typedef struct __array_pool array_pool;
@@ -26,53 +61,105 @@ struct __array_pool{
 };
 
 struct __gc_context{
-  lisp_context * ctx;
-  hash_table * visited_nodes;
   cons_buffer * cons_pool;
   array_pool array_pool[3 * 1024 + 1];
 };
 
 gc_context * gc_context_new(){
-  gc_context * ctx = malloc(sizeof(*ctx));
-  *ctx = (gc_context){0};
+  gc_context * ctx = _alloc0(sizeof(*ctx));
   return ctx;
 }
 
+static bool mark_cons(gc_context * gc, cons * c){
+  cons_buffer * pool = gc->cons_pool;
+  while(pool){
+    size_t offset = c - pool->buffer;
+    if(offset < pool->size){
+      if(pool->gc_mark[offset])
+        return false;
+
+      pool->gc_mark[offset] = true;
+      return true;
+    }
+    pool = pool->next;
+  }
+  ASSERT(false);
+  return false;
+}
+
+static bool mark_vector(gc_context * gc, void * vector){
+  size_t * mark = vector - sizeof(void*);
+  if(*mark)
+    return false; // already marked.
+  *mark = true;
+  return true;
+}
+void iterate_value(void * key, void * value, void * data);
 void iterate_scope(gc_context * ctx, lisp_scope * scope);
 
 void visit_value(gc_context * gc, lisp_value val){
-  println(val);
+  
   switch(val.type){
   case LISP_CONS:
-    if(!ht_set(gc->visited_nodes, &val.cons, NULL)){
-      return;
-    }
     
+    if(is_heap_ptr(val.cons) && !mark_cons(gc, val.cons)) 
+      return;
     visit_value(gc, car(val));
     visit_value(gc, cdr(val));
     return;
     
   case LISP_FUNCTION_MACRO:
   case LISP_FUNCTION:
-    if(!ht_set(gc->visited_nodes, &val.function, NULL))
+    //printf("marking func \n");
+    if(is_heap_ptr(val.function) && !mark_vector(gc, val.function)){
       return;
-    iterate_scope(gc, val.function->closure);
+    }
+    //printf("marked func\n");
+    //printf("marked scope: %p %p\n", val.function->closure, val.function);
+    if(is_heap_ptr(val.function)){
+      if(mark_vector(gc, val.function->closure)){
+        iterate_scope(gc, val.function->closure);
+      }
+    }else{
+      iterate_scope(gc, val.function->closure);
+    }
     visit_value(gc, val.function->code);
     visit_value(gc, val.function->args);
     return;
   case LISP_ALIEN_FUNCTION:
-    ht_set(gc->visited_nodes, &val.alien_func, NULL);
+    if(is_heap_ptr(val.alien_func) && !mark_vector(gc, val.alien_func))
+      return;
     visit_value(gc, val.alien_func->return_example);
     visit_value(gc, val.alien_func->arg_example);
     return;    
   case LISP_FUNCTION_NATIVE:
-    ht_set(gc->visited_nodes, &val.nfunction, NULL);
-    return;
-
-  case LISP_VECTOR:
-    if(!ht_set(gc->visited_nodes, &val.vector, NULL))
+    if(is_heap_ptr(val.nfunction) && !mark_vector(gc, val.nfunction))
       return;
-    
+    return;
+  case LISP_HASHTABLE:
+    {
+      hash_table * table = val.native_pointer;
+      if(!mark_vector(gc, table)) return;
+      ht_iterate(table, iterate_value, gc);
+      
+      mark_vector(gc, table->keys);
+      mark_vector(gc, table->elems);
+      mark_vector(gc, table->occupied);
+    }
+    return;
+  case LISP_SCOPE:
+    {
+      if(is_heap_ptr(val.scope) && !mark_vector(gc, val.scope))
+        return;
+      iterate_scope(gc, val.scope);
+      break;
+    }
+  case LISP_VECTOR:
+    //ASSERT(is_heap_ptr(val.vector) && is_heap_ptr(val.vector->data));
+    if(!mark_vector(gc, val.vector))
+      return;
+    if(!mark_vector(gc, val.vector->data))
+      return;
     switch (val.vector->default_value.type){
     case LISP_INTEGER:
     case LISP_RATIONAL:
@@ -91,9 +178,10 @@ void visit_value(gc_context * gc, lisp_value val){
     case LISP_VECTOR:
     case LISP_NATIVE_POINTER:
     case LISP_ALIEN_FUNCTION:
+    case LISP_SCOPE:
+    case LISP_HASHTABLE:
       // elem type is lisp_value
       {
-        
         lisp_value * values = val.vector->data;
         size_t count = val.vector->count;
         for(size_t i = 0; i < count; i++){
@@ -103,7 +191,8 @@ void visit_value(gc_context * gc, lisp_value val){
       return;
     }
   case LISP_STRING:
-    ht_set(gc->visited_nodes, val.string, NULL);
+    if(is_heap_ptr(val.string))
+      mark_vector(gc, val.string);
     return;
   case LISP_NATIVE_POINTER:
   case LISP_MACRO_BUILTIN:
@@ -119,31 +208,96 @@ void visit_value(gc_context * gc, lisp_value val){
 }
 
 void iterate_value(void * key, void * value, void * data){
-  
-  int * sym = key;
-  char * sym_string = (char *) symbol_name(*sym);
-  
   lisp_value * val = value;
-  printf("-- %p %s\n", val, sym_string);
   gc_context * gc = data;
-  visit_value(gc, *val);
+  visit_value(gc, *val); 
+}
+
+void clear_gc_marks(gc_context * gc){
+  var buf = gc->cons_pool;
   
+  while(buf != NULL){
+    memset(buf->gc_mark, 0, buf->size * sizeof(buf->gc_mark[0]));
+
+    buf = buf->next;
+  }
+  
+  array_pool * array_pools = gc->array_pool;
+  for(size_t i = 0; i < 3 * 1024 + 1; i++){
+    var ptr = array_pools[i].occupied_arrays;
+    while(ptr){
+      void ** markloc = ptr;
+      markloc[1] = NULL;
+      void ** next = ptr;
+      ptr = *next;
+    }
+  }
+}
+
+void gc_recover_unmarked(gc_context * gc){
+  var buf = gc->cons_pool;
+  
+  while(buf != NULL){
+    cons * c = buf->free_cons;
+    while(c != NULL){
+      // first mark all the already free conses.
+      mark_cons(gc, c);
+      c = c->cdr.cons;
+    }
+    for(size_t i = 0; i < buf->size; i++){
+      if(buf->gc_mark[i] == false){
+        buf->buffer[i].cdr.cons = buf->free_cons;
+        buf->buffer[i].car = nil;
+        ASSERT(is_heap_ptr(buf->buffer + i));
+        buf->free_cons = buf->buffer + i;
+      }
+    }
+    buf = buf->next;
+  }
+  //return;
+  array_pool * array_pools = gc->array_pool;
+  for(size_t i = 0; i < 3 * 1024 + 1; i++){
+    var pool = array_pools + i;
+    void ** place = &array_pools[i].occupied_arrays;
+    while(*place){
+      void * obj = *place;
+      void ** header = obj;
+      
+      if(!header[1]){
+        //printf("Scope? %p\n", obj + 16);
+        void * next = header[0];
+        header[0] = pool->free_arrays;
+        pool->free_arrays = obj;
+        *place = next;
+
+      }else
+        place = header;
+    }
+  }
 }
 
 void iterate_scope(gc_context * ctx, lisp_scope * scope){
-  printf("Scope %p!\n", scope);
+  //printf("Scope %p!\n", scope);
   if(scope->values != NULL)
     ht_iterate(scope->values, iterate_value, ctx);
+  var cns = scope->lookup;
+  for(size_t i = 0; i < scope->argcnt; i++){
+    visit_value(ctx, cns[i].cdr);
+    visit_value(ctx, cns[i].car);
+  }
+  if(scope->super == NULL) return;
+  if(is_heap_ptr(scope->super) && !mark_vector(ctx, scope->super))
+    return;
+  iterate_scope(ctx, scope->super);
 }
+
 size_t ht_count(hash_table * ht);
 void gc_collect_garbage(lisp_context * context){
-  gc_context ctx;
-  ctx.ctx = context;
-  ctx.visited_nodes = ht_create2(1024, sizeof(void *), 0);
-  iterate_scope(&ctx, context->globals);
-  printf("Counted %i objects\n", ht_count(ctx.visited_nodes));
-  
-  ht_clear(ctx.visited_nodes);
+  printf("-- collect garbage --\n");
+  var gc_context = context->gc;
+  clear_gc_marks(gc_context);
+  iterate_scope(gc_context, context->globals);
+  gc_recover_unmarked(gc_context);
 }
 
 lisp_context * current_context;
@@ -151,50 +305,59 @@ lisp_context * current_context;
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   var ctx = current_context->gc;
    while(true){
-    size_t pool_size = 1024;
     var pool = ctx->cons_pool;
     while(pool != NULL){
       if(pool->free_cons != NULL){
         
         var found = pool->free_cons;
-        pool->free_cons = pool->free_cons->cdr.cons;
-        memset(found, 0, sizeof(*found));
+        pool->free_cons = found->cdr.cons;
         found->car = _car;
         found->cdr = _cdr;
         return (lisp_value){.type = LISP_CONS, .cons = found};
       }else{
         pool = pool->next;
-        pool_size *= 4;
       }
     }
+    size_t pool_size = 1024;
     if(pool == NULL){
-      cons_buffer * new_pool = alloc0(sizeof(*pool));
-      new_pool->buffer = alloc0(sizeof(cons) * pool_size);
-      new_pool->free_cons = new_pool->buffer;
+      printf("new pool\n");
+      cons_buffer ** parent = &ctx->cons_pool;
+      while(*parent != NULL){
+        pool_size *= 4;
+        parent = &(*parent)->next;
+      }
       
+      cons_buffer * new_pool = _alloc0(sizeof(*pool));
+      new_pool->buffer = _alloc0(sizeof(cons) * pool_size);
+      new_pool->gc_mark = _alloc0(sizeof(bool) * pool_size);
+      new_pool->size = pool_size;
+      
+      new_pool->free_cons = new_pool->buffer;
       for(size_t i = 0; i < pool_size - 1; i++){
         new_pool->buffer[i].cdr.cons = &new_pool->buffer[i + 1];
         new_pool->buffer[i].car = nil;                 
       }
-      size_t pool_size2 = 1024/4;
-      var parent = &ctx->cons_pool;
-      while(pool_size2 * 4 != pool_size){
-        parent = &((*parent)->next);
-        pool_size2 *= 4;
-      }
       *parent = new_pool;
-      
     }
   }
-  // this hsould never happen.
+  // this should never happen.
   return nil;
 }
 
 void * gc_clone(const void * mem, size_t s){
+
   void * d = lisp_malloc(s);
   memcpy(d, mem, s);
   return d;
 }
+
+void * nogc_clone(const void * mem, size_t s){
+  
+  void * d = _alloc(s);
+  memcpy(d, mem, s);
+  return d;
+}
+
 
 size_t allocated = 0;
 bool trace_allocations = false;
@@ -204,7 +367,8 @@ lisp_value lisp_trace_allocations(lisp_value c){
   return nil;
 }
 void * lisp_malloc(size_t v){
-  if(current_context == NULL) return malloc(v);
+  
+  if(current_context == NULL) return _alloc(v);
   var ctx = current_context->gc;
   
   size_t poolid = 0;
@@ -223,17 +387,22 @@ void * lisp_malloc(size_t v){
   }
 
   if(ctx->array_pool[poolid].free_arrays){
+    //printf("reuse free array\n");
     var new_ptr = ctx->array_pool[poolid].free_arrays;
     void ** next_ptr = (void **) new_ptr;
     ctx->array_pool[poolid].free_arrays = *next_ptr;
-    return new_ptr + sizeof(void*);
+    next_ptr[0] = ctx->array_pool[poolid].occupied_arrays;
+    ctx->array_pool[poolid].occupied_arrays = next_ptr;
+    return new_ptr + sizeof(void*) * 2;
   }
-  void * arr = malloc(v + sizeof(void *));
+  void * arr = _alloc(v + sizeof(void *) * 2);
+  
   void ** arr_base = arr;
   arr_base[0] = ctx->array_pool[poolid].occupied_arrays;
+  arr_base[1] = NULL; // gc mark
   ctx->array_pool[poolid].occupied_arrays = arr;
   allocated += v;
-  return arr + sizeof(void*);
+  return arr + sizeof(void*) * 2;
 
 }
 
@@ -258,19 +427,22 @@ void lisp_free(void * p){
 lisp_value lisp_count_allocated(){
   var gc = current_context->gc;
   size_t allocated = 0;
-  size_t cbs = 1024;
   var buf = gc->cons_pool;
   
   while(buf != NULL){
-    allocated += cbs;
-    cbs *= 3;
+    allocated += buf->size;
+    var free = buf->free_cons;
+    while(free){
+      allocated -= 1;
+      free = free->cdr.cons;
+    }
     buf = buf->next;
   }
   array_pool * array_pools = gc->array_pool;
   for(size_t i = 0; i < 3 * 1024 + 1; i++){
     var ptr = array_pools[i].occupied_arrays;
     while(ptr){
-      allocated += 1;
+      allocated += i;
       void ** next = ptr;
       ptr = *next;
     }

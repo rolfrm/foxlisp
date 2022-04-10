@@ -15,7 +15,9 @@ typedef enum {
 		LISP_ALIEN_FUNCTION = 12,
 		LISP_VECTOR = 13,
 		LISP_BYTE = 14,
-		LISP_FLOAT32
+		LISP_FLOAT32 = 15,
+      LISP_HASHTABLE = 16,
+      LISP_SCOPE
 }lisp_type;
 
 typedef enum {
@@ -44,6 +46,7 @@ typedef struct __lisp_function lisp_function;
 typedef struct __native_function native_function;
 typedef struct __alien_function alien_function;
 typedef struct __lisp_vector lisp_vector;
+typedef struct __lisp_scope lisp_scope;
 typedef struct{
   lisp_type type;
   union{
@@ -58,6 +61,7 @@ typedef struct{
 	 lisp_builtin builtin;
 	 void * native_pointer;
 	 lisp_vector * vector;
+    lisp_scope * scope;
   };
 }lisp_value;
 
@@ -71,7 +75,6 @@ struct _cons {
   lisp_value cdr;
 };
 
-typedef struct __lisp_scope lisp_scope;
 
 struct __lisp_scope{
   lisp_scope * super;
@@ -111,7 +114,6 @@ struct __lisp_vector{
   size_t count;
   size_t elem_size;
   lisp_value default_value;
-  bool gc_mark;
 };
 
 // globals
@@ -130,6 +132,7 @@ void foxlist_thread_init();
 void gc_collect_garbage(lisp_context * context);
 lisp_value lisp_count_allocated();
 void * gc_clone(const void * mem, size_t s);
+void * nogc_clone(const void * mem, size_t s);
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 

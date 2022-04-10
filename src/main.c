@@ -6,9 +6,6 @@
 #include <signal.h>
 #include <stdio.h>
 #include <iron/full.h>
-#define GC_REDIRECT_TO_LOCAL
-#define GC_THREADS
-#include <gc.h>
 
 #ifdef EMSCRIPTEN
 #include "emscripten.h"
@@ -61,7 +58,7 @@ bool type_assert(lisp_value val, lisp_type type){
 	 sprintf(buffer, "Invalid type, expected %s, but got %s\n",
 			  lisp_type_to_string(type),
 			  lisp_type_to_string(val.type));
-	 raise_string(gc_clone(buffer, strlen(buffer)));
+	 raise_string(nogc_clone(buffer, strlen(buffer) + 1));
     return false;
   }
   return true;
@@ -96,6 +93,7 @@ bool  string_eq(lisp_value a, lisp_value b){
 
 lisp_scope * lisp_scope_new(lisp_scope * super){
   lisp_scope * s = lisp_malloc(sizeof(*super));
+  *s = (lisp_scope){0};
   s->super = super;
   s->values = NULL;
   return s;
@@ -121,6 +119,7 @@ lisp_scope * lisp_scope_unstack(lisp_scope * scope){
     scope->lookup = gc_clone(scope->lookup, sizeof(scope->lookup[0]) * scope->argcnt);
   }
   var newscope = (lisp_scope *) gc_clone(scope, sizeof(*scope));
+  //printf(" scope ? %p %p\n", newscope->lookup - 16, newscope);
   newscope->stack_scope = false;
   return newscope;
 }
@@ -132,9 +131,6 @@ lisp_value lisp_scope_get_value(lisp_scope * scope, lisp_value sym){
 	 return r;
   return lisp_scope_get_value(scope->super, sym);
 }
-
-size_t ht_calc_hash(hash_table * ht, void * key);
-bool ht_get_precalc(hash_table * ht, size_t hashed_key, const void *key, void * out_elem);
 
 bool _lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out, size_t hash){
   if(scope == NULL) return false;
@@ -194,6 +190,7 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
   return lisp_scope_set_value(scope->super, sym, value);
 }
 
+size_t htid = 0;
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
   if(scope->lookup != NULL){
     for(size_t i = 0; i < scope->argcnt; i++){
@@ -204,7 +201,12 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
     }
   }
   if(scope->values == NULL){
-	 scope->values = ht_create(sizeof(u64), sizeof(lisp_value));
+	 scope->values = ht_create2(2048, sizeof(u64), sizeof(lisp_value));
+    htid++;
+    
+    printf("make hash table %i", htid);
+    if(htid > 100)
+      raise(SIGINT);
     //if(scope->super != NULL)
     //  raise(SIGINT);
   }
@@ -395,8 +397,12 @@ int64_t get_symbol_id(const char * s){
   int64_t id = 0;
   if(ht_get(current_context->symbols, &s, &id))
     return id;
-  
-  s = gc_clone(s, strlen(s) + 1);
+  if(s == NULL){
+    raise_string("null symbol");
+    return 0;
+  }
+    
+  s = nogc_clone(s, strlen(s) + 1);
   id = current_context->next_symbol++;
   if(s[0] == ':'){
     id += 0x10000000;
@@ -621,6 +627,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 	 var argv = car(args2);
 	 
 	 if(arg.type != LISP_SYMBOL){
+		println(arg);
 		println(value);
 		println(args);
 		println(args2);
@@ -717,11 +724,13 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
   }
 }
 
-static __thread lisp_value call_chain = {0};
+//static __thread lisp_value call_chain = {0};
 void print_call_stack(){
-  lisp_value top = call_chain;
+
   int id = 1;
   printf("Stack trace:\n");
+  var scopename = "lisp:*root-scope*";
+  var top = lisp_scope_get_value(current_context->globals, get_symbol(scopename));
   while(top.type == LISP_CONS){
     printf(" %i - ", id++);
     println(car(top));
@@ -729,21 +738,61 @@ void print_call_stack(){
   }
 }
 
+void pin_to_stack(lisp_value v){
+  static lisp_value symbol;
+  static size_t symbol_hash;
+  if(symbol.type == LISP_NIL){
+    var scopename = "lisp:*root-scope*";
+    symbol = get_symbol(scopename);
+    symbol_hash = ht_calc_hash(current_context->globals->values, &symbol.integer);
+  }
+  
+  var scopename = "lisp:*root-scope*";
+  lisp_value chain;
+  var chain_ok = ht_get_precalc(current_context->globals->values, symbol_hash, &symbol.integer, &chain);
+  var c = new_cons(v, chain);
+  ht_set_precalc(current_context->globals->values, &symbol.integer, &c, symbol_hash);
+  
+}
+
 lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+  static lisp_value symbol;
+  static size_t symbol_hash;
   if(lisp_is_in_error())
     return nil;
-  cons c = {.car = value, .cdr = call_chain};
-  call_chain = (lisp_value){.cons = &c, .type = LISP_CONS};
+  if(symbol.type == LISP_NIL){
+    var scopename = "lisp:*root-scope*";
+    symbol = get_symbol(scopename);
+    symbol_hash = ht_calc_hash(current_context->globals->values, &symbol.integer);
+  }
+  lisp_value chain;
+  bool found = ht_get_precalc(current_context->globals->values, symbol_hash, &symbol.integer, &chain);
+  if(!found){
+    printf(":: %i\n", symbol_hash);
+    raise_string("root scope key not found");
+    return nil;
+  }
+  //TYPE_ASSERT(chain, LISP_CONS);
+  cons c = {.car = value, .cdr = chain };
+  lisp_value chain2 = (lisp_value) (lisp_value){.cons = &c, .type = LISP_CONS};
+  ht_set_precalc(current_context->globals->values, &symbol.integer, &chain2, symbol_hash);
   var r = lisp_eval2(scope, value);
-  call_chain = c.cdr;
+  ht_set_precalc(current_context->globals->values, &symbol.integer, &chain, symbol_hash);
   return r;
 }
 
+lisp_value lisp_collect_garbage(){
+  gc_collect_garbage(current_context);
+  return nil;
+}
+
 lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
+  tail_call:;
   switch(value.type){
   case LISP_CONS:
 	 {
+      
       var first = car(value);
       if(first.type == LISP_NIL){
         raise_string("called with nil");
@@ -755,13 +804,12 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 		  switch(first_value.builtin){
 		  case LISP_IF:
 			 {
-
 				var cond = lisp_eval(scope, cadr(value));
-				if(cond.type == LISP_NIL){
-				  return lisp_eval(scope, cadddr(value));
-				}else{
-				  return lisp_eval(scope, caddr(value));
-				}
+            if(cond.type == LISP_NIL)
+				  value = cadddr(value);
+				else
+				  value = caddr(value);
+            goto tail_call;
 			 }
 		  case LISP_QUOTE:
 			 if(first_value.builtin == LISP_QUOTE)
@@ -778,10 +826,10 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				var argform = cadr(value);
             var argcnt = lisp_length(argform).integer;
             cons argsbuf[argcnt];
-
             memset(argsbuf, 0, sizeof(argsbuf[0]) * argcnt);
             lisp_scope scope1[1] = {0};
             lisp_scope_stack(scope1, scope, argsbuf, argcnt);
+          
             scope = scope1;
             while(argform.type != LISP_NIL){
 				  var arg = car(argform);
@@ -793,6 +841,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				value = cdr(value);
             var body = cdr(value);
 				lisp_value result = nil;
+            //pin_to_stack((lisp_value){.scope = scope1, .type = LISP_SCOPE});
 				while(body.type != LISP_NIL){
 				  result = lisp_eval(scope, car(body));
 				  body = cdr(body);
@@ -814,10 +863,10 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				var cond = cadr(value);
 				var _body = cddr(value);
 				lisp_value result = nil;
-				while(lisp_eval(scope, cond).type != LISP_NIL){
+				while(lisp_eval2(scope, cond).type != LISP_NIL){
 				  var body = _body;;
 				  while(body.type != LISP_NIL){
-					 result = lisp_eval(scope, car(body));
+					 result = lisp_eval2(scope, car(body));
 					 body = cdr(body);
 				  }
 				}
@@ -832,6 +881,8 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				f->code = body;
 				f->args = args;
             scope = lisp_scope_unstack(scope);
+            //printf("SCOPE: %p %p\n", scope, f);
+            //pin_to_stack((lisp_value){.type = LISP_SCOPE, .scope = scope});
 				f->closure = scope;
 
 				if(first_value.builtin == LISP_LAMBDA)
@@ -911,9 +962,11 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         }
       }
       size_t argcnt = lisp_length(cdr(value)).integer;
-      cons args[argcnt];
-		lisp_value things = lisp_sub_eval(scope, cdr(value), args);
-      argcnt += 1;
+      size_t argcnt2 = MAX(argcnt, 6);
+      cons args[argcnt2];
+      memset(args, 0, sizeof(args[0]) * argcnt2);
+      lisp_value things = lisp_sub_eval(scope, cdr(value), args);
+      
       if(lisp_is_in_error())
         return nil;
 
@@ -960,11 +1013,6 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 		  var f = first_value.function;
         cons args3[argcnt];
         memset(args3, 0, sizeof(args3[0]) * (argcnt));
-        //cons * args3 = NULL;
-        /*if(argcnt > 0){
-          args3 = lisp_malloc(argcnt * sizeof(cons));
-          memset(args3, 0, sizeof(cons) * argcnt);
-          }*/
         
 		  lisp_scope function_scope[1];
         
@@ -1126,6 +1174,7 @@ lisp_value lisp_eval_value(lisp_value code){
 lisp_value lisp_eval_stream(io_reader * rd){
   lisp_value result = nil;
   while(true){
+    gc_collect_garbage(current_context);
 	 var off = rd->offset;
 	 var code = lisp_read_stream(rd);
 	 if(off == rd->offset || code.type == LISP_NIL) break;
@@ -1221,6 +1270,10 @@ int print2(char * buffer, int l2, lisp_value v){
 	 return snprintf(buffer, LEN1, "Native function");
   case LISP_MACRO_BUILTIN:
 	 return snprintf(buffer, LEN1, "MacroBuiltin");
+  case LISP_HASHTABLE:
+    return snprintf(buffer, LEN1, "HashTable");
+  case LISP_SCOPE:
+    return snprintf(buffer, LEN1, "Scope");
   case LISP_CONS:
     {
       int l = 0;
@@ -1249,7 +1302,7 @@ int print2(char * buffer, int l2, lisp_value v){
 lisp_value print(lisp_value v){
   char buffer[100];
   int l = print2(NULL,0,  v);
-  char * str = l > 95 ? malloc(l + 1) : buffer;
+  char * str = l >= 95 ? malloc(l + 1) : buffer;
   print2(str, l+ 1, v);
   printf("%s", str);
   if(l >= 95)
@@ -1419,7 +1472,7 @@ lisp_value native_pointer(void * ptr){
 }
 
 lisp_value gc_heap(){
-  return integer(GC_get_heap_size());
+  return integer(0);
 }
 
 lisp_value lisp_sin(lisp_value v){
@@ -1453,7 +1506,9 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_VECTOR: return "VECTOR";
   case LISP_BYTE: return "BYTE";
   case LISP_FLOAT32: return "FLOAT32";
-  }
+  case LISP_HASHTABLE: return "HASHTABLE";
+  case LISP_SCOPE: return "SCOPE";
+    }
   raise_string("Unknown type:\n");
   
   return NULL;
@@ -1555,7 +1610,7 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
   void * new_data = lisp_malloc(l * elem_size);
   size_t prevCount = MIN(l, vector.vector->count);   
   memcpy(new_data, vector.vector->data, prevCount * elem_size);
-  vector.vector->data = lisp_realloc(vector.vector->data, l * elem_size);
+  vector.vector->data = new_data;
   vector.vector->count = l;
   for(size_t i = prevCount; i < l; i++){
 	 vector_set(vector, integer(i), vector.vector->default_value);
@@ -1661,30 +1716,36 @@ lisp_value lisp_register_finalizer(lisp_value item, lisp_value func){
   return nil;
   TYPE_ASSERT(item, LISP_CONS);
   TYPE_ASSERT(func, LISP_FUNCTION);
-  GC_REGISTER_FINALIZER(item.cons, item_finalizer, func.function, 0, 0);
+  //GC_REGISTER_FINALIZER(item.cons, item_finalizer, func.function, 0, 0);
   return nil;
 }
 
+lisp_value lisp_hash_table(hash_table * table){
+  return (lisp_value){.native_pointer = table, .type = LISP_HASHTABLE};
+}
+
+
 lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
-    bool weak_keys = !is_nil(weak_key);
+  bool weak_keys = !is_nil(weak_key);
   bool weak_values = !is_nil(weak_value);
   hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
-  if(weak_keys)
+  printf("make hash table");
+  /*if(weak_keys)
 	 ht_set_mem_keys(ht, lisp_malloc_atomic, lisp_free);
   if(weak_values)
-  ht_set_mem_values(ht, lisp_malloc_atomic, lisp_free);
-  return native_pointer(ht);
+  ht_set_mem_values(ht, lisp_malloc_atomic, lisp_free);*/
+  return lisp_hash_table(ht);
 }
 
 lisp_value lisp_hashtable_set(lisp_value _ht, lisp_value key, lisp_value value){
-  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
   hash_table * ht = _ht.native_pointer;
   ht_set(ht, &key, &value);
   return nil;
 }
 
 lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
-  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
   hash_table * ht = _ht.native_pointer;
   lisp_value value;
   if(ht_get(ht, &key, &value))
@@ -1707,7 +1768,7 @@ lisp_value lisp_all_symbols(){
 }
 
 lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
-  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
   hash_table * ht = _ht.native_pointer;
   if(ht_remove(ht, &key))
 	 return t;
@@ -1715,7 +1776,7 @@ lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
 }
 
 lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
-  TYPE_ASSERT(_ht, LISP_NATIVE_POINTER);
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
   hash_table * ht = _ht.native_pointer;
   lisp_value value;
   if(ht_get(ht, &key, &value))
@@ -1780,19 +1841,16 @@ void web_update(){
   //lisp_eval_string("(lisp:*web-update*)");
   //printf("Web update\n");
 }
-void warn_gc(char * msg, GC_word arg){
-  printf("%s %i\n", msg, arg);
-}
+
 //void setup_signal_handler();
 int main(int argc, char ** argv){
-  //GC_no_dls = 1;
-  GC_set_warn_proc(warn_gc);
-  GC_INIT();
+  
   printf("starting..\n");
   //setup_signal_handler();
-  ht_mem_malloc = lisp_malloc;
-  ht_mem_free = lisp_free;
+  //ht_mem_malloc = lisp_malloc;
+  //ht_mem_free = lisp_free;
   current_context = lisp_context_new();
+  
   lisp_register_native("gc-heap", 0, gc_heap);
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
@@ -1814,6 +1872,7 @@ int main(int argc, char ** argv){
   lisp_register_native("set-cdr!", 2, set_cdr);
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("length", 1, list_length);
+  lisp_register_native("lisp:collect-garbage", 0, lisp_collect_garbage);
   lisp_register_native("lisp:get-conses-allocated", 0, get_conses_allocated);
   lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);
   lisp_register_native("lisp:trace-allocations", 1, lisp_trace_allocations);
@@ -1882,16 +1941,16 @@ int main(int argc, char ** argv){
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 #ifndef WASM
-  GC_allow_register_threads();
   lisp_register_value("lisp:*web-environment*", nil);
 #else
   lisp_register_value("lisp:*web-environment*", t);
   lisp_register_value("lisp:*web-update*", nil);
-
 #endif
 
   load_modules();
+  lisp_register_value("lisp:*root-scope*", nil);
   lisp_eval_file("ld50.lisp");
+  printf("Finished..\n");
 #ifdef WASM
   emscripten_set_main_loop(web_update, 0, 1);
 #endif
@@ -1899,7 +1958,8 @@ int main(int argc, char ** argv){
 }
 
 pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
-  pthread_t thread;
-  GC_pthread_create(&thread, NULL, f, data);
+  pthread_t thread = {0};
+  raise_string("cannot create thread");
+  //GC_pthread_create(&thread, NULL, f, data);
   return thread;
 }

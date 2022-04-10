@@ -54,6 +54,7 @@
   (println (list 'vector 'pointer ': (vector-native-element-pointer vector 0)))
   (vector-resize vector 5)
   (println (list 'resized vector))
+  (assert (eq (vector-length vector) 5))
   )
 (println (type-of 1))
 
@@ -79,7 +80,7 @@
 
 (println (= 1 (car '(1 . 2))))
 
-(assert (equals? x '(1 2)))
+;(assert (equals? x '(1 2)))
 
 (assert (equals? '(1 . 2) '( 1 . 2)))
 (assert-not (equals? '(1 . 2) '(2 . 1)))
@@ -250,8 +251,84 @@
 
 (let ((x 5))
   (println 'hej))
+(println (list 'pre-gc (lisp:count-allocated)))
+(lisp:collect-garbage)
+(lisp:collect-garbage)
+(list 1 2 3)
+(println (list 'post-gc (lisp:count-allocated)))
+
+(make-vector 100 0.0)
+(println (list 'pre-gc (lisp:count-allocated)))
+(lisp:collect-garbage)
+(list 1 2 3)
+(println (list 'post-gc (lisp:count-allocated)))
+
+
+(for-each arg '(1 2 3 4) 
+      (print arg))
+(lisp:collect-garbage)
+
+(do-times 10 (lambda ()
+(let ((l '(2.0 1.0))
+      (l2 0.0)
+      (actions nil))
+        
+  (do-times 10
+    (lambda ()
+      (lisp:collect-garbage)
+      (for-each f actions (f))
+      (let ((f2 (lambda ()
+                  (let ((v 0.0))
+                    (map! (lambda (i) (incf v i)) l)
+                    (push! l v)
+                    (incf l2 v)
+                    ))))
+        (push! actions f2)
+        (println l2)
+        )))
+  ;(println l)
+  )))
+
+(define test1:f nil)
+(define test1:f2 nil)
+
+(let ((a 1)
+      (b 2))
+  (set! test1:f
+        (lambda ()
+          (incf a 1)
+          (incf b b)
+          (+ a b)))
+  (set! test1:f2
+        (lambda ()
+          (incf a 1)
+          (incf b b)
+          (+ a b)))
+
+  )
+(lisp:collect-garbage)
+(lisp:collect-garbage)
+(assert (eq 6 (test1:f)))
+(println (test1:f))
+(println (test1:f))
+(println (test1:f2))
+
+(loop nil
+     (lisp:collect-garbage)
+
+     (
+      (let ((a 10))
+
+        (let ((lmb (lambda ()
+                     (println (cons (test1:f2) (test1:f))))))
+          lmb
+          ))))
+
+(load "test3.lisp")
+(defun try-print-color()
+  (lisp:collect-garbage)
+  (test-other))
+(try-print-color)
+(try-print-color)
 
 (println "Tests Passed")
-
-
-  

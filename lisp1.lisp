@@ -67,6 +67,7 @@
 ;(defun symbol?(p) (= (type-of p) 'SYMBOL)) 
 (defun macro? (s) (eq (type-of s) 'FUNCTION_MACRO))
 (defun procedure? (s) (eq (type-of s) 'FUNCTION))
+(defun hashtable? (s) (eq (type-of s) 'HASHTABLE))
 
 (defun unbound? (s) (not (bound? s)))
 (define string=? string=)
@@ -310,6 +311,16 @@
 
 (defun  min (a b)
   (if (< a b) a b))
+
+(defmacro for-each (arg list &rest body)
+  `(let ((lst ,list)
+         (,arg nil))
+    (loop lst
+         (set! ,arg (car lst))
+         (progn ,@body)
+         (set! lst (cdr lst))
+         )))
+
 ;(println (list* '1 'b 'c '(1 2 3)))
 
 (define pi 3.141592)

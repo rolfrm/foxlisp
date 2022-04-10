@@ -554,7 +554,7 @@ void foxgl_register(){
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);
   lrn("mat4:print", 1, math_mat4_print);
-  lrn("foxgl:timestamp", 0, timestamp);
+  lrn("foxgl:timestamp", 0, foxgl_timestamp);
   lrn("foxgl:clear", 0, foxgl_clear);
   lrn("foxgl:get-events", 0, foxgl_get_events);
   
