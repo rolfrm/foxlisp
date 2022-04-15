@@ -278,6 +278,13 @@ lisp_value foxgl_swap(lisp_value win){
   return nil;
 }
 
+lisp_value lisp_window_size(lisp_value win){
+  TYPE_ASSERT(win, LISP_NATIVE_POINTER);
+  int w, h;
+  gl_window_get_size(win.native_pointer, &w, &h);
+  return new_cons(integer(w), new_cons(integer(h), nil));
+}
+
 lisp_value foxgl_poll_events(){
   gl_window_poll_events();
   return nil;
@@ -522,10 +529,26 @@ lisp_value foxgl_key_down(lisp_value window, lisp_value keyid){
   return nil;
 }
 
+lisp_value foxgl_mouse_down(lisp_value window, lisp_value mouseid){
+  if(gl_window_get_btn_state(window.native_pointer, mouseid.integer))
+    return t;
+  return nil;
+}
+
 lisp_value foxgl_timestamp(){
   return integer(timestamp());
 }
 
+lisp_value lisp_vec2_len(lisp_value v){
+  TYPE_ASSERT(v, LISP_VECTOR);
+  vec2 * x = v.vector->data;
+  return rational(vec2_len(*x));
+}
+
+lisp_value lisp_viewport(lisp_value w, lisp_value h){
+  glViewport(0, 0, w.integer, h.integer);
+  return nil;
+}
 
 void lrn(const char * l, int args, void * f){
   lisp_register_native(l, args, f);
@@ -542,7 +565,9 @@ void foxgl_register(){
   lrn("foxgl:create-window", 2, foxgl_create_window);
   lrn("foxgl:make-current", 1, foxgl_make_current);
   lrn("foxgl:set-title", 2, foxgl_set_title);
+  lrn("foxgl:window-size", 1, lisp_window_size);
   lrn("foxgl:swap", 1, foxgl_swap);
+  lrn("foxgl:viewport", 2, lisp_viewport);
   lrn("foxgl:poll-events", 0, foxgl_poll_events);
   
   lrn("math:*", 2, math_mul);
@@ -554,6 +579,8 @@ void foxgl_register(){
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);
   lrn("mat4:print", 1, math_mat4_print);
+  lrn("vec2:len", 1, lisp_vec2_len);
+
   lrn("foxgl:timestamp", 0, foxgl_timestamp);
   lrn("foxgl:clear", 0, foxgl_clear);
   lrn("foxgl:get-events", 0, foxgl_get_events);
@@ -565,6 +592,7 @@ void foxgl_register(){
   lrn("foxgl:load-polygon", 2, load_polygon);
   lrn("foxgl:blit-polygon", 1, blit_polygon);
   lrn("foxgl:delete-polygon", 1, delete_polygon);
+
   
   lrn("foxgl:create-framebuffer", 2, foxgl_create_framebuffer);
   lrn("foxgl:bind-framebuffer", 1, foxgl_bind_framebuffer);
@@ -577,6 +605,7 @@ void foxgl_register(){
   lrn("foxgl:blend", 1, foxgl_blend);
   lrn("foxgl:depth", 1, foxgl_depth);
   lrn("foxgl:key-down?", 2, foxgl_key_down);
+  lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
   tcp_register();
   foxal_register();
 }

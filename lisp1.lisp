@@ -30,7 +30,7 @@
   `(if ,test (progn ,@body)))
 
 (defmacro unless (test &rest body)
-  `(if ,test () (progn ,@body)))
+  `(if ,test (progn) (progn ,@body)))
 
 (defun map (lst f2)
   (when lst
@@ -55,11 +55,9 @@
 (defun funcall (f &rest args)
   (apply f args))
 
-(defun nil? (v) (not v))
-(defun null? (v) (not v))
-(defun cons? (v) (= (type-of v) 'CONS))
+(define nil? not)
+(define null? not)
 (define pair? cons?)
-
 
 (defun integer? (v) (= (type-of v) 'INTEGER))
 (defun rational? (v) (= (type-of v) 'RATIONAL))
@@ -75,29 +73,9 @@
 (defun last (lst)
   (if (cdr lst) (last (cdr lst)) (car lst)))
 
-(defmacro or (&rest items)
-  (defun ior(l)
-    (when l
-      `(let ((v ,(car l)))
-        (if v
-            v
-            ,(ior (cdr l))))))
-  (ior items))
-
-(defmacro and (&rest items)
-  (let ((iand nil))
-    (set! iand (lambda (l)
-                (if l
-                    `(let ((v ,(car l)))
-                      (if v ,(iand (cdr l)) nil))
-                    't)))
-    (println iand)
-    (iand items)))
-
 (defun symbol-macro? (s) (and (bound? s t) (macro? (symbol-value s) 'FUNCTION_MACRO)))
 (defun symbol-procedure? (s) (and (bound? s t) (procedure? (symbol-value s))))
 
-(defun list? (x) (or (null? x) (cons? x)))
 (defmacro assert (test text)
   `(unless ,test (panic ,(or text "assertion failed"))))
 (defmacro assert-not (test text)
@@ -167,17 +145,6 @@
 
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))
-
-(defmacro cond (&rest args)
-  (defun condi (args)
-    (if args
-        (if (eq (caar args) 'else)
-            (cadar args)
-            `(if ,(caar args)
-                 ,(cadar args)
-                 ,(condi (cdr args))))
-        nil))
-  (condi args))
 
 (defun memq (obj list)
   (let ((result nil))

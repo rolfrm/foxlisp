@@ -1,7 +1,10 @@
 (println "starting ld50 game")
 (load "lisp1.lisp")
+(lisp:collect-garbage)
 (load "foxgl.lisp")
+(lisp:collect-garbage)
 (load "vec2.lisp")
+(lisp:collect-garbage)
 (define swank-loaded nil)
 (unless (or t lisp:*web-environment*)
   (load "swank.lisp")
@@ -44,23 +47,25 @@
 
 
 (define wheel-model
-    `(color :rgb (0.1 0.1 0.1)
+    '(color :rgb (0.1 0.1 0.1)
       (transform :scale (0.5 0.5 0.8)
        (ref cube-model))))
 
 (define car-model
-    `(car
+    '(car
       (transform :translate (-1 0 -2)
-       (blend
+       ;(blend
         (transform :scale (2 1 4) :translate (-0.2 -0.5)
          (color :rgb ( 0.2 0.2 0.2)
           
-          ,tile-model)))
-       
-       (transform :translate (0 -0.6 0) ,wheel-model)
-       (transform :translate (1.5 -0.6 0) ,wheel-model)
-       (transform :translate (0 -0.6 3) ,wheel-model)
-       (transform :translate (1.5 -0.6 3) ,wheel-model)
+          (ref tile-model)))
+        ;)
+       (measure-model
+        (wheels
+         (transform :translate (0 -0.6 0) (ref wheel-model))
+         (transform :translate (1.5 -0.6 0) (ref wheel-model))
+         (transform :translate (0 -0.6 3) (ref wheel-model))
+         (transform :translate (1.5 -0.6 3) (ref wheel-model))))
 
 
        (color :rgb (1 0 0)
@@ -76,17 +81,17 @@
        (color :rgb (1 0 0)
         (transform :translate (0.25 1.9 0.5)
          :scale (1.5 0.8 2.0)
-         ,tile-model)
+         (ref tile-model))
         )
        (color :rgb (0 0 0)
         (transform :translate (0.4 2.002 1.2)
          :scale (1.2 0.8 0.9)
-         ,tile-model)
+         (ref tile-model))
         )
        )))
 
 (define tree-model
-    `(color :rgb (0.5 0.8 0.5)
+    '(color :rgb (0.5 0.8 0.5)
       (transform :scale (2 1 2)
                                         ;,square-model
        (transform :translate (0 4 0)
@@ -104,11 +109,11 @@
       
       (color :rgb (0.9 0.7 0.4)
        (transform :scale (1 1 1) :translate (-0.5 0.0)
-        ,square-model))
-      ))
+        (ref square-model))
+      )))
 
 (define ice-cube-model
-    `(color :rgb (0.6 0.6 0.9)
+    '(color :rgb (0.6 0.6 0.9)
       (ref cube-model)
       (transform :translate (1 0 0.6)
        (color :rgb (0.7 0.7 1.0)
@@ -157,9 +162,9 @@
              (cx (car curve))
              (cy (cadr curve))
              )
-         (do-times 30
+         (do-times 20
            (lambda (i)
-             (let* ((d (/ (rational i) 30.0))
+             (let* ((d (/ (rational i) 20.0))
                     (dn (- 1.0 d))
                     (dn2 (* dn dn))
                     (d2 (* d d)))
@@ -275,7 +280,7 @@
              (ay (pop points))
              (bx (car points))
              (by (cadr points)))
-         (incf length (vec2-len (vec2- (vec2 ax ay) (vec2 bx by))))))
+         (incf length (vec2:len (vec2 (- ax bx) (- ay by))))))
     length))
 
 (defun follow-lines (points len)
@@ -285,7 +290,7 @@
              (ay (pop points))
              (bx (car points))
              (by (cadr points)))
-         (incf length (vec2-len (vec2- (vec2 ax ay) (vec2 bx by))))))
+         (incf length (vec2:len (vec2 (- ax bx) (- ay by))))))
     (cddr points)))
 
 
@@ -344,36 +349,55 @@
        (depth     
 
         (background :id background
-         
-         (transform :id tree :translate (-2 0 -6)
-          (ref tree-model))
-         (transform :id tree :translate (-2 0 -60)
-          (ref tree-model))
-         
-         (transform :id tree :translate (-2 0 -600)
-          (ref tree-model))
-         (transform :id tree :translate (-2 0 -600)
-          (ref tree-model))
-         (transform :id tree :translate (-2 0 -600)
-          (ref tree-model))
-         (transform :id tree :translate (-2 0 -600)
-          (ref tree-model))
-         (transform :id tree :translate (-2 0 -600)
-          (ref tree-model))
-         (transform :id tree :translate (-2 0 -600)
-          (ref tree-model))
-         (transform  :id tree :translate (2 0 -6)
-          (ref tree-model))
-         (transform  :id tree :translate (-2 0 -2)
-          (ref tree-model))
-         (transform  :id tree :translate (-4 0 -2.2)
-          (ref tree-model))
-         (transform  :id tree :translate (4.3 0 -3)
-          (ref tree-model))
-         (transform  :id tree :translate (493.3 0 0)
-          (ref tree-model))
-         (transform  :id tree :translate (612.3 0 -17)
-          (ref tree-model))
+         (scope :id trees
+          
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -6)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -60)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -600)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -600)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -600)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -600)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -600)
+           (ref tree-model))
+          (transform :id tree :translate (-2 0 -600)
+           (ref tree-model))
+          (transform  :id tree :translate (2 0 -6)
+           (ref tree-model))
+          (transform  :id tree :translate (-2 0 -2)
+           (ref tree-model))
+          (transform  :id tree :translate (-4 0 -2.2)
+           (ref tree-model))
+          (transform  :id tree :translate (4.3 0 -3)
+           (ref tree-model))
+          (transform  :id tree :translate (493.3 0 0)
+           (ref tree-model))
+          (transform  :id tree :translate (612.3 0 -17)
+           (ref tree-model))
+          (transform :id tree :translate (351.3 0 12)
+           (ref tree-model))
+          )
          
          (transform :id gas :translate (10 0 10) :rotate (0 0 0)
           (ref gascan-model)
@@ -383,8 +407,9 @@
          (color :rgb (0.3 0.3 0.3)
           (ref road-model))
          )
-        (transform :id car :translate (0 0 0) :rotate (0.0 0.0 0.0)
-         (ref car-model))     
+        (measure-model
+          (transform :id car :translate (0 0 0) :rotate (0.0 0.0 0.0)
+           (ref car-model)))
 
         (transform :translate (49.7 0.0 45) :id coin
          :rotate (0 0 0)
@@ -397,16 +422,7 @@
         (transform :id rocks :translate (13.0 0.0 0.0) :id coin
          :rotate (0 0 0)
          (ref rocks-model))
-        
-        )
-
-       (foreground :id foregound
-        
-        
-        (transform :id tree :translate (351.3 0 12)
-         (ref tree-model)))
-       ))
-  )
+        ))))
 
 (define heart-model
     `(heart
@@ -567,42 +583,41 @@
 (defun model-find-elem(obj id)
   
   (let ((result nil)
+        (scope (eq (car obj) 'scope))
         (model (cdr obj)))
     (loop (and model (not result))
        (cond
          ((list? (car model))
-          (progn
-            (set result (model-find-elem (car model) id))
-            (set! model (cdr model))))
+          (unless scope
+            (set result (model-find-elem (car model) id)))
+          (set! model (cdr model)))
          ((symbol? (car model))
-          (progn
 
-            (when (and (eq (car model) :id)
-                       (eq (cadr model) id))
-              (set! result obj))
-            (set! model (cddr model))))
+          (when (and (eq (car model) :id)
+                     (eq (cadr model) id))
+            (set! result obj))
+          (set! model (cddr model)))
          (else
           (set! model (cdr model)))))
     result))
 
 (defun model-find-elems(obj id)
   (let ((result nil)
+        (scope (eq (car obj) 'scope))
         (model (cdr obj)))
-    (loop (and model)
+    (loop model
        (cond
          ((list? (car model))
-          (progn
-            (map! (lambda (x)
-                    (push! result x))
-                  (model-find-elems (car model) id) )
-            (set! model (cdr model))))
+          (unless scope
+            (for-each x
+                      (model-find-elems (car model) id)
+                      (push! result x)))
+            (set! model (cdr model)))
          ((symbol? (car model))
-          (progn
-
             (when (and (eq (car model) :id)
                        (eq (cadr model) id))
               (push! result obj))
-            (set! model (cddr model))))
+            (set! model (cddr model)))
          (else
           (set! model (cdr model)))))
     result))
@@ -704,7 +719,7 @@
 
 
 (defun render-scene()
-  
+  (measure2 'render-world
   (render-model
    `(root
      (transform :scale (2.0 2.0)
@@ -719,8 +734,9 @@
           (transform :translate (-0.5 -0.5 -10)
            :scale (0.5 0.5 0.5)
            
-
-           (ref world-model) ))))))))
+           
+           (ref world-model) )))))))))
+  (measure2 'render-ui
   (render-model
    `(ui
      (transform :scale (2.0 2.0)
@@ -819,7 +835,7 @@
          (text "Radio [R]"))
         )
        )
-      )))
+      ))))
   (when show-help
     (render-model
      '(intro
@@ -830,7 +846,7 @@
           (color :rgba (0 0 0 0.7)
            (ref square-model))))
         (transform :scale (0.1 0.1) :translate (-0.2 0.1)
-         (transform :scale (0.015 -0.015) :translate (-0.3 1)
+         (transform :scale (0.013 -0.015) :translate (-0.3 1)
           (text "Welcome to Fox Driver.
 You have to avoid dying.
 You die by being too cold or too hot.
@@ -841,8 +857,6 @@ You control the car with WASD.
 Start by pressing W.
 Restart by pressing [Enter]
 
-NOTE! The web version currently lacks a garbage collector.
-Conside closing the tab when done.
 "))
          )
         
@@ -861,12 +875,38 @@ Conside closing the tab when done.
                                (cons e (cdr tsl)))))))
       evts2
       )))
-
+(define mouse-x 0.0)
+(define mouse-y 0.0)
+(define mouse-0-down nil)
+(define mouse-0-click nil)
 (defun entities-update ()
-  (let ((evts (poll-events2)))
+  (set! mouse-0-click nil)
+  (measure2 'poll-events
+   (let ((evts (poll-events2))
+         (s (foxgl:window-size win))
+         )
     (when evts
       
-      (println evts))
+      (println evts)
+      )
+    (map! (lambda (evt)
+            (case (car evt)
+              (mouse-move (let ((x (/ (rational (cadr evt)) (rational (car s))))
+                                (y (/ (rational (cddr evt)) (rational (cadr s)))))
+                            (set! mouse-x x)
+                            (set! mouse-y y)
+                            ))
+              (mouse-button-down
+               (when (eq (cadr evt) 0)
+                 (unless mouse-0-down
+                   (set! mouse-0-click t))
+                 (set! mouse-0-down t))
+               )
+              (mouse-button-up
+               (when (eq (cadr evt) 0)
+                 (set! mouse-0-down nil))
+              )))
+          evts)
     (when (first (lambda (x) (equals? '(char e) x)) evts)
       (set! ac-state
             (cond ((eq ac-state :cool) :heat)
@@ -882,28 +922,43 @@ Conside closing the tab when done.
                        (equals? '(key-down scankey 36) x))) evts)
       
       (reset))
-    )
+    ))
   
-  
+  (measure2 'game-rest
   (let ((max-speed 0.7)
         (p1 nil)
         (p2 nil)
-        (car-object (model-find-elem world-model 'car))
-        (coin-object (model-find-elem world-model 'coin))
-        (gas-object (model-find-elem world-model 'gas))
-        (ice-object (model-find-elem world-model 'ice-cube))
+        (car-object (measure2 'car (model-find-elem world-model 'car)))
+        (coin-object (measure2  'coin (model-find-elem world-model 'coin)))
+        (gas-object (measure2 'gas (model-find-elem world-model 'gas)))
+        (ice-object (measure 'ice-cube (model-find-elem world-model 'ice-cube)))
         (out-of-gas nil)
+        (drive-left (< mouse-x 0.33))
+        (drive-right (> mouse-x 0.66))
+        (ac-area (and mouse-0-click (> mouse-y 0.8) (< mouse-x 0.2)))
+        (radio-area (and mouse-0-click (> mouse-y 0.8) (> mouse-x 0.2) (< mouse-x 0.4)))
         (road-part nil))
+
+    (when ac-area
+      (set! ac-state
+            (cond ((eq ac-state :cool) :heat)
+                  ((eq ac-state :heat) :off)
+                  ((eq ac-state :off) :cool)
+                  (else :cool))))
+    (when radio-area
+      (set! radio-state
+            (cond ((eq radio-state :off) :on)
+                  (else :off))))
+    
+    ;(println (list ac-area mouse-y mouse-x))
 
     (let ((out-of-bounds (> (abs car-y-offset) 6.0)))
       (when out-of-bounds
         (set! max-speed 0.2)
         ))
-    (when nil
-      (do-times 320 (lambda (i) (when (> i 31)
-                                  (when (foxgl:key-down? win i)
-                                    (println (list 'yes i)))))))
-    (when (foxgl:key-down? win foxgl:key-w)
+    (measure2 'game-events
+              
+    (when (or (foxgl:mouse-down? win 0) (foxgl:key-down? win foxgl:key-w))
       (when show-help
         (set! show-help nil))
       (set! vx (+ vx 0.1))
@@ -911,16 +966,20 @@ Conside closing the tab when done.
     (when (foxgl:key-down? win foxgl:key-s)
       (set! vx (- vx 0.1))
       )
-                                        ;(set! car-turn 0.0)
     
-    (if (foxgl:key-down? win foxgl:key-a)
-        (set! car-turn -0.3)
-        (if (foxgl:key-down? win foxgl:key-d)
-            (set! car-turn  0.3)
-            (if (< car-turn 0.0)
-                (set! car-turn -0.025)
-                (if (> car-turn 0.0)
-                    (set! car-turn 0.025)))))
+    (let ((left (or (and (< mouse-y 0.8) mouse-0-down (< mouse-x 0.33))
+                    (foxgl:key-down? win foxgl:key-a)))
+          (right (or (and (< mouse-y 0.8) mouse-0-down (> mouse-x 0.66))
+                    (foxgl:key-down? win foxgl:key-d))))
+
+      (if left
+          (set! car-turn -0.3)
+          (if right
+              (set! car-turn  0.3)
+              (if (< car-turn 0.0)
+                  (set! car-turn -0.025)
+                  (if (> car-turn 0.0)
+                      (set! car-turn 0.025)))))))
     
     (incf car-rotation (* 1.5 car-turn))
     (when (> (abs vx) 0.1)
@@ -935,7 +994,8 @@ Conside closing the tab when done.
       (set! vx 0.0)
       (set! out-of-gas t)
       )
-    (set! road-part (list-offset road-line (* car-road-location 2)))
+    (measure2 'list-offset
+     (set! road-part (list-offset road-line (* car-road-location 2))))
     (unless (or show-help end-state out-of-gas)
       (when (eq ac-state :heat)
         (incf temperature 0.1))
@@ -969,13 +1029,12 @@ Conside closing the tab when done.
       )
     
     (incf temperature (* 0.001 (- (ambient-temperature) temperature)))
-    
+
+    (measure2 'check-stats
     (if (< vx 0.0)
         (set! vx 0.0))
-    
     (when (> vx 0.0)
-      (incf gas-level -0.01)
-      )
+      (incf gas-level -0.01))
     (when (< temperature 20.0)
       (incf health-level -0.1))
     (when (> temperature 80.0)
@@ -988,17 +1047,18 @@ Conside closing the tab when done.
     (when (< gas-level 0.001)
       (set! end-state :out-of-gas))
     (when (< health-level 0.001)
-      (set! end-state :dead))
+      (set! end-state :dead)))
 
     (set! p1 (vec2-scale (list->vec2 road-part) 20.0))
-
+    
+    (measure2 'check-collisions
     (for-each obj (list coin-object gas-object ice-object)
-               (let* ((close (detect-collision car-object obj 20.0))
-                   (collided (detect-collision car-object obj 1.5))
-                   (gone (and (not close) (hashtable-ref been-close-set obj))))
-              (when close 
-                (hashtable-set! been-close-set obj t)
-                )
+              (let* ((close (detect-collision car-object obj 20.0))
+                     (collided (detect-collision car-object obj 1.5))
+                     (gone (and (not close) (hashtable-ref been-close-set obj))))
+                (when close 
+                  (hashtable-set! been-close-set obj t)
+                  )
               
               (when (or collided gone)
                 (let* ((car-pos (list->vec3 (pget car-object :translate)))
@@ -1031,13 +1091,14 @@ Conside closing the tab when done.
                 
                 )))
 
-    (for-each obj (list coin-object   gas-object)
-            (when obj
-              (pset! (cdr obj) :rotate `(0.0 ,time 0.0))))
+    (for-each obj (list coin-object gas-object)
+              (when obj
+                (pset! (cdr obj) :rotate `(0.0 ,time 0.0)))))
     (unless (cdddr road-part)
       (set! car-offset 0.0)
       (set! car-road-location start-road-location))
-    (when (cdddr road-part)
+    (measure2 'car-update
+     (when (cdddr road-part)
       
       (set! p2 (vec2-scale (list->vec2 (list-offset road-part 2)) 20.0))
       (let* ((dv (vec2- p2 p1))
@@ -1048,7 +1109,7 @@ Conside closing the tab when done.
              
              (world-base (model-find-elem world-model 'world-base))
              )
-        (when (> (vec2-len (vec2- cpos p1)) (vec2-len dv))
+        (when (> (vec2:len (vec2- cpos p1)) (vec2:len dv))
           (set! car-offset 0.0)
           (incf car-road-location 1)
           )
@@ -1061,10 +1122,12 @@ Conside closing the tab when done.
         (pset! car-object :rotate `( 0.0 ,car-rotation 0.0))
         (pset! car-object :translate `(,(rational (vec2-x cpos)) 0.0 ,(rational (vec2-y cpos))))
         (pset! world-base :translate `(,(- 0.0 (vec2-x cpos)) 0.0 ,(- 0.0 (vec2-y cpos))))
-        ))
-    (let ((trees (model-find-elems world-model 'tree)))
+        )))
+    (measure2 'update-trees
+    (let* ((tree-scope (model-find-elem world-model 'trees))
+           (trees (model-find-elems (cdr tree-scope) 'tree)))
       (let* ((car-pos (list->vec3 (pget car-object :translate)))
-             (place (follow-lines road-part (/ (+ 50.0 (math:random 100.0)) 20.0)))
+             (place (measure2 'follow (follow-lines road-part (/ (+ 50.0 (math:random 100.0)) 20.0))))
              (next (vec2-scale (list->vec2 place) 20.0))
              (next2 (vec2-scale (list->vec2 (cddr place)) 20.0))
              (tangent (vec2-90 (vec2-normalize (vec2- next next2))))
@@ -1091,17 +1154,23 @@ Conside closing the tab when done.
                 trees)
                                         ;(println p-car)
 
-          )))))
+          )))))))
                                         ;
 (define last-conses-allocated 0);
-(defun game-update ()                   ;(audio:update)
-  (foxgl:clear)
-  
-  (entities-update)
-  (do-times 10 render-scene)
-  
-  (foxgl:swap win)
-  (foxgl:poll-events)
+(defun game-update ()
+                                        ;(audio:update)
+
+  (measure2 'clear (foxgl:clear))
+  (measure2 'entities-update
+            (entities-update))
+  (let ((s (foxgl:window-size win)))
+    (foxgl:viewport (integer (car s)) (integer (cadr s))))
+  (measure2 'render-scene
+            (do-times 1 render-scene))
+  (measure2 'swap
+   ;(thread:sleep 0.005)
+   (foxgl:swap win)
+   (foxgl:poll-events))
   )
 
 (define ld50:initialized nil)
@@ -1139,11 +1208,11 @@ Conside closing the tab when done.
   (foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
 
   (loop t
-       (measure (lisp:collect-garbage))
+       (measure2 'GC (lisp:collect-garbage))
        (when swank-loaded
          (thread:lock-mutex *swank-mutex*))
        (with-exception-handler
-           (measure 
+           (measure2 'game-update 
             (game-update))
          (lambda (x)
            (println x)

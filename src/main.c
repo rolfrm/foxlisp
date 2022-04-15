@@ -14,6 +14,8 @@
 #include "foxlisp.h"
 
 extern bool debug_set;
+bool tracing = false;
+
 bool is_float(lisp_value a){
   return a.type == LISP_RATIONAL || a.type == LISP_FLOAT32;
 }
@@ -25,7 +27,7 @@ lisp_value unquote_sym = {.type = LISP_SYMBOL};
 lisp_value unquote_splice_sym = {.type = LISP_SYMBOL};
 lisp_value nil = {0};
 lisp_value t = {.type = LISP_T};
-
+lisp_value else_sym;
 #undef ASSERT
 void ht_free(hash_table *ht);
 extern void * (* ht_mem_malloc)(size_t s);
@@ -89,6 +91,17 @@ bool  string_eq(lisp_value a, lisp_value b){
   if(a.type != b.type) return false;
   if(a.type != LISP_STRING) return false;
   return strcmp(a.string, b.string) == 0;
+}
+
+lisp_value  lisp_is_list(lisp_value a){
+  if(a.type == LISP_NIL || a.type == LISP_CONS)
+    return t;
+  return nil;
+}
+lisp_value lisp_is_cons(lisp_value a){
+  if(a.type == LISP_CONS)
+    return t;
+  return nil;
 }
 
 lisp_scope * lisp_scope_new(lisp_scope * super){
@@ -232,6 +245,7 @@ lisp_context * lisp_context_new(){
   quote_sym = get_symbol("quote");
   quasiquote_sym = get_symbol("quasiquote");
   unquote_sym = get_symbol("unquote");
+  else_sym = get_symbol("else");
   unquote_splice_sym = get_symbol("unquote-splicing");
   lisp_scope_create_value(current_context->globals, get_symbol("nil"), nil);
   lisp_scope_create_value(current_context->globals, get_symbol("t"), t);
@@ -659,14 +673,14 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		  
   return ret;
 }
-
+lisp_value lisp_eval2(lisp_scope * scope, lisp_value c);
 
 lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
   if(c.type == LISP_NIL) return nil;
   var next = cdr(c);
   if(next.type != LISP_NIL){
 
-	 var value = lisp_eval(scope, car(c));
+	 var value = lisp_eval2(scope, car(c));
 	 var nextr = lisp_sub_eval(scope, next, cons_buf + 1);
     lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
 	 cns.cons->car =value;
@@ -674,7 +688,7 @@ lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
     return cns;
   }else{
     lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
-    cns.cons->car = lisp_eval(scope, car(c));
+    cns.cons->car = lisp_eval2(scope, car(c));
     cns.cons->cdr = nil;
     return cns;
   }
@@ -747,7 +761,6 @@ void pin_to_stack(lisp_value v){
     symbol_hash = ht_calc_hash(current_context->globals->values, &symbol.integer);
   }
   
-  var scopename = "lisp:*root-scope*";
   lisp_value chain;
   var chain_ok = ht_get_precalc(current_context->globals->values, symbol_hash, &symbol.integer, &chain);
   var c = new_cons(v, chain);
@@ -794,17 +807,20 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 	 {
       
       var first = car(value);
+      if(tracing){
+        println(first);
+      }
       if(first.type == LISP_NIL){
         raise_string("called with nil");
         return nil;
       }
 
-      lisp_value first_value = lisp_eval(scope, first);
+      lisp_value first_value = lisp_eval2(scope, first);
 		if(first_value.type == LISP_MACRO_BUILTIN){
 		  switch(first_value.builtin){
 		  case LISP_IF:
 			 {
-				var cond = lisp_eval(scope, cadr(value));
+				var cond = lisp_eval2(scope, cadr(value));
             if(cond.type == LISP_NIL)
 				  value = cadddr(value);
 				else
@@ -820,6 +836,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 		  case LISP_UNQUOTE:
 			 raise_string("Unexpected unquote!\n");
 			 break;
+         
 		  case LISP_LET:
 			 {
 
@@ -834,7 +851,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
             while(argform.type != LISP_NIL){
 				  var arg = car(argform);
 				  var sym = car(arg);
-				  var value = lisp_eval(scope, cadr(arg));
+				  var value = lisp_eval2(scope, cadr(arg));
 				  lisp_scope_create_value(scope, sym, value);
 				  argform = cdr(argform);
 				}
@@ -853,7 +870,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				var body = cdr(value);
 				lisp_value result = nil;
 				while(body.type != LISP_NIL){
-				  result = lisp_eval(scope, car(body));
+				  result = lisp_eval2(scope, car(body));
 				  body = cdr(body);
 				}
 				return result;
@@ -896,7 +913,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				if(sym.type != LISP_SYMBOL){
 				  return nil; // error
 				}
-				var value2 = lisp_eval(scope, caddr(value));
+				var value2 = lisp_eval2(scope, caddr(value));
 				lisp_scope_set_value(scope, sym, value2);
 				return value2;
 			 }
@@ -916,7 +933,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 			 }
         case LISP_SYMBOL_VALUE:
           {
-            var sym = lisp_eval(scope, cadr(value));
+            var sym = lisp_eval2(scope, cadr(value));
             
             if(sym.type != LISP_SYMBOL){
               println(sym);
@@ -958,6 +975,65 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
             return result;
             
             break;
+          }
+        case LISP_CASE:
+          {
+            var result = lisp_eval2(scope, cadr(value));
+            var cases = cddr(value);
+            while(is_nil(cases) == false){
+              var c = car(cases);
+              var test = car(c);
+              if(_lisp_eq(result, test))
+                return lisp_eval(scope, cadr(c));
+              cases = cdr(cases);
+            }
+          }
+          return nil;
+        case LISP_COND:
+          {
+            var cases = cdr(value);
+            while(is_nil(cases) == false){
+              var c = car(cases);
+              var test = car(c);
+
+              if(_lisp_eq(test, else_sym) || !is_nil(lisp_eval(scope, test))){
+                lisp_value ret = nil;
+                var form = cdr(c);
+                while(!is_nil(form)){
+                  ret = lisp_eval(scope, car(form));
+                  form = cdr(form);
+                }
+                return ret;
+                
+              }
+              cases = cdr(cases);
+            }
+          }
+          return nil;
+
+          case LISP_AND:
+          {
+            var cases = cdr(value);
+            lisp_value result = t;
+            while(is_nil(cases) == false){
+              var c = car(cases);
+              result = lisp_eval2(scope, c);
+              if(is_nil(result)) return nil;
+              cases = cdr(cases);
+            }
+            return result;
+          }
+        case LISP_OR:
+          {
+            var cases = cdr(value);
+            lisp_value result = nil;
+            while(is_nil(cases) == false){
+              var c = car(cases);
+              result = lisp_eval2(scope, c);
+              if(is_nil(result) == false) return result;
+              cases = cdr(cases);
+            }
+            return nil;
           }
         }
       }
@@ -1824,6 +1900,11 @@ lisp_value lisp_exit(){
   exit(0);
   return nil;
 }
+lisp_value lisp_trace(lisp_value v){
+  tracing = !is_nil(v);
+  return nil;
+}
+
 void foxgl_register();
 
 void load_modules(){
@@ -1854,8 +1935,11 @@ int main(int argc, char ** argv){
   lisp_register_native("gc-heap", 0, gc_heap);
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
+  lisp_register_native("lisp:trace", 1, lisp_trace);
   lisp_register_native("+", 2, lisp_add);
   lisp_register_native("symbol?", 1, lisp_is_symbol);
+  lisp_register_native("list?", 1, lisp_is_list);
+  lisp_register_native("cons?", 1, lisp_is_cons);
   lisp_register_native("-", 2, lisp_sub);
   lisp_register_native("*", 2, lisp_mul);
   lisp_register_native("/", 2, lisp_div);
@@ -1934,6 +2018,10 @@ int main(int argc, char ** argv){
   lisp_register_macro("def", LISP_DEFINE);
   //lisp_register_macro("eval", LISP_EVAL);
   lisp_register_macro("quasiquote", LISP_QUASIQUOTE);
+  lisp_register_macro("case", LISP_CASE);
+  lisp_register_macro("cond", LISP_COND);
+  lisp_register_macro("and", LISP_AND);
+  lisp_register_macro("or", LISP_OR);
   lisp_register_macro("unquote", LISP_UNQUOTE);
   lisp_register_macro("symbol-value", LISP_SYMBOL_VALUE);
   lisp_register_macro("bound?", LISP_BOUND);

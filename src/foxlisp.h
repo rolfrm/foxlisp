@@ -36,7 +36,11 @@ typedef enum {
 				  LISP_UNQUOTE_SPLICE = 13,
               LISP_SYMBOL_VALUE = 14,
               LISP_BOUND = 15,
-              LISP_WITH_EXCEPTION_HANDLER = 16
+              LISP_WITH_EXCEPTION_HANDLER = 16,
+              LISP_CASE = 17,
+              LISP_COND = 18,
+              LISP_AND,
+              LISP_OR
 }lisp_builtin;
 
 // structs
@@ -126,6 +130,7 @@ extern lisp_value quote_sym;
 extern lisp_value quasiquote_sym;
 extern lisp_value unquote_sym;
 extern lisp_value unquote_splice_sym;
+extern lisp_value else_sym;
 extern size_t conses_allocated;
 
 void foxlist_thread_init();

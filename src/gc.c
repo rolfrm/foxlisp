@@ -293,14 +293,13 @@ void iterate_scope(gc_context * ctx, lisp_scope * scope){
 
 size_t ht_count(hash_table * ht);
 void gc_collect_garbage(lisp_context * context){
-  printf("-- collect garbage --\n");
   var gc_context = context->gc;
   clear_gc_marks(gc_context);
   iterate_scope(gc_context, context->globals);
   gc_recover_unmarked(gc_context);
 }
 
-lisp_context * current_context;
+extern lisp_context * current_context;
 
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   var ctx = current_context->gc;
@@ -318,7 +317,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
         pool = pool->next;
       }
     }
-    size_t pool_size = 1024;
+    size_t pool_size = 1024 * 8;
     if(pool == NULL){
       printf("new pool\n");
       cons_buffer ** parent = &ctx->cons_pool;

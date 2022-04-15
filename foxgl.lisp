@@ -1,5 +1,39 @@
 ;(println (foxgl:timestamp))
 
+(defmacro measure(&rest body)
+  `(let ((time-start (foxgl:timestamp))
+         (result (progn ,@body))
+         (time-end (foxgl:timestamp)))
+                                        ;(println (list 'operation-took (/ (rational (- time-end time-start)) 1000000.0)))
+    result))
+
+(define measure2-inlet 0)
+(defmacro measure2 (name &rest body)
+  `(let ((time-start (foxgl:timestamp))
+         (l (incf measure2-inlet 1))
+    
+         (result (progn ,@body))
+         (time-end (foxgl:timestamp)))
+                                        ;(when (eq measure2-inlet 1)
+    (do-times (- measure2-inlet 1)
+      (lambda () (print " ")))
+    (println (list ,name (/ (rational (- time-end time-start)) 1000000.0) 's))
+    ;  )
+    (incf measure2-inlet -1)
+    result))
+
+(defmacro measure2 (name &rest body)
+  `(progn ,@body))
+
+
+(defmacro with-tracing(&rest body)
+  `(let ((result nil))
+    (lisp:trace t)
+    (set! result
+     (progn ,@body))
+    (lisp:trace nil)
+    result))
+
 (defun plist-rest (lst func)
   (while lst
          (let ((fst (car lst)))
@@ -71,11 +105,11 @@
 (defun foxgl:render-model2 (model)
 
   (let ((sym (car model))
-        (funcs ())
         (render-sub t)
         )
-    (when (eq sym 'color)
-      (let ((prev-color foxgl:current-color))
+    (case sym
+      (color
+       (let ((prev-color foxgl:current-color))
         
         (match rgb (plookup (cdr model) ':rgb)
                (set! foxgl:current-color rgb)
@@ -87,146 +121,152 @@
         (foxgl:render-sub-models model)
         (set! foxgl:current-color prev-color)
         ))
-    (when (eq sym 'ref)
-      ;(println (list 'ref model))
-      (foxgl:render-model2 (symbol-value (cadr model) t)))
-    (when (eq sym 'view)
-         
-      (match p (plookup (cdr model) :perspective)
-             (let ((fov (car p))
-                   (aspect (cadr p))
-                   (near (caddr p))
-                   (far (cadddr p))
-                   (prev-tform foxgl:current-transform))
-               (set! foxgl:current-transform (mat4:perspective fov aspect near far))
-               ))
-      (match p (plookup (cdr model) :orthographic)
-             (let ((w (car p))
-                   (h (cadr p))
-                   (z (caddr p))
-                   (prev-tform foxgl:current-transform))
-               (set! foxgl:current-transform (mat4:orthographic w h z))
-               ))
-      (set! render-sub nil)
-      (foxgl:render-sub-models model)
-         
-      )
-       
-    (when (eq sym 'transform)
-      (let ((prev-tform foxgl:current-transform)
-            (new-transform (mat4-identity)))
-        (when foxgl:current-transform
-          (math:*! new-transform new-transform foxgl:current-transform))
-           
-        (match tlate (plookup (cdr model) ':translate)
-               (math:translate! new-transform
-                                (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))
-                
-         
-        (match scale (plookup (cdr model) ':scale)
-               (math:scale! new-transform 
-                            (car scale) (cadr scale) (or (caddr scale) 1.0)))
-        
-        (match rotation (plookup (cdr model) ':rotate)
-               
-               (math:rotate!  new-transform  (car rotation)
-                              (or (cadr rotation) 0.0)
-                              (or (caddr rotation) 0.0)))
-        (set! foxgl:current-transform new-transform)
-        (set! render-sub nil)
-        (foxgl:render-sub-models model)
-        (set! foxgl:current-transform prev-tform)
-        
+      (measure-model
+       (progn
+         (measure (foxgl:render-model2 (cadr model)))
+         ;(println (cadr model))
+         (set! render-sub nil)
          ))
-    (when (eq sym 'render-callback)
-      ((cadr model) model)
-      )
-    (when (eq sym 'unit-square)
-      (foxgl:color foxgl:current-color)
-      (foxgl:transform (or foxgl:current-transform (mat4-identity)))
-      (foxgl:square)
-      )
-    (when (eq sym 'print)
-      (println (list (cdr model) foxgl:current-transform color)))
-    (when (eq sym 'blend)
-      (foxgl:blend t)
-      (set! render-sub nil)
-      (foxgl:render-sub-models model)
-      (foxgl:blend nil)
-      )
-    (when (eq sym 'depth)
+      (ref 
+       (foxgl:render-model2 (symbol-value (cadr model) t)))
+      (view
+       (progn
+         (match p (plookup (cdr model) :perspective)
+                (let ((fov (car p))
+                      (aspect (cadr p))
+                      (near (caddr p))
+                      (far (cadddr p))
+                      (prev-tform foxgl:current-transform))
+                  (set! foxgl:current-transform (mat4:perspective fov aspect near far))
+                  ))
+         (match p (plookup (cdr model) :orthographic)
+                (let ((w (car p))
+                      (h (cadr p))
+                      (z (caddr p))
+                      (prev-tform foxgl:current-transform))
+                  (set! foxgl:current-transform (mat4:orthographic w h z))
+                  ))
+         (set! render-sub nil)
+         (foxgl:render-sub-models model)
+         
+         ))
+      (transform
+       (let ((prev-tform foxgl:current-transform)
+             (new-transform (mat4-identity)))
+         (when foxgl:current-transform
+           (math:*! new-transform new-transform foxgl:current-transform))
+         
+         (match tlate (plookup (cdr model) ':translate)
+                (math:translate! new-transform
+                                 (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))
+         
+         
+         (match scale (plookup (cdr model) ':scale)
+                (math:scale! new-transform 
+                             (car scale) (cadr scale) (or (caddr scale) 1.0)))
+         
+         (match rotation (plookup (cdr model) ':rotate)
+                
+                (math:rotate!  new-transform  (car rotation)
+                               (or (cadr rotation) 0.0)
+                               (or (caddr rotation) 0.0)))
+         (set! foxgl:current-transform new-transform)
+         (set! render-sub nil)
+         (foxgl:render-sub-models model)
+         (set! foxgl:current-transform prev-tform)
+         
+         ))
+      (render-callback
+       ((cadr model) model)
+       )
+      (unit-square
+       (progn
+         (foxgl:color foxgl:current-color)
+         (foxgl:transform (or foxgl:current-transform (mat4-identity)))
+         (foxgl:square)
+         ))
+      (print-model
+       (println 'print-model)
+       (println (cdr model))
+
+       )
+      (blend
+       (progn
+         (foxgl:blend t)
+         (set! render-sub nil)
+         (foxgl:render-sub-models model)
+         (foxgl:blend nil)
+         ))
+      (depth
+       (progn
       
-      (foxgl:depth t)
+         (foxgl:depth t)
                                         ;(println (glerror))
-      (set! render-sub nil)
-      (foxgl:render-sub-models model)
-      (foxgl:depth nil)
-      )
-    (when (eq sym 'text)
-      (foxgl:color foxgl:current-color)
-      (foxgl:transform (or foxgl:current-transform (mat4-identity)))
-      (foxgl:blit-text (cadr model)(or foxgl:current-transform (mat4-identity)))
-      )
-    (when (eq sym 'flat)
-      (let ((fb (foxgl:get-framebuffer model))
-            (prev-transform foxgl:current-transform)
-            )
-        (when (null? fb)
-          (let ((s (plookup (cdr model) :size)))
-            (set! fb (foxgl:load-framebuffer model (or s '(100 100))))))
-        (foxgl:bind-framebuffer fb)
-        (set! foxgl:transform (mat4-identity))
-        (push! funcs (lambda ()
-                       (foxgl:unbind-framebuffer fb)
-                       (set! foxgl:current-transform prev-transform)
-                       (unless foxgl:square-buffers
-                            
-                            (set! foxgl:square-buffers
-                                  (list
-                                   (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
-                                   (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
-                            
-                            )
-                       (foxgl:bind-texture (foxgl:framebuffer-texture fb))
-                       (foxgl:color foxgl:current-color)
-                       (foxgl:transform foxgl:current-transform)
-                       (foxgl:blend t)
-                       (foxgl:blit-polygon foxgl:square-buffers)
-                       (foxgl:blend nil)
-                       (foxgl:bind-texture nil)
-                          
-                       ))
-           )
-         )
-       (when (eq sym 'polygon)
-         (let ((dims 2)
-               (poly (plookup (cdr model) :2d-triangle-strip)))
-           (unless poly
-             (set! poly (plookup (cdr model) :3d-triangle-strip))
-             (set! dims 3)
+         (set! render-sub nil)
+         (foxgl:render-sub-models model)
+         (foxgl:depth nil)
+         ))
+      (text
+       (progn
+         (foxgl:color foxgl:current-color)
+         (foxgl:transform (or foxgl:current-transform (mat4-identity)))
+         (foxgl:blit-text (cadr model)(or foxgl:current-transform (mat4-identity)))
+         ))
+      (flat
+       (let ((fb (foxgl:get-framebuffer model))
+             (prev-transform foxgl:current-transform)
              )
-           (when poly
-             (let ((r (hashtable-ref foxgl:polygon-cache (cdr model))))
-               (unless r
-                 (println (list 'new-poly r))
-                 (set! r (cons 'poly (foxgl:load-polygon (list-to-array poly) dims)))
-                 (hashtable-set foxgl:polygon-cache (cdr model) r)
-                 (push! foxgl:polygon-cache2 (cdr model))
-                 (push! foxgl:polygon-cache2 r)
-                 ;(register-finalizer r cache-delete)
-                 )
-               (foxgl:color foxgl:current-color)
-               (foxgl:transform foxgl:current-transform)
-               (foxgl:blit-polygon (cdr r))
+         (when (null? fb)
+           (let ((s (plookup (cdr model) :size)))
+             (set! fb (foxgl:load-framebuffer model (or s '(100 100))))))
+         (foxgl:bind-framebuffer fb)
+         (set! foxgl:transform (mat4-identity))
+         (foxgl:unbind-framebuffer fb)
+         (set! foxgl:current-transform prev-transform)
+         (unless foxgl:square-buffers
+           
+           (set! foxgl:square-buffers
+                 (list
+                  (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
+                  (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
+           
+           )
+         (foxgl:bind-texture (foxgl:framebuffer-texture fb))
+         (foxgl:color foxgl:current-color)
+         (foxgl:transform foxgl:current-transform)
+         (foxgl:blend t)
+         (foxgl:blit-polygon foxgl:square-buffers)
+         (foxgl:blend nil)
+         (foxgl:bind-texture nil)
+         (set! render-sub nil)
+         ))
+      (polygon
+       (let ((dims 2)
+             (poly (plookup (cdr model) :2d-triangle-strip)))
+         (unless poly
+           (set! poly (plookup (cdr model) :3d-triangle-strip))
+           (set! dims 3)
+           )
+         (when poly
+           (let ((r (hashtable-ref foxgl:polygon-cache (cdr model))))
+             (unless r
+               (println (list 'new-poly r))
+               (set! r (cons 'poly (foxgl:load-polygon (list-to-array poly) dims)))
+               (hashtable-set foxgl:polygon-cache (cdr model) r)
+               (push! foxgl:polygon-cache2 (cdr model))
+               (push! foxgl:polygon-cache2 r)
+                                        ;(register-finalizer r cache-delete)
                )
-             )))
-       (when (eq sym 'hidden)
-         (set! render-sub nil))
-       (when render-sub
-         (plist-rest (cdr model) foxgl:render-model2))
-       
-       (map! funcall funcs)  
-       ))
+             (foxgl:color foxgl:current-color)
+             (foxgl:transform foxgl:current-transform)
+             (foxgl:blit-polygon (cdr r))
+             )
+           )))
+      (hidden
+       (set! render-sub nil)))
+    (when render-sub
+      (plist-rest (cdr model) foxgl:render-model2))  
+    ))
 
 (let ((m1 (mat4-translation 4 0 0))
       (m2 (mat4-translation 3 2 1)))
@@ -306,12 +346,6 @@
 (define foxgl:key-s 83)
 (define foxgl:key-d 68)
 
-(defmacro measure(&rest body)
-  `(let ((time-start (foxgl:timestamp))
-         (result (progn ,@body))
-         (time-end (foxgl:timestamp)))
-    (println (list 'operation-took (/ (rational (- time-end time-start)) 1000000.0)))
-    result))
 
 
 ;(render-model2 nil)

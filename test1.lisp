@@ -58,8 +58,9 @@
   )
 (println (type-of 1))
 
-(assert (and 1 1 2))
-(assert-not (and 1 1 2 nil))
+
+(assert (println (and 1 1 2)))
+(assert-not (println (and 1 1 2 nil)))
 (assert-not (and nil))
 (assert (and t))
 (assert (and))
@@ -273,7 +274,7 @@
       (l2 0.0)
       (actions nil))
         
-  (do-times 10
+  (do-times 0
     (lambda ()
       (lisp:collect-garbage)
       (for-each f actions (f))
@@ -330,5 +331,9 @@
   (test-other))
 (try-print-color)
 (try-print-color)
+
+(case 1
+  (2 (println '2))
+  (1 (println 'oook)))
 
 (println "Tests Passed")
