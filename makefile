@@ -1,4 +1,4 @@
-OPT = -O3 -g0
+OPT = -O2 -g3
 LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
@@ -16,8 +16,8 @@ CFLAGS = -Isrc/  -I. -Iinclude/ -Igc/bdwgc/include/ -Ilibmicroio/include -std=gn
 all: libmicroio.a
 all: $(TARGET)
 
-$(TARGET): $(LIB_OBJECTS) libiron.a gc.o
-	$(CC) $(LDFLAGS) $(LIB_OBJECTS) -lpthread gc.o  libiron.a $(LIBS) -ldl  -o $(TARGET)
+$(TARGET): $(LIB_OBJECTS) libiron.a
+	$(CC) $(LDFLAGS) $(LIB_OBJECTS) -lpthread libiron.a $(LIBS) -ldl  -o $(TARGET)
 
 .FORCE:
 iron/libiron.so: .FORCE
@@ -32,17 +32,11 @@ libmicroio/libmicroio.a:
 libmicroio.bc:
 	emcc $(BCFLAGS) -Ilibmicroio/include -c libmicroio/src/microio.c -o libmicroio.bc
 
-gc.o: gc/bdwgc/extra/gc.c
-	gcc -DGC_PTHREADS -DGC_THREADS -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.o -O3 -Igc/bdwgc/include
-
-gc.bc: gc/bdwgc/extra/gc.c
-	emcc $(BCFLAGS) -Igc/libatomic_ops/src -c gc/bdwgc/extra/gc.c -o gc.bc -O3 -Igc/bdwgc/include
-
 libiron.bc: iron/libiron.bc
 	cp iron/libiron.bc .
 
-index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp foxgl.lisp libiron.bc
-	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf
+index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp spinning-cube.lisp foxgl.lisp libiron.bc
+	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -sEXPORTED_RUNTIME_METHODS=ccall -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp --embed-file ./spinning-cube.lisp@spinning-cube.lisp --embed-file ./spinning-cube-model.lisp@spinning-cube-model.lisp --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .

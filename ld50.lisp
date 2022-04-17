@@ -54,29 +54,18 @@
 (define car-model
     '(car
       (transform :translate (-1 0 -2)
-       ;(blend
-        (transform :scale (2 1 4) :translate (-0.2 -0.5)
-         (color :rgb ( 0.2 0.2 0.2)
-          
-          (ref tile-model)))
-        ;)
-       (measure-model
         (wheels
          (transform :translate (0 -0.6 0) (ref wheel-model))
          (transform :translate (1.5 -0.6 0) (ref wheel-model))
          (transform :translate (0 -0.6 3) (ref wheel-model))
-         (transform :translate (1.5 -0.6 3) (ref wheel-model))))
-
-
+         (transform :translate (1.5 -0.6 3) (ref wheel-model)))
        (color :rgb (1 0 0)
         (transform :scale (2 1 4)
          (ref cube-model)))
-       
        (color :rgb (0 0 0)
         (transform :translate (0.25 1.0 0.5)
          :scale (1.5 0.8 2.0)
          (ref cube-model)))
-
        ;; sun roof
        (color :rgb (1 0 0)
         (transform :translate (0.25 1.9 0.5)
@@ -1170,6 +1159,7 @@ Restart by pressing [Enter]
   (measure2 'swap
    ;(thread:sleep 0.005)
    (foxgl:swap win)
+   (measure2 'GC (lisp:collect-garbage))
    (foxgl:poll-events))
   )
 
@@ -1190,7 +1180,6 @@ Restart by pressing [Enter]
   (foxgl:make-current win)
   (with-exception-handler
       (progn                            ;(game-update)
-
         (game-update)
         )
     
@@ -1208,7 +1197,6 @@ Restart by pressing [Enter]
   (foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
 
   (loop t
-       (measure2 'GC (lisp:collect-garbage))
        (when swank-loaded
          (thread:lock-mutex *swank-mutex*))
        (with-exception-handler

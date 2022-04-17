@@ -6,7 +6,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
 
-    <title>Foxlisp</title>
+    <title>Spinning Cube</title>
     <style>
       html,
       body {
@@ -21,33 +21,22 @@
       }
 
       body {
-          background-color: #222222;
-          color: #FFFFFF;
-          position: relative;
+          //background-color: #222222;
+          //color: #FFFFFF;
+          //position: relative;
       }
 
 
       .emscripten_border {
-          z-index: 2;
-          margin-top: 5px;
-          position: absolute;
-          width:100%;
+          width:50%;
           height:100%;
       }
-
-
-      #placeholder {
-
-          height: 100%;
-          width: 100%;
-          opacity: 0.5;
-          z-index: 1;
+      #editor {
+          flex-grow: 1;
       }
 
       #canvas {
-          z-index: 2;
-          position: absolute;
-          width:100%;
+          width:100%
           height:100%;
       }
 
@@ -61,19 +50,25 @@
 
 </span>
 <div class="collapsible">
-  
-</div>
-
+  <button onclick="loadLispCode('spinning-cube-model.lisp')">editor</button>
+  <button onclick="invokeLispCode()">Invoke</button>
+                                                             
 </div>
 <div class="emscripten">
   <progress value="0" max="100" id="progress" height="0" hidden=1></progress>
 </div>
+<div id="editor-and-view" class="container" style="display: flex;">
 
-<div class="emscripten_border">
-  <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+  <div class="emscripten_border">
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+  </div>
+  <div id="editor">
+    (+ 1 2 3)
+  </div>
 
-  <canvas id="placeholder" />
 </div>
+
+
 
 <script type='text/javascript'>
  
@@ -99,8 +94,7 @@
           
           console.error(text);
       },
-      placeholder: document.querySelector('#placeholder'),
-      brushcolor: document.querySelector('#brushcolor'),
+      
       setStatus: function (text) {
           if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
           if (text === Module.setStatus.last.text) return;
@@ -140,7 +134,36 @@
       };
   };
 
+  var editor = []
+  function loadLispCode(file){
+      r = Module.ccall("lisp_read_file", [], ['string'], [file]);
+      i = 0;
+      for(; i < 100000; i++){
+          if(Module.HEAPU8[r + i] == 0)
+              break;
+      }
+      var heapBytes = new Uint8Array(Module.HEAPU8.buffer, r, i);
+        
+      var decoder = new TextDecoder('utf-8')
+      decodedMessage = decoder.decode(heapBytes);
+
+      editor = ace.edit("editor", {
+          mode: "ace/mode/javascript",
+          selectionStyle: "text"
+      })
+
+      editor.setTheme("ace/theme/twilight");
+      lsp = ace.createEditSession(decodedMessage);
+      lsp.setMode("ace/mode/lisp");
+      editor.setSession(lsp);
+  }
+  function invokeLispCode(){
+      var code = editor.getValue()
+      Module.ccall("lisp_invoke_string", [], ['string'], [code]);
+  }
+
 </script>
+<script src="https://pagecdn.io/lib/ace/1.4.14/ace.js" type="text/javascript" charset="utf-8"></script>
 <script async type="text/javascript" src="index.js"></script>
 </body>
 

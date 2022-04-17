@@ -14,16 +14,14 @@
     
          (result (progn ,@body))
          (time-end (foxgl:timestamp)))
-                                        ;(when (eq measure2-inlet 1)
-    (do-times (- measure2-inlet 1)
-      (lambda () (print " ")))
-    (println (list ,name (/ (rational (- time-end time-start)) 1000000.0) 's))
-    ;  )
+                              
+    (println (list l ,name (/ (rational (- time-end time-start)) 1000000.0)))
+                                        ;  )
     (incf measure2-inlet -1)
     result))
 
-(defmacro measure2 (name &rest body)
-  `(progn ,@body))
+;(defmacro measure2 (name &rest body)
+;  `(progn ,@body))
 
 
 (defmacro with-tracing(&rest body)
@@ -130,7 +128,7 @@
       (ref 
        (foxgl:render-model2 (symbol-value (cadr model) t)))
       (view
-       (progn
+       (let ((prev-transform foxgl:current-transform))
          (match p (plookup (cdr model) :perspective)
                 (let ((fov (car p))
                       (aspect (cadr p))
@@ -148,7 +146,7 @@
                   ))
          (set! render-sub nil)
          (foxgl:render-sub-models model)
-         
+         (set! foxgl:current-transform prev-transform)
          ))
       (transform
        (let ((prev-tform foxgl:current-transform)

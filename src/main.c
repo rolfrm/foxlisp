@@ -120,6 +120,15 @@ void lisp_scope_stack(lisp_scope * s, lisp_scope * super, cons * lookup, size_t 
   s->lookup_on_stack = true;
   s->argcnt = cnt;
 }
+
+// since symbol IDs are forthrunning numbers anyway, there is not really a good reason to hash them.
+// experiments show a slight performance increase when doing this.
+static int symbol_nohash(const void * key, void * userdata){
+  u64 * k = key;
+  return (int)k[0];
+}
+
+// moving a scope off the stack.
 lisp_scope * lisp_scope_unstack(lisp_scope * scope){
 
   if(scope->super == NULL)
@@ -130,9 +139,9 @@ lisp_scope * lisp_scope_unstack(lisp_scope * scope){
   if(scope->lookup_on_stack){
     scope->lookup_on_stack = false;
     scope->lookup = gc_clone(scope->lookup, sizeof(scope->lookup[0]) * scope->argcnt);
+    
   }
   var newscope = (lisp_scope *) gc_clone(scope, sizeof(*scope));
-  //printf(" scope ? %p %p\n", newscope->lookup - 16, newscope);
   newscope->stack_scope = false;
   return newscope;
 }
@@ -215,6 +224,7 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   }
   if(scope->values == NULL){
 	 scope->values = ht_create2(2048, sizeof(u64), sizeof(lisp_value));
+    scope->values->hash = symbol_nohash;
     htid++;
     
     printf("make hash table %i", htid);
@@ -237,6 +247,8 @@ lisp_context * lisp_context_new(){
   ctx->next_symbol = 1;
   ctx->symbols = ht_create_strkey(sizeof(u64));
   ctx->symbols_reverse = ht_create(sizeof(u64), sizeof(char *));
+  ctx->symbols_reverse->hash = symbol_nohash;
+    
   ctx->globals = lisp_scope_new(NULL);
   var prev_ctx = current_context;
   current_context = ctx;
@@ -814,8 +826,14 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         raise_string("called with nil");
         return nil;
       }
+      lisp_value first_value;
+      if(first.type == LISP_SYMBOL && lisp_scope_try_get_value(scope, first, &first_value))
+        {
+          // this is a performance optimization for the normal case - calling a function by name
+        }else{
+        first_value = lisp_eval2(scope, first);
+      }
 
-      lisp_value first_value = lisp_eval2(scope, first);
 		if(first_value.type == LISP_MACRO_BUILTIN){
 		  switch(first_value.builtin){
 		  case LISP_IF:
@@ -909,11 +927,12 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 			 }
 		  case LISP_SET:
 			 {
-				var sym = cadr(value);
-				if(sym.type != LISP_SYMBOL){
+            value = cdr(value);
+				var sym = car(value);
+				if(sym.type != LISP_SYMBOL)
 				  return nil; // error
-				}
-				var value2 = lisp_eval2(scope, caddr(value));
+				value = cdr(value);
+				var value2 = lisp_eval2(scope, car(value));
 				lisp_scope_set_value(scope, sym, value2);
 				return value2;
 			 }
@@ -1278,9 +1297,9 @@ lisp_value lisp_eval_string(const char * str){
   return lisp_eval_stream(&w);
 }
 
-lisp_value lisp_eval_file(const char * filepath){
+char * file_to_string(const char * filepath){
   FILE * f = fopen(filepath, "r");
-  if(f == NULL) return nil;
+  if(f == NULL) return NULL;
   fseek(f,0,SEEK_END);
   size_t size = ftell(f);
   char * buffer = malloc(size + 1);
@@ -1290,6 +1309,16 @@ lisp_value lisp_eval_file(const char * filepath){
   (void)(l);
   
   fclose(f);
+  return buffer;
+}
+
+lisp_value lisp_eval_file(const char * filepath){
+  char * buffer = file_to_string(filepath);
+  if(buffer == NULL) {
+    printf("FILE: %s\n", filepath);
+    raise_string("Unable to read file");
+    return nil;
+  }
   lisp_value r = lisp_eval_string(buffer);
   free(buffer);
   return r;
@@ -2044,6 +2073,19 @@ int main(int argc, char ** argv){
 #endif
   return 0;
 }
+
+#ifdef WASM
+EMSCRIPTEN_KEEPALIVE
+void * lisp_read_file(const char * filename){
+  printf("read file: %s\n", filename);
+  return file_to_string(filename);
+}
+EMSCRIPTEN_KEEPALIVE
+void lisp_invoke_string(const char * code){
+  lisp_eval_string(code);
+}
+
+#endif
 
 pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
   pthread_t thread = {0};
