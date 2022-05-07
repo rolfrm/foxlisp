@@ -20,8 +20,8 @@
     (incf measure2-inlet -1)
     result))
 
-;(defmacro measure2 (name &rest body)
-;  `(progn ,@body))
+(defmacro measure2 (name &rest body)
+  `(progn ,@body))
 
 
 (defmacro with-tracing(&rest body)

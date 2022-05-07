@@ -1209,5 +1209,5 @@ Restart by pressing [Enter]
        (when swank-loaded
          (thread:unlock-mutex *swank-mutex*))
                                         ;(lisp:exit)
-       )
+       ))
 

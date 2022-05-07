@@ -7,9 +7,6 @@
 #include <stdio.h>
 #include <iron/full.h>
 #include <dlfcn.h>
-#define GC_REDIRECT_TO_LOCAL
-#define GC_THREADS
-#include <gc.h>
 
 #include "foxlisp.h"
 
@@ -19,7 +16,6 @@ static void * heap_end = NULL;
 int allccc = 0;
 static void * _alloc(size_t v){
   allccc += 1;
-  //printf("alloc! %i\n", allccc);
   if(allccc == 30000)
     raise(SIGINT);
   void * ptr = malloc(v);
@@ -110,12 +106,9 @@ void visit_value(gc_context * gc, lisp_value val){
     
   case LISP_FUNCTION_MACRO:
   case LISP_FUNCTION:
-    //printf("marking func \n");
-    if(is_heap_ptr(val.function) && !mark_vector(gc, val.function)){
+    if(is_heap_ptr(val.function) && !mark_vector(gc, val.function))
       return;
-    }
-    //printf("marked func\n");
-    //printf("marked scope: %p %p\n", val.function->closure, val.function);
+    
     if(is_heap_ptr(val.function)){
       if(mark_vector(gc, val.function->closure)){
         iterate_scope(gc, val.function->closure);
@@ -155,7 +148,6 @@ void visit_value(gc_context * gc, lisp_value val){
       break;
     }
   case LISP_VECTOR:
-    //ASSERT(is_heap_ptr(val.vector) && is_heap_ptr(val.vector->data));
     if(!mark_vector(gc, val.vector))
       return;
     if(!mark_vector(gc, val.vector->data))
@@ -244,13 +236,16 @@ void gc_recover_unmarked(gc_context * gc){
       mark_cons(gc, c);
       c = c->cdr.cons;
     }
-    for(size_t i = 0; i < buf->size; i++){
+    // free them in inverse order
+    // this means
+    for(size_t i = buf->size - 1; i >= 0; i--){
       if(buf->gc_mark[i] == false){
         buf->buffer[i].cdr.cons = buf->free_cons;
         buf->buffer[i].car = nil;
-        ASSERT(is_heap_ptr(buf->buffer + i));
+        //ASSERT(is_heap_ptr(buf->buffer + i));
         buf->free_cons = buf->buffer + i;
       }
+      if(i == 0)break;
     }
     buf = buf->next;
   }
@@ -289,6 +284,23 @@ void iterate_scope(gc_context * ctx, lisp_scope * scope){
   if(is_heap_ptr(scope->super) && !mark_vector(ctx, scope->super))
     return;
   iterate_scope(ctx, scope->super);
+}
+
+int gc_unsorted_cons(gc_context * gc){
+  int cnt = 0;
+  var buf = gc->cons_pool;
+  
+  while(buf != NULL){
+    cons * c = buf->free_cons;
+    while(c){
+      if(c > c->cdr.cons){
+        cnt +=1;
+      }
+      c = c->cdr.cons;
+    }
+    buf = buf->next;
+  }
+  return cnt;
 }
 
 size_t ht_count(hash_table * ht);

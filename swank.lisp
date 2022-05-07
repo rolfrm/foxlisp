@@ -48,7 +48,6 @@
   ;(println (list 'completions prefix))
   (let ((matching (take (lambda (x) (string-starts-with (symbol->string x) prefix)) (all-symbols))))
     (when matching
-      (println (map matching symbol->string))
       (println `(:ok (,(map matching symbol->string) ,(if (cdr matching) prefix (symbol->string (car matching)))))))))
 
 
@@ -135,8 +134,8 @@
     (let ((str (value->string `(:return ,(eval (cadr cmd)) ,(last cmd)))))
       (let ((strbuf (string->vector str)))
         (let ((lenbuf (hex-string (vector-length strbuf) 6)))
-          (write slime (string->vector lenbuf))
-          (write slime (string->vector str)))
+          (fd:write slime (string->vector lenbuf))
+          (fd:write slime (string->vector str)))
     ))))
 
 (define *swank-mutex* (thread:create-mutex))
@@ -146,14 +145,17 @@
 (assert *swank-mutex*)
 
 (defun swank-event-loop(slime)
-  (let ((len-buf (make-vector 6 (byte 0)))
-        (active t)
-        )
+  
     (loop active
-          (let ((read-len (read slime len-buf)))
-            (when (< 0 read-len)
+         (thread:lock-mutex *swank-mutex*)
+         
+         (let ((len-buf (make-vector 6 (byte 0)))
+               (active t)
+               )
+           
+         (let ((read-len (read slime len-buf)))
+           (when (< 0 read-len)
               (progn
-                (thread:lock-mutex *swank-mutex*)
                 (let ((len (parse-hex (vector->string len-buf))))
                   (let ((buf2 (make-vector len (byte 0))))
                     (read slime buf2)
@@ -164,16 +166,60 @@
                         (lambda (ex)
                           (println ex)))
                       )))
-                (thread:unlock-mutex *swank-mutex*)
                 )
-              )))))
+              )))
+
+         (thread:unlock-mutex *swank-mutex*)
+                
+         ))
 
 (define *swank:server-port* 8810)
 
 (defun swank-make-server (port file)
-  (let ((listener (tcp-listen port)))
-    (let ((emacs (tcp-accept listener)))
+  (let ((listener (tcp:listen port)))
+    (let ((emacs (tcp:accept listener)))
       (swank-event-loop emacs))))
+
+(defun swank-server-new (port)
+  (let ((listener (tcp:listen port)))
+    (println "listening")
+    (fd:set-blocking listener nil)
+    (cons listener nil)))
+    ;(let ((emacs (tcp:accept listener)))
+    ;  (println "ok")
+    ;  emacs)))
+(defun swank-server-update(listener)
+  (unless (cdr listener)
+    (let ((new (tcp:accept (car listener))))
+      (unless (eq (cdr new) -1)
+        (fd:set-blocking new t)
+    
+        (set-cdr! listener new))))
+  (when (cdr listener)
+    (let ((len-buf (make-vector 6 (byte 0)))
+          (slime (cdr listener))
+          (next t)
+          )
+      (while next
+             (let ((read-len (fd:recv slime len-buf)))
+               (when (nil? read-len)
+                 (set! read-len 0)
+                 (fd:close slime)
+                 (set-cdr! listener nil)
+                 )
+               (when (= 0 read-len)
+                 (set! next nil))
+               (when (< 0 read-len)
+                 (let ((len (parse-hex (vector->string len-buf))))
+                   (let ((buf2 (make-vector len (byte 0))))
+                     (fd:read slime buf2)
+                     (let ((cmd (read-string (vector->string buf2))))
+                       (with-exception-handler
+                           (swank-handle-command slime cmd)
+                         (lambda (ex)
+                           (println ex)))
+                       )))
+                 ))))))
 
 (defun swank:start-server ()
   (swank-make-server *swank:server-port* nil))

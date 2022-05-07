@@ -227,7 +227,6 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
     scope->values->hash = symbol_nohash;
     htid++;
     
-    printf("make hash table %i", htid);
     if(htid > 100)
       raise(SIGINT);
     //if(scope->super != NULL)
@@ -1795,7 +1794,6 @@ lisp_value hex_string(lisp_value i, lisp_value dec){
   if(is_nil(dec))
     l = cnt;
   char * buf = lisp_malloc(l + 1);
-  printf("%i %i %i\n", v, l, cnt);
   snprintf(buf + MAX(0, l - cnt), MIN(cnt, l) + 1, "%x", v);
   buf[l] = 0;
   for(int i = 0; i < MAX(0, l - cnt); i++)
@@ -1834,7 +1832,6 @@ lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
   bool weak_keys = !is_nil(weak_key);
   bool weak_values = !is_nil(weak_value);
   hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
-  printf("make hash table");
   /*if(weak_keys)
 	 ht_set_mem_keys(ht, lisp_malloc_atomic, lisp_free);
   if(weak_values)
@@ -2066,7 +2063,13 @@ int main(int argc, char ** argv){
 
   load_modules();
   lisp_register_value("lisp:*root-scope*", nil);
+#ifndef WASM
+  for(int i = 1; i < argc; i++){
+    lisp_eval_file(argv[i]);
+  }
+#else
   lisp_eval_file("ld50.lisp");
+#endif
   printf("Finished..\n");
 #ifdef WASM
   emscripten_set_main_loop(web_update, 0, 1);
@@ -2087,9 +2090,11 @@ void lisp_invoke_string(const char * code){
 
 #endif
 
+#include<pthread.h>
 pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
   pthread_t thread = {0};
-  raise_string("cannot create thread");
+  //raise_string("cannot create thread");
   //GC_pthread_create(&thread, NULL, f, data);
+  pthread_create(&thread, NULL, f, data);
   return thread;
 }

@@ -9,6 +9,10 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include "foxlisp.h"
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <poll.h>
 extern lisp_context * current_context;
    
 lisp_value tcp_listen(lisp_value _port)
@@ -63,6 +67,21 @@ static int get_fd(lisp_value value){
   return -1;
 }
 
+lisp_value tcp_set_nonblock(lisp_value l, lisp_value blocking){
+  int sockfd = get_fd(l);
+  bool blk = is_nil(blocking) == false;
+  int status;
+  if(!blk){
+    status = fcntl(sockfd, F_SETFL, fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK);
+  }
+  else
+    status = fcntl(sockfd, F_SETFL, fcntl(sockfd, F_GETFL, 0) & ~O_NONBLOCK);
+  if(status == -1){
+    return nil;
+  }
+  return t;
+}
+
 lisp_value tcp_accept(lisp_value l)
 {
   int sockfd = get_fd(l);
@@ -90,19 +109,46 @@ lisp_value lisp_read_fd(lisp_value item, lisp_value buffer){
     printf("NO FD\n");
 	 return nil;
   }
-  ssize_t r = read(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type));;
-  if(r == -1) {
+  int r = read(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type));
+  if(r == -1)
     return nil;
-  }
   return integer(r);
 }
+
+
+lisp_value lisp_recv_fd(lisp_value item, lisp_value buffer){
+  var fd = get_fd(item);
+  if(fd == -1){
+    printf("NO FD\n");
+	 return nil;
+  }
+  // non-blocking receive.
+  // first check if data is read (POLLIN)
+  // if data is read, data is read.
+  // if data is read and 0 bytes are read, 
+  struct pollfd test = {0};
+  test.events = POLLIN;
+  test.fd = fd;
+  int stat = poll(&test, 1, 0);
+  if(stat == 0)
+    return integer(0);
+  int r = recv(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type), 0);
+  
+  if(stat != 0 && r == 0)
+    return nil;
+  return integer(r);
+}
+
 
 
 lisp_value lisp_write_fd(lisp_value item, lisp_value buffer){
   var fd = get_fd(item);
   if(fd == -1)
 	 return nil;
-  return integer(write(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type))); 
+
+  ssize_t written = write(fd, buffer.vector->data, buffer.vector->count * lisp_type_size(buffer.vector->default_value.type));
+
+  return integer(written); 
 }
 
 void * lisp_perform_work(void * args){
@@ -112,6 +158,7 @@ void * lisp_perform_work(void * args){
 }
 #ifndef WASM
 pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data);
+
 
 lisp_value thread_start(lisp_value func){
   type_assert(func, LISP_FUNCTION);
@@ -183,6 +230,8 @@ void tcp_register(){
   lrn("fd:close", 1, lisp_close_fd);
   lrn("fd:read", 2, lisp_read_fd);
   lrn("fd:write", 2, lisp_write_fd);
+  lrn("fd:set-blocking", 2, tcp_set_nonblock);
+  lrn("fd:recv", 2, lisp_recv_fd);
 
   #ifndef WASM
   lrn("thread:start", 1, thread_start);
