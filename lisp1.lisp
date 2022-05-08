@@ -15,7 +15,10 @@
 (def eq =)
 (def #f ())
 (defun not (x) (= x nil))
-
+(defmacro test! (x)
+  (if lisp:*test-enabled*
+      x
+      nil))
 (define append2 
     (lambda (lst)
       (if (not (cdr lst))
@@ -40,7 +43,10 @@
 (defun map! (f2 lst)
   (loop lst
         (f2 (car lst))
-        (set! lst (cdr lst))))
+        (set! lst (cdr lst)))
+  nil)
+
+
 
 (defun do-times (n f2)
   (let ((x 0))
@@ -178,19 +184,20 @@
       `(def ,var ,(car value))))
 
 (defun reverse! (lst)
-  (let ((head lst))
-    (set! lst (cdr lst))
-    (set-cdr! head nil)
-    (while lst
-           (let ((new-head lst))
-             (set! lst (cdr new-head))
-             (when new-head
-               (set-cdr! new-head head)
+  (when lst
+    (let ((head lst))
+      (set! lst (cdr lst))
+      (set-cdr! head nil)
+      (while lst
+             (let ((new-head lst))
+               (set! lst (cdr new-head))
+               (when new-head
+                 (set-cdr! new-head head)
+                 )
+               (set! head new-head)
                )
-             (set! head new-head)
              )
-           )
-    head))
+      head)))
 
 (defun take (f list)
   (let ((result nil))
@@ -199,8 +206,12 @@
             (set! result (cons (car list) result)))
           (set! list (cdr list)))
     (reverse! result)))
+(test! (assert (eq 4 (length '(1 2 3 4)))))
+(test! (println (take (lambda (x) (> x 10)) '(0 1 2 -2 3 -5 -9))))
+(test! (assert (nil? (take (lambda (x) (> x 10)) '(0 1 2 -2 3 -5 -9)))))
+(test! (assert (eq 3 (length (take (lambda (x) (> x 0)) '(0 1 2 -2 3 -5 -9))))))
 
-
+(println lisp:*test-enabled*)
 (defun first (f list)
   (let ((result nil))
     (loop list
@@ -241,7 +252,9 @@
         (set! r `(progn ,r
                   (lisp:write-doc ,name '(,name ,@params)))))
       r
-    )))
+      )))
+
+
 
 (defun list*1(lists)
   (let ((head (car lists))

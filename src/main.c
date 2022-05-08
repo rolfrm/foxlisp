@@ -868,7 +868,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
             while(argform.type != LISP_NIL){
 				  var arg = car(argform);
 				  var sym = car(arg);
-				  var value = lisp_eval2(scope, cadr(arg));
+				  var value = lisp_eval(scope, cadr(arg));
 				  lisp_scope_create_value(scope, sym, value);
 				  argform = cdr(argform);
 				}
@@ -2064,8 +2064,12 @@ int main(int argc, char ** argv){
   load_modules();
   lisp_register_value("lisp:*root-scope*", nil);
 #ifndef WASM
+  lisp_register_value("lisp:*test-enabled*", nil);
   for(int i = 1; i < argc; i++){
-    lisp_eval_file(argv[i]);
+    if(strcmp(argv[i], "--test") == 0){
+      lisp_register_value("lisp:*test-enabled*", t);
+    }else
+      lisp_eval_file(argv[i]);
   }
 #else
   lisp_eval_file("ld50.lisp");
