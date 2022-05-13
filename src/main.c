@@ -1987,7 +1987,7 @@ int main(int argc, char ** argv){
   lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);
   lisp_register_native("lisp:trace-allocations", 1, lisp_trace_allocations);
   lisp_register_native("copy-list", 1, copy_cons);
-  lisp_register_native("copy-list-deep", 1, copy_cons);
+  lisp_register_native("copy-list-deep", 1, copy_cons_deep);
   lisp_register_native("plookup", 2, lisp_plookup);
   //lisp_register_native("map!", 2, lisp_mapn);
 

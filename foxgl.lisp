@@ -100,6 +100,30 @@
   (let ((bf (foxgl:create-framebuffer (car size) (cadr size))))
     (hashtable-set! foxgl:framebuffer-cache model bf)
     bf))
+
+(define value-binding (make-hashtable))
+(defmacro with-binding (sym value &rest body)
+  `(let ((old-value ,(hashtable-ref2 value-binding ',sym))
+         (,sym ,value))
+    (hashtable-set! value-binding ',sym ,sym)
+    ,@body
+
+    (if old-value
+        (hashtable-set! value-binding ',sym (cdr old-value))
+        (hashtable-remove value-binding ',sym))))
+
+(defun binding-value (sym)
+  (hashtable-ref value-binding sym))
+
+(with-binding b 1000
+  (println (binding-value 'b)))
+
+(defun unbind(p)
+  (if (= (car p) 'bind)
+      (binding-value (cadr p))
+      p))
+
+(println (binding-value 'b))
 (defun foxgl:render-model2 (model)
 
   (let ((sym (car model))
@@ -129,7 +153,7 @@
        (foxgl:render-model2 (symbol-value (cadr model) t)))
       (view
        (let ((prev-transform foxgl:current-transform))
-         (match p (plookup (cdr model) :perspective)
+         (match p (unbind (plookup (cdr model) :perspective))
                 (let ((fov (car p))
                       (aspect (cadr p))
                       (near (caddr p))
@@ -154,20 +178,24 @@
          (when foxgl:current-transform
            (math:*! new-transform new-transform foxgl:current-transform))
          
-         (match tlate (plookup (cdr model) ':translate)
+         (match tlate (unbind (plookup (cdr model) ':translate))
                 (math:translate! new-transform
-                                 (car tlate) (cadr tlate) (or (caddr tlate) 0.0)))
+                                 (unbind (car tlate))
+                                 (unbind (cadr tlate))
+                                 (or (unbind (caddr tlate)) 0.0)
+                                 ))
          
          
-         (match scale (plookup (cdr model) ':scale)
+         (match scale (unbind (plookup (cdr model) ':scale))
                 (math:scale! new-transform 
                              (car scale) (cadr scale) (or (caddr scale) 1.0)))
          
-         (match rotation (plookup (cdr model) ':rotate)
+         (match rotation (unbind (plookup (cdr model) ':rotate))
                 
-                (math:rotate!  new-transform  (car rotation)
-                               (or (cadr rotation) 0.0)
-                               (or (caddr rotation) 0.0)))
+                (math:rotate!  new-transform
+                               (unbind (car rotation))
+                               (or (unbind (cadr rotation)) 0.0)
+                               (or (unbind (caddr rotation)) 0.0)))
          (set! foxgl:current-transform new-transform)
          (set! render-sub nil)
          (foxgl:render-sub-models model)

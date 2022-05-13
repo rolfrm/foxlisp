@@ -48,7 +48,7 @@
 
 
 
-(defun do-times (n f2)
+(defun do-times(n f2)
   (let ((x 0))
     (loop (< x n)
           (f2 x)
@@ -151,6 +151,15 @@
 
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))
+
+(defmacro dotimes! (a n &rest body)
+  `(let ((,a 0))
+    (loop (< ,a ,n)
+          ,@body
+          (incf ,a 1))
+    nil
+    ))
+
 
 (defun memq (obj list)
   (let ((result nil))

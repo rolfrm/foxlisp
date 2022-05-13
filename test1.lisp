@@ -246,7 +246,6 @@
     (set! exception-handled t)
     (println "its ok)")))
 
-
 (assert exception-handled)
 (assert-not normal-form-completed)
 
