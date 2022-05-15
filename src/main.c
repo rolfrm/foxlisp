@@ -875,9 +875,9 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				value = cdr(value);
             var body = cdr(value);
 				lisp_value result = nil;
-            //pin_to_stack((lisp_value){.scope = scope1, .type = LISP_SCOPE});
-				while(body.type != LISP_NIL){
+            while(body.type != LISP_NIL){
 				  result = lisp_eval(scope, car(body));
+				  if(lisp_is_in_error()) break;
 				  body = cdr(body);
 				}
 				return result;
@@ -888,6 +888,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				lisp_value result = nil;
 				while(body.type != LISP_NIL){
 				  result = lisp_eval2(scope, car(body));
+              if(lisp_is_in_error()) break;
 				  body = cdr(body);
 				}
 				return result;
@@ -901,7 +902,8 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				  var body = _body;;
 				  while(body.type != LISP_NIL){
 					 result = lisp_eval2(scope, car(body));
-					 body = cdr(body);
+                if(lisp_is_in_error()) return result;
+                body = cdr(body);
 				  }
 				}
 				return result;
@@ -915,8 +917,6 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				f->code = body;
 				f->args = args;
             scope = lisp_scope_unstack(scope);
-            //printf("SCOPE: %p %p\n", scope, f);
-            //pin_to_stack((lisp_value){.type = LISP_SCOPE, .scope = scope});
 				f->closure = scope;
 
 				if(first_value.builtin == LISP_LAMBDA)
@@ -926,11 +926,13 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 			 }
 		  case LISP_SET:
 			 {
+            
             value = cdr(value);
 				var sym = car(value);
 				if(sym.type != LISP_SYMBOL)
 				  return nil; // error
-				value = cdr(value);
+            //printf("SET %s %i\n", symbol_name(sym.integer), lisp_is_in_error());
+            value = cdr(value);
 				var value2 = lisp_eval2(scope, car(value));
 				lisp_scope_set_value(scope, sym, value2);
 				return value2;
@@ -2002,7 +2004,6 @@ int main(int argc, char ** argv){
   lisp_register_native("type-of", 1, lisp_type_of);
   
   lisp_register_native("read-string", 1, lisp_read);
-  lisp_register_native("panic", 1, lisp_panic);
   lisp_register_native("load", 1, lisp_load);
   
   lisp_register_native("make-vector", 2, make_vector);

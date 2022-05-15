@@ -240,12 +240,11 @@
 (with-exception-handler
     (progn
       (panic "empty list")
-      (set! normal-form-completed t)
+      (set! normal-form-completed 10)
       )
   (lambda (ex)
-    (set! exception-handled t)
+    (set! exception-handled 1)
     (println "its ok)")))
-
 (assert exception-handled)
 (assert-not normal-form-completed)
 
