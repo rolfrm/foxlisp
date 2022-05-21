@@ -13,6 +13,7 @@
 (def set! set)
 (def display println)
 (def eq =)
+(def neq /=)
 (def #f ())
 (defun not (x) (= x nil))
 (defmacro test! (x)
@@ -33,7 +34,7 @@
   `(if ,test (progn ,@body)))
 
 (defmacro unless (test &rest body)
-  `(if ,test (progn) (progn ,@body)))
+  `(if ,test () (progn ,@body)))
 
 (defun map (lst f2)
   (when lst

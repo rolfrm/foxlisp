@@ -17,6 +17,7 @@ typedef enum {
 		LISP_BYTE = 14,
 		LISP_FLOAT32 = 15,
       LISP_HASHTABLE = 16,
+      LISP_INTEGER32,
       LISP_SCOPE
 }lisp_type;
 
@@ -30,7 +31,6 @@ typedef enum {
 				  LISP_MACRO = 7,
 				  LISP_SET = 8,
 				  LISP_DEFINE = 9,
-				  LISP_EVAL = 10,
 				  LISP_QUASIQUOTE = 11,
 				  LISP_UNQUOTE = 12,
 				  LISP_UNQUOTE_SPLICE = 13,
@@ -40,7 +40,8 @@ typedef enum {
               LISP_CASE = 17,
               LISP_COND = 18,
               LISP_AND,
-              LISP_OR
+              LISP_OR,
+              LISP_GET_SCOPE
 }lisp_builtin;
 
 // structs
@@ -71,7 +72,7 @@ typedef struct{
 
 struct __native_function{
   void * fptr;
-  int nargs;
+  int nargs; // -1: infinite number of arguments.
 };
 
 struct _cons {

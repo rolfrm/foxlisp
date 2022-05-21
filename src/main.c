@@ -42,7 +42,7 @@ bool lisp_is_in_error(){
 }
 
 void raise_string(const char * str){
-  current_error = (lisp_value){.string = str, .type = LISP_STRING};
+  current_error = (lisp_value){.string = (char *)str, .type = LISP_STRING};
   printf("%s\n", str);
   print_call_stack();
 }
@@ -71,7 +71,7 @@ bool elem_type_assert(lisp_value vector, lisp_type type){
 }
 
 
-#define ASSERT(x) if(!x){printf("!!! %s\n",  #x); error(); }
+#define ASSERT(x) if(!(x)){raise_string("!!! " #x "\n"); }
 
 bool is_nil(lisp_value v){
   return v.type == LISP_NIL;
@@ -124,7 +124,7 @@ void lisp_scope_stack(lisp_scope * s, lisp_scope * super, cons * lookup, size_t 
 // since symbol IDs are forthrunning numbers anyway, there is not really a good reason to hash them.
 // experiments show a slight performance increase when doing this.
 static int symbol_nohash(const void * key, void * userdata){
-  u64 * k = key;
+  const u64 * k = key;
   return (int)k[0];
 }
 
@@ -179,6 +179,7 @@ bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * o
       var v = scope->lookup[i].car.integer;
       if(v == 0) break;
       if(v == sym.integer){
+        
         *out = scope->lookup[i].cdr;
         return true;
       }
@@ -763,21 +764,23 @@ void print_call_stack(){
   }
 }
 
-void pin_to_stack(lisp_value v){
-  static lisp_value symbol;
-  static size_t symbol_hash;
-  if(symbol.type == LISP_NIL){
-    var scopename = "lisp:*root-scope*";
-    symbol = get_symbol(scopename);
-    symbol_hash = ht_calc_hash(current_context->globals->values, &symbol.integer);
+/*
+bool lambda_needs_scope_copy(lisp_value code, lisp_scope * scope){
+  switch(code.type){
+  case LISP_SYMBOL:
+
+    //
+
   }
-  
-  lisp_value chain;
-  var chain_ok = ht_get_precalc(current_context->globals->values, symbol_hash, &symbol.integer, &chain);
-  var c = new_cons(v, chain);
-  ht_set_precalc(current_context->globals->values, &symbol.integer, &c, symbol_hash);
-  
-}
+  if(code.type == LISP_SYMBOL){
+    return false;
+  }
+  while(){
+    
+    
+  }
+
+  }*/
 
 lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
@@ -866,11 +869,13 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
           
             scope = scope1;
             while(argform.type != LISP_NIL){
-				  var arg = car(argform);
+
+              var arg = car(argform);
 				  var sym = car(arg);
 				  var value = lisp_eval(scope, cadr(arg));
-				  lisp_scope_create_value(scope, sym, value);
-				  argform = cdr(argform);
+				  if(lisp_is_in_error()) return nil;
+              lisp_scope_create_value(scope, sym, value);
+              argform = cdr(argform);
 				}
 				value = cdr(value);
             var body = cdr(value);
@@ -947,10 +952,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				lisp_scope_create_value(scope, sym, value2);
 				return value2;
 			 }
-		  case LISP_EVAL:
-			 {
-				return lisp_eval(scope, lisp_eval(scope, cadr(value)));
-			 }
+		  
         case LISP_SYMBOL_VALUE:
           {
             var sym = lisp_eval2(scope, cadr(value));
@@ -1055,17 +1057,21 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
             }
             return nil;
           }
+        case LISP_GET_SCOPE:
+          {
+				return (lisp_value){.scope = lisp_scope_unstack(scope), .type = LISP_SCOPE}; 
+          }
         }
       }
       size_t argcnt = lisp_length(cdr(value)).integer;
-      size_t argcnt2 = MAX(argcnt, 6);
-      cons args[argcnt2];
-      memset(args, 0, sizeof(args[0]) * argcnt2);
+      
+      cons args[argcnt];
+      memset(args, 0, sizeof(args[0]) * argcnt);
       lisp_value things = lisp_sub_eval(scope, cdr(value), args);
       
       if(lisp_is_in_error())
         return nil;
-
+      
 		if(first_value.type == LISP_FUNCTION_NATIVE){
       
 		  var n = first_value.nfunction;
@@ -1073,7 +1079,20 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
           raise_string("function is null");
           return nil;
         }
+        
+        if(n->nargs != -1){
+          for(int i = argcnt; i < n->nargs; i++){
+            args[i].car = nil;
+          }
+          if(argcnt > n->nargs){
+            raise_string("Invalid number of arguments");
+            return nil;
+          }
+        }
+
+          
 		  union{
+          lisp_value (* nvar)(lisp_value * values, int count);
 			 lisp_value (* n0)();
 			 lisp_value (* n1)(lisp_value);
 			 lisp_value (* n2)(lisp_value, lisp_value);
@@ -1085,8 +1104,16 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 		  }f;
 
 		  f.n0 = n->fptr;
+        
 		  switch(n->nargs){
-		  case 0:
+        case -1:
+          {
+            lisp_value args2[argcnt];
+            for(int i = 0; i < argcnt; i++)
+              args2[i] = args[i].car;
+            return f.nvar(args2, argcnt);
+          }
+        case 0:
 			 return f.n0();
 		  case 1:
 			 return f.n1(args[0].car);
@@ -1255,16 +1282,24 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
   return nil;
 }
 
-lisp_value lisp_eval_value(lisp_value code){
+lisp_value lisp_eval_value(lisp_value code, lisp_value scope){
+  lisp_scope * scopeptr;
+  if(scope.type != LISP_NIL){
+    println(scope);
+    TYPE_ASSERT(scope, LISP_SCOPE);
+    scopeptr = scope.scope;
+  }else{
+    scopeptr = current_context->globals;
+  }
   while(true){
-    var next_code = lisp_macro_expand(current_context->globals, code);
+    var next_code = lisp_macro_expand(scopeptr, code);
 		
     if(lisp_value_eq(next_code, code))
       break;
     code = next_code;
   }
   //println(code);
-  return lisp_eval(current_context->globals, code);
+  return lisp_eval(scopeptr, code);
 }
 
 lisp_value lisp_eval_stream(io_reader * rd){
@@ -1337,6 +1372,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_T:
 	 return snprintf(buffer, LEN1, "t");
   case LISP_INTEGER:
+  case LISP_INTEGER32:
 	 return snprintf(buffer, LEN1, "%lli", v.integer);
   case LISP_BYTE:
 	 return snprintf(buffer, LEN1, "%i", (u8)v.integer);
@@ -1379,7 +1415,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_HASHTABLE:
     return snprintf(buffer, LEN1, "HashTable");
   case LISP_SCOPE:
-    return snprintf(buffer, LEN1, "Scope");
+    return snprintf(buffer, LEN1, "Scope(%i)", v.scope->argcnt);
   case LISP_CONS:
     {
       int l = 0;
@@ -1446,54 +1482,207 @@ void lisp_register_macro(const char * name, lisp_builtin builtin){
   lisp_register_value(name, v);
 }
 
-lisp_value lisp_add(lisp_value a, lisp_value b){
-  if(is_float(a))
-	 a.rational += b.rational;
-  else if(a.type == LISP_INTEGER)
-	 a.integer += b.integer;
-  return a;
+bool is_integer_type(lisp_type t){
+  switch(t){
+  case LISP_INTEGER:
+  case LISP_BYTE:
+  case LISP_INTEGER32:
+    return true;
+  default:
+    break;
+  }
+  return false;  
 }
 
-lisp_value lisp_sub(lisp_value a, lisp_value b){
-  if(is_float(a))
-	 a.rational -= b.rational;
-  else if(a.type == LISP_INTEGER)
-	 a.integer -= b.integer;
-  return a;
+bool is_float_type(lisp_type t){
+  switch(t){
+  case LISP_RATIONAL:
+  case LISP_FLOAT32:
+    return true;
+  default:
+    break;
+  }
+  return false;  
 }
 
-lisp_value lisp_mul(lisp_value a, lisp_value b){
-  if(is_float(a))
-	 a.rational *= b.rational;
-  else if(a.type == LISP_INTEGER)
-	 a.integer *= b.integer;
-  return a;
-}
-lisp_value lisp_div(lisp_value a, lisp_value b){
-  if(is_float(a))
-	 a.rational /= b.rational;
-  else if(a.type == LISP_INTEGER)
-	 a.integer /= b.integer;
-  return a;
+static void normalize_numericals(lisp_value * values, int count){
+  static u8 numeric_tower[LISP_SCOPE];
+  if(numeric_tower[0] == 0){
+    numeric_tower[LISP_NIL] = 0xFF;
+    numeric_tower[LISP_T] = 0x0;
+    numeric_tower[LISP_CONS] = 0xFF;
+    numeric_tower[LISP_BYTE] = 1;
+    numeric_tower[LISP_INTEGER32] = numeric_tower[LISP_BYTE] + 1;
+    numeric_tower[LISP_INTEGER] = numeric_tower[LISP_INTEGER32] + 1;
+    numeric_tower[LISP_FLOAT32] = numeric_tower[LISP_INTEGER] + 1;
+    numeric_tower[LISP_RATIONAL] = numeric_tower[LISP_FLOAT32] + 1;
+  }
+  ASSERT(count > 0);
+  lisp_type type = LISP_BYTE;
+  for(int i = 0; i < count; i++){
+    lisp_type thistype = LISP_NIL;
+    if(is_integer(values[i])){
+      if(values[i].integer <= 0xFF){
+        thistype = LISP_BYTE;
+      }else if (values[i].integer <= 0xFFFFFFFFL){
+        thistype = LISP_INTEGER32;
+      }else
+        thistype = LISP_INTEGER;
+      } 
+    else if(values[i].type == LISP_FLOAT32){
+      thistype = LISP_FLOAT32;
+    }if(values[i].type == LISP_RATIONAL){
+      thistype = LISP_RATIONAL;
+    }
+    if(numeric_tower[thistype] > numeric_tower[type])
+      type = thistype;
+  }
+  if(is_float_type(type)){
+    for(int i = 0; i < count; i++){
+      if(is_integer_type(values[i].type))
+        values[i].rational = values[i].integer;
+      values[i].type = type;
+    }
+  }else{
+    for(int i = 0; i < count; i++){
+      if(is_float_type(values[i].type))
+        values[i].integer = (int64_t)values[i].rational;
+      values[i].type = type;
+    }
+  }
 }
 
-lisp_value lisp_less(lisp_value a, lisp_value b){
-  if(is_float(a) && a.rational < b.rational)
-	 return t;
-  if(a.type == LISP_INTEGER && a.integer < b.integer)
-	 return t;
-  return nil;
-}
-lisp_value lisp_greater(lisp_value a, lisp_value b){
-  if(is_float(a) && a.rational > b.rational)
-	 return t;
-  if(a.type == LISP_INTEGER && a.integer > b.integer)
-	 return t;
-  return nil;
+lisp_value lisp_procn(lisp_value * values, int count, void (*ff )(f64 * l, f64 * r), void (*lf )(i64 * l, i64 * r)){
+  normalize_numericals(values, count);
+  if(is_float(values[0])){
+    double sum = values[0].rational;
+    for(int i = 1; i < count; i++)
+      ff(&sum, &(values[i]).rational);
+    return rational(sum);
+  }else{
+    i64 sum = values[0].integer;
+    for(int i = 1; i < count; i++)
+      lf(&sum, &(values[i]).integer);
+    return integer(sum);
+  }
 }
 
-lisp_value lisp_eq(lisp_value a, lisp_value b){
-  return _lisp_eq(a,b) ? t : nil;
+
+lisp_value lisp_binn(lisp_value * values, int count, bool (*cmpf )(f64 l, f64 r), bool (*cmpi )(i64 l, i64 r)){
+  normalize_numericals(values, count);
+  if(is_float(values[0])){
+    for(int i = 1; i < count; i++)
+      if(!cmpf((values[i - 1]).rational, (values[i]).rational))
+        return nil;
+  }else{
+    for(int i = 1; i < count; i++)
+      if(!cmpi((values[i - 1]).integer, (values[i]).integer))
+        return nil;
+  }
+  return t;
+}
+
+static void addf(f64 * a, f64 * b){
+  *a += *b;
+}
+static void addi(i64 * a, i64 * b){
+  *a += *b;
+}
+lisp_value lisp_addn(lisp_value * values, int count){
+  return lisp_procn(values, count, addf, addi);
+}
+
+static void subf(f64 * a, f64 * b){
+  *a -= *b;
+}
+static void subi(i64 * a, i64 * b){
+  *a -= *b;
+}
+lisp_value lisp_subn(lisp_value * values, int count){
+  return lisp_procn(values, count, subf, subi);
+}
+
+static void mulf(f64 * a, f64 * b){
+  *a *= *b;
+}
+static void muli(i64 * a, i64 * b){
+  *a *= *b;
+}
+lisp_value lisp_muln(lisp_value * values, int count){
+  return lisp_procn(values, count, mulf, muli);
+}
+
+static void divf(f64 * a, f64 * b){
+  *a /= *b;
+}
+
+static void divi(i64 * a, i64 * b){
+  *a /= *b;
+}
+
+lisp_value lisp_divn(lisp_value * values, int count){
+  return lisp_procn(values, count, divf, divi);
+}
+
+static bool lessf(f64 a, f64 b){
+  return a < b;
+}
+static bool lessi(i64 a, i64 b){
+  return a < b;
+}
+
+lisp_value lisp_lessn(lisp_value * values, int count){
+  return lisp_binn(values, count, lessf, lessi);
+}
+
+static bool lesseqf(f64 a, f64 b){
+  return a <= b;
+}
+static bool lesseqi(i64 a, i64 b){
+  return a <= b;
+}
+
+lisp_value lisp_lesseqn(lisp_value * values, int count){
+  return lisp_binn(values, count, lesseqf, lesseqi);
+}
+
+static bool greaterf(f64 a, f64 b){
+  return a > b;
+}
+static bool greateri(i64 a, i64 b){
+  return a > b;
+}
+
+lisp_value lisp_greatern(lisp_value * values, int count){
+  return lisp_binn(values, count, greaterf, greateri);
+}
+
+static bool greatereqf(f64 a, f64 b){
+  return a >= b;
+}
+
+static bool greatereqi(i64 a, i64 b){
+  return a >= b;
+}
+
+lisp_value lisp_greatereqn(lisp_value * values, int count){
+  return lisp_binn(values, count, greatereqf, greatereqi);
+}
+
+
+lisp_value lisp_eqn(lisp_value * values, int count){
+  for(int i = 1; i < count; i++)
+    if(!_lisp_eq(values[i-1], values[i]))
+      return nil;
+  return t;
+}
+
+lisp_value lisp_neqn(lisp_value * values, int count){
+  for(int i = 0; i < count; i++)
+    for(int j = i + 1; j < count; j++)
+    if(_lisp_eq(values[i], values[j]))
+      return nil;
+  return t;
 }
 
 bool eq(lisp_value a, lisp_value b){
@@ -1600,6 +1789,7 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_T: return "T";
   case LISP_CONS: return "CONS";
   case LISP_INTEGER: return "INTEGER";
+  case LISP_INTEGER32: return "INTEGER32";
   case LISP_RATIONAL: return "RATIONAL";
   case LISP_STRING: return "STRING";
   case LISP_SYMBOL: return "SYMBOL";
@@ -1937,9 +2127,7 @@ void foxgl_register();
 
 void load_modules(){
   foxgl_register();
-
 }
-
 
 void web_update(){
   //debug_set = true;
@@ -1964,15 +2152,17 @@ int main(int argc, char ** argv){
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
   lisp_register_native("lisp:trace", 1, lisp_trace);
-  lisp_register_native("+", 2, lisp_add);
+  lisp_register_native("+", -1, lisp_addn);
   lisp_register_native("symbol?", 1, lisp_is_symbol);
   lisp_register_native("list?", 1, lisp_is_list);
   lisp_register_native("cons?", 1, lisp_is_cons);
-  lisp_register_native("-", 2, lisp_sub);
-  lisp_register_native("*", 2, lisp_mul);
-  lisp_register_native("/", 2, lisp_div);
-  lisp_register_native("<", 2, lisp_less);
-  lisp_register_native(">", 2, lisp_greater);
+  lisp_register_native("-", -1, lisp_subn);
+  lisp_register_native("*", -1, lisp_muln);
+  lisp_register_native("/",-1, lisp_divn);
+  lisp_register_native("<", -1, lisp_lessn);
+  lisp_register_native(">", -1, lisp_greatern);
+  lisp_register_native("<=", -1, lisp_lesseqn);
+  lisp_register_native(">=", -1, lisp_greatereqn);
   lisp_register_native("print", 1, print);
   lisp_register_native("println", 1, println);
   lisp_register_native("value->string", 1, value_to_string);
@@ -1993,7 +2183,8 @@ int main(int argc, char ** argv){
   lisp_register_native("plookup", 2, lisp_plookup);
   //lisp_register_native("map!", 2, lisp_mapn);
 
-  lisp_register_native("=", 2, lisp_eq);
+  lisp_register_native("=", -1, lisp_eqn);
+  lisp_register_native("/=", -1, lisp_neqn);
   lisp_register_native("string=", 2, string_eq);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
@@ -2033,7 +2224,7 @@ int main(int argc, char ** argv){
   
   lisp_register_native("register-finalizer", 2, lisp_register_finalizer);
   
-  lisp_register_native("eval", 1, lisp_eval_value);
+  lisp_register_native("eval", 2, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
   lisp_register_macro("let", LISP_LET);
@@ -2043,7 +2234,6 @@ int main(int argc, char ** argv){
   lisp_register_macro("macro", LISP_MACRO);
   lisp_register_macro("set", LISP_SET);
   lisp_register_macro("def", LISP_DEFINE);
-  //lisp_register_macro("eval", LISP_EVAL);
   lisp_register_macro("quasiquote", LISP_QUASIQUOTE);
   lisp_register_macro("case", LISP_CASE);
   lisp_register_macro("cond", LISP_COND);
@@ -2053,6 +2243,7 @@ int main(int argc, char ** argv){
   lisp_register_macro("symbol-value", LISP_SYMBOL_VALUE);
   lisp_register_macro("bound?", LISP_BOUND);
   lisp_register_macro("with-exception-handler", LISP_WITH_EXCEPTION_HANDLER);
+  lisp_register_macro("lisp:get-current-scope", LISP_GET_SCOPE);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 #ifndef WASM

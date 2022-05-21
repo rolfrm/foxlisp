@@ -83,34 +83,29 @@
   (let ((time (* 0.000001 (rational  (- (foxgl:timestamp) start-time ))))
         (offset 0.0)
         )
-    
+
     (dotimes! i 10
                                         
               (let ((belt-offset (rational i)))
-              (with-binding c belt-offset
-                (with-binding time time
-                  (render-model
+                (foxgl:render-model
                    '(color :rgb (0.0 0.4 0.0)
-                     (transform :scale (0.1 0.1 0.1)
-                      (transform :translate ((bind c) 0.0 0.0)
+                     (scale (0.1 0.1 0.1)
+                      (translate ((bind belt-offset) 0.0 0.0)
                        (transform :translate (-0.5 -0.6 0.0) :scale (0.95 1.20) 
                         (ref square-model)))))))
-                )
-                ))
+              )
+                
     (set! offset 0.0)
     (dotimes! i 10
-              (let ((belt-offset (rational i)))
               (when (vector-ref (cdr belts) i)
-                (with-binding c (+ belt-offset (vector-ref (car belts) i))
-                  (render-model
-                   '(color :rgb (0.4 0.4 0.0)
-                     (transform :scale (0.1 0.1 0.1)
-                     (transform :translate ((bind c) 0.0 0.0)
-                      (transform  :rotate (0.0 0.0 0.0) :translate (0.0 0.0 0.0)
-                       (transform :translate (-0.5 -0.45 0.0) :scale (0.90 0.90 0.5) 
-                        (ref square-model)))))))
-                  )))
-      ))
+                (foxgl:render-model
+                 '(color :rgb (0.4 0.4 0.0)
+                   (scale (0.1 0.1 0.1)
+                    (translate ((bind (+ i (vector-ref (car belts) i))) 0.0 0.0)
+                     (transform :translate (-0.5 -0.45 0.0) :scale (0.90 0.90 0.5)
+                      (ref square-model))))))
+                  ))
+      )
     
   (foxgl:swap win)
   (foxgl:poll-events)

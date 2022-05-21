@@ -154,6 +154,7 @@ void visit_value(gc_context * gc, lisp_value val){
       return;
     switch (val.vector->default_value.type){
     case LISP_INTEGER:
+    case LISP_INTEGER32:
     case LISP_RATIONAL:
     case LISP_SYMBOL:
     case LISP_BYTE:
@@ -189,6 +190,7 @@ void visit_value(gc_context * gc, lisp_value val){
   case LISP_NATIVE_POINTER:
   case LISP_MACRO_BUILTIN:
   case LISP_INTEGER:
+  case LISP_INTEGER32:
   case LISP_NIL:
   case LISP_T:
   case LISP_RATIONAL:

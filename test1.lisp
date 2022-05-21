@@ -32,6 +32,9 @@
 (println '(1 2 3))
 (println `(1 2 ,(+ 1 3)))
 
+(assert (= 15 (+ 1 2 3 4 5)))
+(assert (= 8 (* 2 2 2)))
+(assert (= 8.0 (* 2 2 2.0)))
 
 (assert (= 10 (funcall + 1 9)))
 
@@ -334,5 +337,30 @@
   (2 (println '2))
   (1 (println 'oook)))
 
+
+(defmacro test-lambda-macro(x y)
+  `(list ,x ,y))
+(let ((c 2))
+  (println ((lambda (a) (test-lambda-macro a c)) 1)))
+
+(assert (eq 3 (eval '(+ 1 2))))
+;; test eval with dynamic scope
+
+(let ((x 10))
+  (assert (eq 30 (eval '(* 3 x) (lisp:get-current-scope)))))
+(assert (eq 3.0 (+ 1.0 2)))
+
+(assert (eq (/ 10 3.0 2.0) (/ 10.0 6.0)))
+
+(assert (not (< 1 2 1)))
+(assert (< 0 1 2 3))
+(assert (= 1 1 1 1 1 1 1 1 1 1 1 1))
+(assert (not (= 1 1 1 1 1 0 1 1)))
+(assert (not (/= 1 2 3 4 5 1 6 7)))
+(assert (/= 1 2 3 4 5 6 7 8))
+(assert (/= 1 2))
+(assert (not (/= 1 1)))
+(assert (> 3 2 1 0))
+(assert (not (> 1 2 3)))
 (println "Tests Passed")
 

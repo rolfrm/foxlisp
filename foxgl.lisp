@@ -82,6 +82,13 @@
   ;(println 'render-model)
   (foxgl:render-model2 model)
   )
+
+(defmacro foxgl:render-model(model)
+  `(let ((cscope foxgl:current-scope))
+    (set! foxgl:current-scope (lisp:get-current-scope))
+    (render-model ,model)
+    (set! foxgl:current-scope cscope)))
+
 (define get-framebuffer nil)
 (define load-framebuffer nil)
 (define foxgl:current-color '(1 1 1 1))
@@ -101,29 +108,12 @@
     (hashtable-set! foxgl:framebuffer-cache model bf)
     bf))
 
-(define value-binding (make-hashtable))
-(defmacro with-binding (sym value &rest body)
-  `(let ((old-value ,(hashtable-ref2 value-binding ',sym))
-         (,sym ,value))
-    (hashtable-set! value-binding ',sym ,sym)
-    ,@body
-
-    (if old-value
-        (hashtable-set! value-binding ',sym (cdr old-value))
-        (hashtable-remove value-binding ',sym))))
-
-(defun binding-value (sym)
-  (hashtable-ref value-binding sym))
-
-(with-binding b 1000
-  (println (binding-value 'b)))
-
+(define foxgl:current-scope nil)
 (defun unbind(p)
   (if (= (car p) 'bind)
-      (binding-value (cadr p))
+      (eval (cadr p) foxgl:current-scope)
       p))
 
-(println (binding-value 'b))
 (defun foxgl:render-model2 (model)
 
   (let ((sym (car model))
@@ -146,7 +136,6 @@
       (measure-model
        (progn
          (measure (foxgl:render-model2 (cadr model)))
-         ;(println (cadr model))
          (set! render-sub nil)
          ))
       (ref 
@@ -171,6 +160,56 @@
          (set! render-sub nil)
          (foxgl:render-sub-models model)
          (set! foxgl:current-transform prev-transform)
+         ))
+      (rotate
+       (let ((prev-tform foxgl:current-transform)
+             (new-transform (mat4-identity))
+             (rot (unbind (cadr model))))
+         (math:*! new-transform new-transform foxgl:current-transform)
+         (if (cons? rot)
+             (math:rotate!  new-transform
+                            (unbind (car rot))
+                            (or (unbind (cadr rot)) 0.0)
+                            (or (unbind (caddr rot)) 0.0))
+             (math:rotate!  new-transform
+                            0.0
+                            0.0
+                            (unbind rot))
+             )
+         (set! foxgl:current-transform new-transform)
+         (set! render-sub nil)
+         (foxgl:render-sub-models model)
+         (set! foxgl:current-transform prev-tform)
+         ))
+      (translate
+       (let ((prev-tform foxgl:current-transform)
+             (new-transform (mat4-identity))
+             (rot (unbind (cadr model))))
+         (math:*! new-transform new-transform foxgl:current-transform)
+         (math:translate!  new-transform
+                        (unbind (car rot))
+                        (or (unbind (cadr rot)) 0.0)
+                        (or (unbind (caddr rot)) 0.0))
+             
+         (set! foxgl:current-transform new-transform)
+         (set! render-sub nil)
+         (foxgl:render-sub-models model)
+         (set! foxgl:current-transform prev-tform)
+         ))
+      (scale
+       (let ((prev-tform foxgl:current-transform)
+             (new-transform (mat4-identity))
+             (rot (unbind (cadr model))))
+         (math:*! new-transform new-transform foxgl:current-transform)
+         (math:scale! new-transform
+                      (unbind (car rot))
+                      (or (unbind (cadr rot)) 0.0)
+                      (or (unbind (caddr rot)) 0.0))
+             
+         (set! foxgl:current-transform new-transform)
+         (set! render-sub nil)
+         (foxgl:render-sub-models (cdr model))
+         (set! foxgl:current-transform prev-tform)
          ))
       (transform
        (let ((prev-tform foxgl:current-transform)
@@ -200,7 +239,6 @@
          (set! render-sub nil)
          (foxgl:render-sub-models model)
          (set! foxgl:current-transform prev-tform)
-         
          ))
       (render-callback
        ((cadr model) model)
