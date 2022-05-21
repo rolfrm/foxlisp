@@ -80,19 +80,17 @@
 (defun update ()
   (belt-update 0.01)
   (foxgl:clear)
-  (let ((time (* 0.000001 (rational  (- (foxgl:timestamp) start-time ))))
+  (let ((time (* 0.000001 (- (foxgl:timestamp) start-time )))
         (offset 0.0)
         )
 
     (dotimes! i 10
-                                        
-              (let ((belt-offset (rational i)))
-                (foxgl:render-model
-                   '(color :rgb (0.0 0.4 0.0)
-                     (scale (0.1 0.1 0.1)
-                      (translate ((bind belt-offset) 0.0 0.0)
-                       (transform :translate (-0.5 -0.6 0.0) :scale (0.95 1.20) 
-                        (ref square-model)))))))
+              (foxgl:render-model
+               '(color :rgb (0.0 0.4 0.0)
+                 (scale (0.1 0.1 0.1)
+                  (translate ((bind i) 0.0 0.0)
+                   (transform :translate (-0.5 -0.6 0.0) :scale (0.95 1.20) 
+                    (ref square-model))))))
               )
                 
     (set! offset 0.0)

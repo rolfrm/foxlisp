@@ -362,5 +362,9 @@
 (assert (not (/= 1 1)))
 (assert (> 3 2 1 0))
 (assert (not (> 1 2 3)))
+
+(assert (eq 3 (min 6 9 102 9 3)))
+(assert (eq 102 (max 6 9 102 9 3)))
+
 (println "Tests Passed")
 

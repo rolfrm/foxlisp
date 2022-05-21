@@ -1285,7 +1285,6 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 lisp_value lisp_eval_value(lisp_value code, lisp_value scope){
   lisp_scope * scopeptr;
   if(scope.type != LISP_NIL){
-    println(scope);
     TYPE_ASSERT(scope, LISP_SCOPE);
     scopeptr = scope.scope;
   }else{
@@ -1623,6 +1622,32 @@ static void divi(i64 * a, i64 * b){
 lisp_value lisp_divn(lisp_value * values, int count){
   return lisp_procn(values, count, divf, divi);
 }
+
+static void minimumf(f64 * a, f64 * b){
+  *a = MIN(*b, *a);
+}
+
+static void minimumi(i64 * a, i64 * b){
+  *a = MIN(*b, *a);
+}
+
+lisp_value lisp_minimumn(lisp_value * values, int count){
+  return lisp_procn(values, count, minimumf, minimumi);
+}
+
+
+static void maximumf(f64 * a, f64 * b){
+  *a = MAX(*b, *a);
+}
+
+static void maximumi(i64 * a, i64 * b){
+  *a = MAX(*b, *a);
+}
+
+lisp_value lisp_maximumn(lisp_value * values, int count){
+  return lisp_procn(values, count, maximumf, maximumi);
+}
+
 
 static bool lessf(f64 a, f64 b){
   return a < b;
@@ -2152,10 +2177,10 @@ int main(int argc, char ** argv){
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
   lisp_register_native("lisp:trace", 1, lisp_trace);
-  lisp_register_native("+", -1, lisp_addn);
   lisp_register_native("symbol?", 1, lisp_is_symbol);
   lisp_register_native("list?", 1, lisp_is_list);
   lisp_register_native("cons?", 1, lisp_is_cons);
+  lisp_register_native("+", -1, lisp_addn);
   lisp_register_native("-", -1, lisp_subn);
   lisp_register_native("*", -1, lisp_muln);
   lisp_register_native("/",-1, lisp_divn);
@@ -2163,6 +2188,9 @@ int main(int argc, char ** argv){
   lisp_register_native(">", -1, lisp_greatern);
   lisp_register_native("<=", -1, lisp_lesseqn);
   lisp_register_native(">=", -1, lisp_greatereqn);
+  lisp_register_native("min", -1, lisp_minimumn);
+  lisp_register_native("max", -1, lisp_maximumn);
+
   lisp_register_native("print", 1, print);
   lisp_register_native("println", 1, println);
   lisp_register_native("value->string", 1, value_to_string);

@@ -55,12 +55,12 @@
     '(car
       (transform :translate (-1 0 -2)
         (wheels
-         (transform :translate (0 -0.6 0) (ref wheel-model))
-         (transform :translate (1.5 -0.6 0) (ref wheel-model))
-         (transform :translate (0 -0.6 3) (ref wheel-model))
-         (transform :translate (1.5 -0.6 3) (ref wheel-model)))
+         (translate (0 -0.6 0) (ref wheel-model))
+         (translate (1.5 -0.6 0) (ref wheel-model))
+         (translate (0 -0.6 3) (ref wheel-model))
+         (translate (1.5 -0.6 3) (ref wheel-model)))
        (color :rgb (1 0 0)
-        (transform :scale (2 1 4)
+        (scale (2 1 4)
          (ref cube-model)))
        (color :rgb (0 0 0)
         (transform :translate (0.25 1.0 0.5)
@@ -81,9 +81,8 @@
 
 (define tree-model
     '(color :rgb (0.5 0.8 0.5)
-      (transform :scale (2 1 2)
-                                        ;,square-model
-       (transform :translate (0 4 0)
+      (scale (2 1 2)
+       (translate (0 4 0)
         (polygon :2d-triangle-strip
          (0 0
           -0.5 -1
@@ -104,14 +103,13 @@
 (define ice-cube-model
     '(color :rgb (0.6 0.6 0.9)
       (ref cube-model)
-      (transform :translate (1 0 0.6)
+      (translate (1 0 0.6)
        (color :rgb (0.7 0.7 1.0)
         (ref cube-model))
        )
-      (transform :translate (0.7 1 0.3)
+      (translate (0.7 1 0.3)
        (ref cube-model)
        )
-
       ))
 
 (define rocks-model
@@ -215,7 +213,7 @@
 
 (define coin-model
     `(coin
-      (transform :rotate (0 1.0 0)
+      (rotate (0 1.0 0)
        (color :rgb (1 1 0)
         (color :rgb (0.4 0.4 0.35)
          (transform :translate (-0.95 -0.7 -0.35)
@@ -247,7 +245,7 @@
         ))))
 
 (define gascan-model
-    '(transform :translate (-0.5 0.0 -0.5) :scale (1 1 1)
+    '(translate (-0.5 0.0 -0.5)
       (color :rgb (0.8 0 0)
        (ref cube-model))
       (transform :translate (0 0.8 0.5) :scale (0.2 0.4 0.2) :rotate (0 0 0.3)
@@ -925,7 +923,7 @@ Restart by pressing [Enter]
         (drive-left (< mouse-x 0.33))
         (drive-right (> mouse-x 0.66))
         (ac-area (and mouse-0-click (> mouse-y 0.8) (< mouse-x 0.2)))
-        (radio-area (and mouse-0-click (> mouse-y 0.8) (> mouse-x 0.2) (< mouse-x 0.4)))
+        (radio-area (and mouse-0-click (> mouse-y 0.8) (> 0.4 mouse-x 0.2)))
         (road-part nil))
 
     (when ac-area
@@ -990,7 +988,7 @@ Restart by pressing [Enter]
         (incf temperature 0.1))
       (when (eq ac-state :cool)
         (incf temperature -0.1))
-      (when (not (eq ac-state :off))
+      (when (/= ac-state :off)
         (incf gas-level -0.005))
       (when (eq radio-state :on)
         (incf gas-level -0.005))
@@ -1055,8 +1053,8 @@ Restart by pressing [Enter]
                        (next (vec2-scale (list->vec2 place) 20.0))
                        (next2 (vec2-scale (list->vec2 (cddr place)) 20.0))
                        (tangent (vec2-90 (vec2-normalize (vec2- next next2))))
-                       (dir (if (eq (math:random 2) 1) -1.0 1.0))
-                       (next3 (vec2+ next (vec2-scale tangent (* dir (+ -4.0 (math:random 8.0))))))
+                       (dir (if (eq (math:random 2) 1) -1 1))
+                       (next3 (vec2+ next (vec2-scale tangent (* dir (+ -4 (math:random 8.0))))))
                        )
                   (pset! (cdr obj) :translate `(,(vec2-x next3)
                                                 0.0
@@ -1072,7 +1070,7 @@ Restart by pressing [Enter]
                     (incf money 1)
                     )
                   (when (eq (pget (cdr obj) :id) 'ice-cube)
-                    (set! temperature (- temperature 10.0))) 
+                    (set! temperature (- temperature 10))) 
                   )
                 (when gone
                   (println 'gone))
@@ -1109,7 +1107,7 @@ Restart by pressing [Enter]
           (set! car-rotation (+ car-rotation  (* (float32 0.5) ang)))
           )
         (pset! car-object :rotate `( 0.0 ,car-rotation 0.0))
-        (pset! car-object :translate `(,(rational (vec2-x cpos)) 0.0 ,(rational (vec2-y cpos))))
+        (pset! car-object :translate `(,(vec2-x cpos) 0.0 ,(vec2-y cpos)))
         (pset! world-base :translate `(,(- 0.0 (vec2-x cpos)) 0.0 ,(- 0.0 (vec2-y cpos))))
         )))
     (measure2 'update-trees

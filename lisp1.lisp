@@ -299,9 +299,6 @@
         
 (defun concat (&rest lists) (concat-1 lists) )
 
-(defun  min (a b)
-  (if (< a b) a b))
-
 (defmacro for-each (arg list &rest body)
   `(let ((lst ,list)
          (,arg nil))
