@@ -366,5 +366,12 @@
 (assert (eq 3 (min 6 9 102 9 3)))
 (assert (eq 102 (max 6 9 102 9 3)))
 
+
+(assert (or nil nil 2))
+(assert (and t t t))
+(assert-not (and t nil t))
+(assert-not (or nil nil nil))
+
+
 (println "Tests Passed")
 

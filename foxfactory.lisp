@@ -71,7 +71,6 @@
                       (set-car! (cdr x) (+ 1 (cadr x))))
                     )
                 )
-                 
                
               (vector-set! (car belts) (cadr x) state)
               ))))
@@ -86,7 +85,7 @@
 
     (dotimes! i 10
               (foxgl:render-model
-               '(color :rgb (0.0 0.4 0.0)
+               '(rgb (0.0 0.4 0.0)
                  (scale (0.1 0.1 0.1)
                   (translate ((bind i) 0.0 0.0)
                    (transform :translate (-0.5 -0.6 0.0) :scale (0.95 1.20) 
@@ -97,7 +96,7 @@
     (dotimes! i 10
               (when (vector-ref (cdr belts) i)
                 (foxgl:render-model
-                 '(color :rgb (0.4 0.4 0.0)
+                 '(rgb (0.4 0.4 0.0)
                    (scale (0.1 0.1 0.1)
                     (translate ((bind (+ i (vector-ref (car belts) i))) 0.0 0.0)
                      (transform :translate (-0.5 -0.45 0.0) :scale (0.90 0.90 0.5)

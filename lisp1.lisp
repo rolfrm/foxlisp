@@ -47,8 +47,6 @@
         (set! lst (cdr lst)))
   nil)
 
-
-
 (defun do-times(n f2)
   (let ((x 0))
     (loop (< x n)
@@ -87,12 +85,6 @@
   `(unless ,test (panic ,(or text "assertion failed"))))
 (defmacro assert-not (test text)
   `(when ,test (panic (cons ,(if text text "assertion failed") ',test)))) 
-
-(assert (or nil nil 2))
-(assert (and t t t))
-(assert-not (and t nil t))
-(assert-not (or nil nil nil))
-
 
 (defmacro while (test &rest body)
   `(loop ,test ,@body))
@@ -307,8 +299,6 @@
          (progn ,@body)
          (set! lst (cdr lst))
          )))
-
-;(println (list* '1 'b 'c '(1 2 3)))
 
 (define pi 3.141592)
 (define pi_2 (/ pi 2.0))
