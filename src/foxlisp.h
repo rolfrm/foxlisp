@@ -66,10 +66,12 @@ typedef struct{
 	 lisp_builtin builtin;
 	 void * native_pointer;
 	 lisp_vector * vector;
+    
     lisp_scope * scope;
   };
 }lisp_value;
-
+void lisp_push_scope(lisp_scope * scope);
+void lisp_pop_scope(lisp_scope * scope);
 struct __native_function{
   void * fptr;
   int nargs; // -1: infinite number of arguments.
@@ -80,15 +82,16 @@ struct _cons {
   lisp_value cdr;
 };
 
-
 struct __lisp_scope{
   lisp_scope * super;
-  hash_table * values;
+  hash_table * values_index;
+  lisp_value * values;
+  size_t values_count;
+  size_t values_capacity;
   cons * lookup;
   size_t argcnt;
   bool stack_scope;
   bool lookup_on_stack;
-  
 };
 
 typedef struct __gc_context gc_context;
@@ -99,6 +102,9 @@ typedef struct{
   size_t next_symbol;
   lisp_scope * globals;
   gc_context * gc;
+  lisp_scope ** scopes;
+  size_t scope_count;
+  size_t scope_capacity;
 }lisp_context;
 
 struct __lisp_function{

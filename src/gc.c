@@ -110,9 +110,9 @@ void visit_value(gc_context * gc, lisp_value val){
       return;
     
     if(is_heap_ptr(val.function)){
-      if(mark_vector(gc, val.function->closure)){
+      if(mark_vector(gc, val.function->closure))
         iterate_scope(gc, val.function->closure);
-      }
+      
     }else{
       iterate_scope(gc, val.function->closure);
     }
@@ -274,10 +274,14 @@ void gc_recover_unmarked(gc_context * gc){
 }
 
 void iterate_scope(gc_context * ctx, lisp_scope * scope){
-  //printf("Scope %p!\n", scope);
-  if(scope->values != NULL)
-    ht_iterate(scope->values, iterate_value, ctx);
+  if(scope->values != NULL){
+    for(int i = 0; i < scope->values_count; i++){
+      visit_value(ctx, scope->values[i]);
+    }
+  }
   var cns = scope->lookup;
+  if(!scope->lookup_on_stack && scope->lookup != NULL)
+    mark_vector(ctx, scope->lookup);
   for(size_t i = 0; i < scope->argcnt; i++){
     visit_value(ctx, cns[i].cdr);
     visit_value(ctx, cns[i].car);
@@ -310,6 +314,9 @@ void gc_collect_garbage(lisp_context * context){
   var gc_context = context->gc;
   clear_gc_marks(gc_context);
   iterate_scope(gc_context, context->globals);
+  for(size_t i = 0; i < context->scope_count; i++){
+    iterate_scope(gc_context, context->scopes[i]);
+  }
   gc_recover_unmarked(gc_context);
 }
 

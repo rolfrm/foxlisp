@@ -131,10 +131,10 @@ static int symbol_nohash(const void * key, void * userdata){
 // moving a scope off the stack.
 lisp_scope * lisp_scope_unstack(lisp_scope * scope){
 
-  if(scope->super == NULL)
-    return scope;
+  if(scope->super == NULL) 
+    return scope; // dont unstack from the super scope.
   if(scope->stack_scope == false)
-    return scope;
+    return scope; // the scope was already unstacked.
   scope->super = lisp_scope_unstack(scope->super);
   if(scope->lookup_on_stack){
     scope->lookup_on_stack = false;
@@ -147,11 +147,10 @@ lisp_scope * lisp_scope_unstack(lisp_scope * scope){
 }
 
 lisp_value lisp_scope_get_value(lisp_scope * scope, lisp_value sym){
-  if(scope == NULL) return nil;
-  lisp_value r;
-  if(scope->values != NULL && ht_get(scope->values,&sym.integer,&r))
-	 return r;
-  return lisp_scope_get_value(scope->super, sym);
+  lisp_value val;
+  if(lisp_scope_try_get_value(scope, sym, &val))
+    return val;
+  return nil;
 }
 
 bool _lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out, size_t hash){
@@ -166,8 +165,11 @@ bool _lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * 
       }
     }
   }
-  if(scope->values != NULL && ht_get_precalc(scope->values, hash, &sym.integer, out))
+  int index;
+  if(scope->values != NULL && ht_get_precalc(scope->values_index, hash, &sym.integer, &index)){
+    *out = scope->values[index];
 	 return true;
+  }
   return _lisp_scope_try_get_value(scope->super, sym, out, hash);
 }
 
@@ -187,7 +189,7 @@ bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * o
   }
   if(scope->values == NULL)
     return lisp_scope_try_get_value(scope->super, sym, out);
-  size_t hash = ht_calc_hash(scope->values, &sym.integer);
+  size_t hash = ht_calc_hash(scope->values_index, &sym.integer);
   return _lisp_scope_try_get_value(scope, sym, out, hash);
 }
 
@@ -206,14 +208,14 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
       }
     }
   }
-  if(scope->values != NULL && ht_get(scope->values,&sym.integer,NULL)){
-	 ht_set(scope->values, &sym.integer, &value);
+  int index;
+  if(scope->values != NULL && ht_get(scope->values_index, &sym.integer, &index)){
+	 scope->values[index] = value;
 	 return t;
   }
   return lisp_scope_set_value(scope->super, sym, value);
 }
 
-size_t htid = 0;
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
   if(scope->lookup != NULL){
     for(size_t i = 0; i < scope->argcnt; i++){
@@ -223,22 +225,46 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
       }
     }
   }
+  
   if(scope->values == NULL){
-	 scope->values = ht_create2(2048, sizeof(u64), sizeof(lisp_value));
-    scope->values->hash = symbol_nohash;
-    htid++;
-    
-    if(htid > 100)
-      raise(SIGINT);
-    //if(scope->super != NULL)
-    //  raise(SIGINT);
+	 scope->values_index = ht_create2(2048, sizeof(u64), sizeof(int));
+    scope->values_index->hash = symbol_nohash;
+    scope->values_capacity = 2048;
+    scope->values = malloc(scope->values_capacity * sizeof(lisp_value));
+    scope->values[0] = nil;
+    scope->values_count = 1;
   }
   
-  ht_set(scope->values,&sym.integer,&value);
+  if(scope->values_count == scope->values_capacity){
+    scope->values_capacity *= 2;
+    scope->values = realloc(scope->values, scope->values_capacity * sizeof(lisp_value)); 
+  }
+  
+  int idx = scope->values_count;
+  ht_set(scope->values_index, &sym.integer, &idx);
+  scope->values[scope->values_count] = value;
+  scope->values_count += 1;
   return nil;
 }
 
 lisp_context * current_context;
+void lisp_push_scope(lisp_scope * scope){
+  if(current_context->scope_count == current_context->scope_capacity){
+    current_context->scope_capacity = MAX(8, current_context->scope_capacity * 2);
+    current_context->scopes = realloc(current_context->scopes, sizeof(current_context->scopes[0]) * current_context->scope_capacity);
+  }
+  current_context->scopes[current_context->scope_count] = scope;
+  current_context->scope_count += 1;
+}
+
+void lisp_pop_scope(lisp_scope * scope){
+  ASSERT(current_context->scope_count > 0);
+  ASSERT(current_context->scopes[current_context->scope_count - 1] == scope);
+  current_context->scopes[current_context->scope_count - 1] = NULL;
+  current_context->scope_count -= 1; 
+}
+
+
 
 lisp_context * lisp_context_new(){
   printf("LISP NEW CONTEXT\n");
@@ -277,7 +303,6 @@ lisp_value cdr(lisp_value v){
 	 return v.cons->cdr;
   return nil;
 }
-
 
 lisp_value cddr(lisp_value v){
   return cdr(cdr(v));
@@ -646,6 +671,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   memset(args3, 0, sizeof(args3[0]) * argcnt);
   lisp_scope function_scope[1] = {0};
   lisp_scope_stack(function_scope, f->closure, args3, argcnt);
+  lisp_push_scope(function_scope);
   var args = f->args;
   var args2 = cdr(value);
   while(args.type != LISP_NIL){
@@ -658,6 +684,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		println(args);
 		println(args2);
 		raise_string("arg name must be a symbol\n");
+      lisp_pop_scope(function_scope);
 		return nil;
 	 }
 	 if(arg.symbol == rest_sym.symbol){
@@ -665,6 +692,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		arg = car(args);
 		if(arg.type != LISP_SYMBOL){
 		  raise_string("(2) arg name must be a symbol.");
+        lisp_pop_scope(function_scope);
 		  return nil;
 		}
 		lisp_scope_create_value(function_scope, arg, args2);
@@ -676,12 +704,14 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 	 args2 = cdr(args2);
 	 
   }
+  		
   var it = f->code;
   lisp_value ret = nil;
   while(it.type != LISP_NIL){
 	 ret = lisp_eval(function_scope, car(it));
 	 it = cdr(it);
   }
+  lisp_pop_scope(function_scope);
 		  
   return ret;
 }
@@ -754,14 +784,7 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
 void print_call_stack(){
 
   int id = 1;
-  printf("Stack trace:\n");
-  var scopename = "lisp:*root-scope*";
-  var top = lisp_scope_get_value(current_context->globals, get_symbol(scopename));
-  while(top.type == LISP_CONS){
-    printf(" %i - ", id++);
-    println(car(top));
-    top = cdr(top);
-  }
+  
 }
 
 /*
@@ -784,28 +807,9 @@ bool lambda_needs_scope_copy(lisp_value code, lisp_scope * scope){
 
 lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
-  static lisp_value symbol;
-  static size_t symbol_hash;
   if(lisp_is_in_error())
     return nil;
-  if(symbol.type == LISP_NIL){
-    var scopename = "lisp:*root-scope*";
-    symbol = get_symbol(scopename);
-    symbol_hash = ht_calc_hash(current_context->globals->values, &symbol.integer);
-  }
-  lisp_value chain;
-  bool found = ht_get_precalc(current_context->globals->values, symbol_hash, &symbol.integer, &chain);
-  if(!found){
-    printf(":: %i\n", symbol_hash);
-    raise_string("root scope key not found");
-    return nil;
-  }
-  //TYPE_ASSERT(chain, LISP_CONS);
-  cons c = {.car = value, .cdr = chain };
-  lisp_value chain2 = (lisp_value) (lisp_value){.cons = &c, .type = LISP_CONS};
-  ht_set_precalc(current_context->globals->values, &symbol.integer, &chain2, symbol_hash);
   var r = lisp_eval2(scope, value);
-  ht_set_precalc(current_context->globals->values, &symbol.integer, &chain, symbol_hash);
   return r;
 }
 
@@ -902,6 +906,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 			 {
 				var cond = cadr(value);
 				var _body = cddr(value);
+            
 				lisp_value result = nil;
 				while(lisp_eval2(scope, cond).type != LISP_NIL){
 				  var body = _body;;
@@ -1005,8 +1010,17 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
             while(is_nil(cases) == false){
               var c = car(cases);
               var test = car(c);
-              if(_lisp_eq(result, test))
-                return lisp_eval(scope, cadr(c));
+              if(_lisp_eq(result, test)){
+                var form = cdr(c);
+                lisp_value ret = nil;
+                while(!is_nil(form)){
+                  ret = lisp_eval(scope, car(form));
+                  if(lisp_is_in_error()) return nil;
+                
+                  form = cdr(form);
+                }
+                return ret;
+              }
               cases = cdr(cases);
             }
           }
@@ -1023,6 +1037,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
                 var form = cdr(c);
                 while(!is_nil(form)){
                   ret = lisp_eval(scope, car(form));
+                  if(lisp_is_in_error()) return nil;
                   form = cdr(form);
                 }
                 return ret;
@@ -1090,7 +1105,6 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
           }
         }
 
-          
 		  union{
           lisp_value (* nvar)(lisp_value * values, int count);
 			 lisp_value (* n0)();
@@ -1140,7 +1154,9 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 		  lisp_scope function_scope[1];
         
         lisp_scope_stack(function_scope, f->closure,  args3, argcnt);
-		  var args = f->args;
+        lisp_push_scope(function_scope);
+		  
+        var args = f->args;
 		  var args2 = things;
 
 		  while(args.type != LISP_NIL){
@@ -1171,11 +1187,11 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 
 		  var it = f->code;
 		  lisp_value ret = nil;
-		  while(it.type != LISP_NIL){
+        while(it.type != LISP_NIL){
 			 ret = lisp_eval(function_scope, car(it));
 			 it = cdr(it);
 		  }
-		  
+		  lisp_pop_scope(function_scope);
 		  return ret;
 		}else if(first_value.type == LISP_ALIEN_FUNCTION){
 		  var func = first_value.alien_func;
@@ -1311,14 +1327,15 @@ lisp_value lisp_eval_stream(io_reader * rd){
 	 while(true){
       if(lisp_is_in_error())
         return nil;
-		var next_code = lisp_macro_expand(current_context->globals, code);
+      lisp_register_value("lisp:++current-toplevel++", code);
+      var next_code = lisp_macro_expand(current_context->globals, code);
 		
 		if(lisp_value_eq(next_code, code))
 		  break;
 		code = next_code;
 	 }
 	 println(code);
-
+    lisp_register_value("lisp:++current-toplevel++", code);
 	 result = lisp_eval(current_context->globals, code);
     if(lisp_is_in_error())
       return nil;
@@ -1517,8 +1534,8 @@ static void normalize_numericals(lisp_value * values, int count){
     numeric_tower[LISP_RATIONAL] = numeric_tower[LISP_FLOAT32] + 1;
   }
   ASSERT(count > 0);
-  lisp_type type = LISP_BYTE;
-  for(int i = 0; i < count; i++){
+  lisp_type type = values[0].type;
+  for(int i = 1; i < count; i++){
     lisp_type thistype = LISP_NIL;
     if(is_integer(values[i])){
       if(values[i].integer <= 0xFF){
@@ -2282,7 +2299,7 @@ int main(int argc, char ** argv){
 #endif
 
   load_modules();
-  lisp_register_value("lisp:*root-scope*", nil);
+  //lisp_register_value("lisp:*root-scope*", nil);
 #ifndef WASM
   lisp_register_value("lisp:*test-enabled*", nil);
   for(int i = 1; i < argc; i++){

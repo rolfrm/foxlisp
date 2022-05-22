@@ -300,5 +300,5 @@
          (set! lst (cdr lst))
          )))
 
-(define pi 3.141592)
+(define pi 3.141592653589793)
 (define pi_2 (/ pi 2.0))

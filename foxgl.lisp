@@ -123,7 +123,7 @@
   (case (car model)
     (rgb
      (let ((prev-color foxgl:current-color))
-       (set! foxgl:current-color (cadr model))
+       (set! foxgl:current-color (unbind (cadr model)))
        (!render-sub (cddr model))
        (set! foxgl:current-color prev-color)
        ))
@@ -143,8 +143,9 @@
      (measure (foxgl:render-model2 (cadr model)))
      (set! model nil)
      )
-    (ref 
-     (foxgl:render-model2 (symbol-value (cadr model) t)))
+    (ref
+     
+     (foxgl:render-model2 (symbol-value  (cadr model)) t))
     (view
      (let ((prev-transform foxgl:current-transform))
        (match p (unbind (plookup (cdr model) :perspective))
@@ -319,6 +320,7 @@
              (push! foxgl:polygon-cache2 r)
                                         ;(register-finalizer r cache-delete)
              )
+           
            (foxgl:color foxgl:current-color)
            (foxgl:transform foxgl:current-transform)
            (foxgl:blit-polygon (cdr r))

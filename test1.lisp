@@ -1,3 +1,4 @@
+
 (load "lisp1.lisp" )
 (let ((x2 10))
   (println x2))
@@ -196,7 +197,6 @@
 
 (define countup nil)
 (define clear nil)
-
 (let ((counter 0) (decrement ()))
   (set! countup (lambda ()
                   (set! counter (+ counter 1))
@@ -371,7 +371,6 @@
 (assert (and t t t))
 (assert-not (and t nil t))
 (assert-not (or nil nil nil))
-
-
+(println pi)
 (println "Tests Passed")
 

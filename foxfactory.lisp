@@ -78,6 +78,7 @@
 (define start-time (foxgl:timestamp))
 (defun update ()
   (belt-update 0.01)
+  
   (foxgl:clear)
   (let ((time (* 0.000001 (- (foxgl:timestamp) start-time )))
         (offset 0.0)
@@ -108,7 +109,7 @@
   (foxgl:poll-events)
   (lisp:collect-garbage)
   )
-
+(println "starting!");
 (foxgl:make-current win)
 (loop t
       (with-exception-handler
