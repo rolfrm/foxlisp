@@ -18,7 +18,9 @@ typedef enum {
 		LISP_FLOAT32 = 15,
       LISP_HASHTABLE = 16,
       LISP_INTEGER32,
-      LISP_SCOPE
+      LISP_SCOPE,
+      LISP_GLOBAL_INDEX,
+      LISP_LOCAL_INDEX
 }lisp_type;
 
 typedef enum {
@@ -41,7 +43,7 @@ typedef enum {
               LISP_COND = 18,
               LISP_AND,
               LISP_OR,
-              LISP_GET_SCOPE
+              LISP_GET_SCOPE,
 }lisp_builtin;
 
 // structs
@@ -52,6 +54,13 @@ typedef struct __native_function native_function;
 typedef struct __alien_function alien_function;
 typedef struct __lisp_vector lisp_vector;
 typedef struct __lisp_scope lisp_scope;
+
+typedef struct __attribute__((__packed__))
+{
+  int scope_level;
+  int scope_index;
+}lisp_local_index;
+
 typedef struct{
   lisp_type type;
   union{
@@ -65,9 +74,9 @@ typedef struct{
 	 alien_function * alien_func;
 	 lisp_builtin builtin;
 	 void * native_pointer;
-	 lisp_vector * vector;
-    
+	 lisp_vector * vector;    
     lisp_scope * scope;
+    lisp_local_index local_index;
   };
 }lisp_value;
 void lisp_push_scope(lisp_scope * scope);

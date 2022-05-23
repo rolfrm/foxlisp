@@ -159,6 +159,8 @@ void visit_value(gc_context * gc, lisp_value val){
     case LISP_SYMBOL:
     case LISP_BYTE:
     case LISP_FLOAT32:
+    case LISP_GLOBAL_INDEX:
+    case LISP_LOCAL_INDEX:
       return;
     case LISP_NIL:
     case LISP_T:
@@ -197,6 +199,8 @@ void visit_value(gc_context * gc, lisp_value val){
   case LISP_SYMBOL:
   case LISP_BYTE:
   case LISP_FLOAT32:
+  case LISP_GLOBAL_INDEX:
+  case LISP_LOCAL_INDEX:
     return;
   }
 }
