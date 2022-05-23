@@ -749,6 +749,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value c);
 
 lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
   if(c.type == LISP_NIL) return nil;
+  
   var next = cdr(c);
   if(next.type != LISP_NIL){
 
@@ -1169,24 +1170,26 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         }
       }
       size_t argcnt = lisp_optimize_statement(scope, cdr(value));
-      cons args[argcnt];
-      memset(args, 0, sizeof(args[0]) * argcnt);
-      lisp_value things = lisp_sub_eval(scope, cdr(value), args);
       
       if(lisp_is_in_error())
         return nil;
       
       if(first_value.type == LISP_FUNCTION_NATIVE){
-      
         var n = first_value.nfunction;
         if(n->fptr == NULL){
           raise_string("function is null");
           return nil;
         }
+        lisp_value args[n->nargs == -1 ? argcnt : MAX(argcnt, n->nargs)];
+        lisp_value arglist = cdr(value);
+        for(size_t i = 0; i < argcnt; i++){
+          args[i] = lisp_eval2(scope, car(arglist));
+          arglist = cdr(arglist);
+        }
         
         if(n->nargs != -1){
           for(int i = argcnt; i < n->nargs; i++){
-            args[i].car = nil;
+            args[i] = nil;
           }
           if(argcnt > n->nargs){
             raise_string("Invalid number of arguments");
@@ -1210,32 +1213,35 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         
         switch(n->nargs){
         case -1:
-          {
-            lisp_value args2[argcnt];
-            for(int i = 0; i < argcnt; i++)
-              args2[i] = args[i].car;
-            return f.nvar(args2, argcnt);
-          }
+          return f.nvar(args, argcnt);
         case 0:
           return f.n0();
         case 1:
-          return f.n1(args[0].car);
+          return f.n1(args[0]);
         case 2:
-          return f.n2(args[0].car, args[1].car);
+          return f.n2(args[0], args[1]);
         case 3:
-          return f.n3(args[0].car, args[1].car, args[2].car);       
+          return f.n3(args[0], args[1], args[2]);       
         case 4:
-          return f.n4(args[0].car, args[1].car, args[2].car, args[3].car);
+          return f.n4(args[0], args[1], args[2], args[3]);
         case 5:
-          return f.n5(args[0].car, args[1].car, args[2].car, args[3].car, args[4].car);
+          return f.n5(args[0], args[1], args[2], args[3], args[4]);
           
         case 6:
-          return f.n6(args[0].car, args[1].car, args[2].car, args[3].car, args[4].car, args[5].car);
+          return f.n6(args[0], args[1], args[2], args[3], args[4], args[5]);
         default:
           raise_string("Unsupported number of args");
         }
       }else if(first_value.type == LISP_FUNCTION){
-		  
+        cons args0[argcnt];
+         
+        lisp_value things;
+        {
+          memset(args0, 0, sizeof(args0[0]) * argcnt);
+          // evaluate the arguments
+          things = lisp_sub_eval(scope, cdr(value), args0);
+        }
+        
         var f = first_value.function;
         cons args3[argcnt];
         memset(args3, 0, sizeof(args3[0]) * (argcnt));
