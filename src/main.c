@@ -29,13 +29,8 @@ lisp_value nil = {0};
 lisp_value t = {.type = LISP_T};
 lisp_value else_sym;
 #undef ASSERT
-void ht_free(hash_table *ht);
-extern void * (* ht_mem_malloc)(size_t s);
-extern void (* ht_mem_free)(void *);
-void ht_set_mem_values(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr));
-void ht_set_mem_keys(hash_table * ht, void * (* alloc)(size_t s), void (* free)(void * ptr));
-void ht_empty(hash_table *ht);
 void print_call_stack();
+#define lisp_eval2 lisp_eval
 static __thread lisp_value current_error;
 static inline bool lisp_is_in_error(){
   return !is_nil(current_error);
@@ -294,8 +289,6 @@ void lisp_pop_scope(lisp_scope * scope){
   current_context->scope_count -= 1; 
 }
 
-
-
 lisp_context * lisp_context_new(){
   printf("LISP NEW CONTEXT\n");
   lisp_context * ctx = lisp_malloc(sizeof(ctx[0]));
@@ -392,13 +385,6 @@ lisp_value lisp_length(lisp_value lst){
     lst = lst.cons->cdr;
   }
   return integer(c);
-}
-
-size_t conses_allocated = 0;
-
-
-lisp_value get_conses_allocated (){
-  return integer(conses_allocated);
 }
 
 lisp_value copy_cons(lisp_value a){
@@ -745,7 +731,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		  
   return ret;
 }
-lisp_value lisp_eval2(lisp_scope * scope, lisp_value c);
+//lisp_value lisp_eval2(lisp_scope * scope, lisp_value c);
 
 lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
   if(c.type == LISP_NIL) return nil;
@@ -818,13 +804,13 @@ void print_call_stack(){
   
 }
 
-lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
-lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+//lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
+/*lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   if(lisp_is_in_error())
     return nil;
   var r = lisp_eval2(scope, value);
   return r;
-}
+  }*/
 
 lisp_value lisp_collect_garbage(){
   gc_collect_garbage(current_context);
@@ -866,7 +852,7 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
   return c;
 }
 
-lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
+lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
  tail_call:;
   switch(value.type){
   case LISP_CONS:
@@ -1010,8 +996,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
             switch(sym.type){
             case LISP_SYMBOL:
               
-              size_t len = lisp_optimize_statement(scope, ovalue);
-              //ASSERT(len == 3);
+              lisp_optimize_statement(scope, ovalue);
               lisp_scope_set_value(scope, sym, value2);
               break;
             case LISP_LOCAL_INDEX:
@@ -1530,7 +1515,7 @@ void lisp_register_macro(const char * name, lisp_builtin builtin){
   lisp_register_value(name, v);
 }
 
-inline bool is_integer_type(lisp_type t){
+static inline bool is_integer_type(lisp_type t){
   switch(t){
   case LISP_INTEGER:
   case LISP_BYTE:
@@ -1542,7 +1527,7 @@ inline bool is_integer_type(lisp_type t){
   return false;  
 }
 
-inline bool is_float_type(lisp_type t){
+static inline bool is_float_type(lisp_type t){
   switch(t){
   case LISP_RATIONAL:
   case LISP_FLOAT32:
@@ -2299,7 +2284,6 @@ int main(int argc, char ** argv){
   lisp_register_native("cons", 2, new_cons);
   lisp_register_native("length", 1, list_length);
   lisp_register_native("lisp:collect-garbage", 0, lisp_collect_garbage);
-  lisp_register_native("lisp:get-conses-allocated", 0, get_conses_allocated);
   lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);
   lisp_register_native("lisp:trace-allocations", 1, lisp_trace_allocations);
   lisp_register_native("copy-list", 1, copy_cons);
