@@ -12,11 +12,10 @@ typedef enum {
 		LISP_FUNCTION_NATIVE = 9,
 		LISP_MACRO_BUILTIN = 10,
 		LISP_NATIVE_POINTER = 11,
-		LISP_ALIEN_FUNCTION = 12,
-		LISP_VECTOR = 13,
-		LISP_BYTE = 14,
-		LISP_FLOAT32 = 15,
-      LISP_HASHTABLE = 16,
+		LISP_VECTOR,
+		LISP_BYTE,
+		LISP_FLOAT32,
+      LISP_HASHTABLE,
       LISP_INTEGER32,
       LISP_SCOPE,
       LISP_GLOBAL_INDEX,
@@ -57,7 +56,8 @@ typedef struct __lisp_scope lisp_scope;
 
 typedef struct __attribute__((__packed__))
 {
-  int scope_level;
+  int8_t scope_type; 
+  int32_t scope_level : 24;
   int scope_index;
 }lisp_local_index;
 

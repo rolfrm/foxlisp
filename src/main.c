@@ -817,24 +817,6 @@ void print_call_stack(){
   
 }
 
-/*
-  bool lambda_needs_scope_copy(lisp_value code, lisp_scope * scope){
-  switch(code.type){
-  case LISP_SYMBOL:
-
-  //
-
-  }
-  if(code.type == LISP_SYMBOL){
-  return false;
-  }
-  while(){
-    
-    
-  }
-
-  }*/
-
 lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   if(lisp_is_in_error())
@@ -861,11 +843,19 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
           printf("Optimize!!  "); println(first);
           lisp_value new = {.type = LISP_GLOBAL_INDEX, .integer = i1};
           statement.cons->car = new;
-        }else if(s1 == scope){
+        }else{
+          int cnt = 0;
+          var scope2 = scope;
+          while(scope2 != s1){
+            cnt += 1;
+            scope2 = scope2->super;
+          }
+          
           lisp_value new = {.type = LISP_LOCAL_INDEX,
-            .local_index = {.scope_level = 0, .scope_index = i2}};
+            .local_index = {.scope_level = cnt, .scope_index = i1 == -1 ? i2 : i1,
+                              .scope_type = i2 == -1}};
           statement.cons->car = new;
-          printf("Local var! %i\n", i2);
+          printf("Local var! %i %i %i\n", i2, i1, cnt);
         }
       }
     }
@@ -1018,6 +1008,7 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
 				var value2 = lisp_eval2(scope, car(value));
             switch(sym.type){
             case LISP_SYMBOL:
+              
               size_t len = lisp_optimize_statement(scope, ovalue);
               //ASSERT(len == 3);
               lisp_scope_set_value(scope, sym, value2);
@@ -1028,8 +1019,13 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
                 ASSERT(scope != NULL);
                 sym.local_index.scope_level -= 1;
               }
-              cons * v = scope->lookup + sym.local_index.scope_index;
-              v->cdr = value2;
+              if(sym.local_index.scope_type == 0){
+                cons * v = scope->lookup + sym.local_index.scope_index;
+                v->cdr = value2;
+              }else{
+                lisp_value * v = scope->values + sym.local_index.scope_index;
+                *v = value2;
+              }
               break;
             case LISP_GLOBAL_INDEX:
               current_context->globals->values[sym.integer] = value2;
@@ -1286,85 +1282,6 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
         }
         lisp_pop_scope(function_scope);
         return ret;
-      }else if(first_value.type == LISP_ALIEN_FUNCTION){
-        var func = first_value.alien_func;
-        var arg_len = lisp_len(func->arg_example).integer;
-		  
-        union{
-          int64_t (* n0)();
-          int64_t (* n1)(int64_t);
-          int64_t (* n2)(int64_t, int64_t);
-          double (* n1d)(double);
-          double (* n2d)(double, double);
-          int64_t (* n3)(int64_t, int64_t, int64_t);
-          int64_t (* n4)(int64_t, int64_t, int64_t, int64_t);
-          int64_t (* n5)(int64_t, int64_t, int64_t, int64_t, int64_t);
-          int64_t (* n6)(int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
-          void (* nr0)();
-          void (* nr1)(int64_t);
-          void (* nr2)(int64_t, int64_t);
-          void (* nr3)(int64_t, int64_t, int64_t);
-          void (* nr4)(int64_t, int64_t, int64_t, int64_t);
-          void (* nr5)(int64_t, int64_t, int64_t, int64_t, int64_t);
-          void (* nr6)(int64_t, int64_t, int64_t, int64_t, int64_t, int64_t);
-			
-        }f;
-        f.n0 = func->func;
-		  
-        i64 r = 0;
-        if(func->return_example.type != LISP_NIL){
-          switch(arg_len){
-          case 0:
-            r = f.n0();
-            break;
-          case 1:
-            if(car(things).type == LISP_RATIONAL)
-              r = f.n1d(car(things).rational);
-            else
-              r = f.n1(car(things).integer);
-            break;
-          case 2:
-            if(car(things).type == LISP_RATIONAL)
-              r = f.n2d(car(things).rational, cadr(things).rational);
-            else
-              r = f.n2(car(things).integer, cadr(things).integer);
-            break;
-          case 3:
-            r = f.n3(car(things).integer, cadr(things).integer, caddr(things).integer);
-            break;
-          case 4:
-            r = f.n4(car(things).integer, cadr(things).integer, caddr(things).integer, cadddr(things).integer);
-            break;
-          default:
-				
-            printf("invalid argnr for "); print(value); printf("\n");
-            raise_string("");
-          }
-        }else{
-          switch(arg_len){
-          case 0:
-            f.nr0();
-            break;
-          case 1:
-            f.nr1(car(things).integer);
-            break;
-          case 2:
-            f.nr2(car(things).integer, cadr(things).integer);
-            break;
-          case 3:
-            f.nr3(car(things).integer, cadr(things).integer, caddr(things).integer);
-            break;
-          case 4:
-            f.nr4(car(things).integer, cadr(things).integer, caddr(things).integer, cadddr(things).integer);
-            break;
-          default:
-            raise_string("unsupported number of arguments\n");
-          }
-        }
-        var ret = func->return_example;
-        ret.integer = r;
-        return ret;
-		  		  
       }else{
         raise_string("not a function");
         return nil;
@@ -1376,7 +1293,6 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
       if(is_keyword(value))
         return value;
       lisp_value r;
-        
       if(lisp_scope_try_get_value(scope, value, &r))
         return r;
       else{
@@ -1393,8 +1309,12 @@ lisp_value lisp_eval2(lisp_scope * scope, lisp_value value){
       ASSERT(scope != NULL);
       value.local_index.scope_level -= 1;
     }
-    cons v = scope->lookup[value.local_index.scope_index];
-    return v.cdr;
+    if(value.local_index.scope_type == 0){
+      cons v = scope->lookup[value.local_index.scope_index];
+      return v.cdr;
+    }else{
+      return scope->values[value.local_index.scope_index];
+    }
         
   default:
     return value;
@@ -1515,8 +1435,6 @@ int print2(char * buffer, int l2, lisp_value v){
       return snprintf(buffer, LEN1, "NULL");
     else
       return snprintf(buffer, LEN1, "%p", v.integer);
-  case LISP_ALIEN_FUNCTION:
-    return snprintf(buffer, LEN1, "ALIENF %p", v.alien_func->func);
   case LISP_FLOAT32:
   case LISP_RATIONAL:
     return snprintf(buffer, LEN1, "%f", v.rational);
@@ -1539,7 +1457,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_GLOBAL_INDEX:
     return snprintf(buffer, LEN1, "GLOBAL Index (%i)", v.integer);
   case LISP_LOCAL_INDEX:
-    return snprintf(buffer, LEN1, "Local Index %i.%i",v.local_index.scope_level, v.local_index.scope_index);
+    return snprintf(buffer, LEN1, "Local Index %i,%i",v.local_index.scope_level, v.local_index.scope_index);
 case LISP_CONS:
     {
       int l = 0;
@@ -1994,7 +1912,6 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_FUNCTION_NATIVE: return "NATIVE_FUNCTION";
   case LISP_MACRO_BUILTIN: return "MACRO_BUILTIN";
   case LISP_NATIVE_POINTER: return "NATIVE_POINTER";
-  case LISP_ALIEN_FUNCTION: return "ALIEN_FUNCTION";
   case LISP_VECTOR: return "VECTOR";
   case LISP_BYTE: return "BYTE";
   case LISP_FLOAT32: return "FLOAT32";

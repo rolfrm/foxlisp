@@ -119,12 +119,6 @@ void visit_value(gc_context * gc, lisp_value val){
     visit_value(gc, val.function->code);
     visit_value(gc, val.function->args);
     return;
-  case LISP_ALIEN_FUNCTION:
-    if(is_heap_ptr(val.alien_func) && !mark_vector(gc, val.alien_func))
-      return;
-    visit_value(gc, val.alien_func->return_example);
-    visit_value(gc, val.alien_func->arg_example);
-    return;    
   case LISP_FUNCTION_NATIVE:
     if(is_heap_ptr(val.nfunction) && !mark_vector(gc, val.nfunction))
       return;
@@ -172,7 +166,6 @@ void visit_value(gc_context * gc, lisp_value val){
     case LISP_MACRO_BUILTIN:
     case LISP_VECTOR:
     case LISP_NATIVE_POINTER:
-    case LISP_ALIEN_FUNCTION:
     case LISP_SCOPE:
     case LISP_HASHTABLE:
       // elem type is lisp_value
