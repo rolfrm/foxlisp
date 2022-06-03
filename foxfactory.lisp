@@ -77,6 +77,7 @@
         goods))
 (define start-time (foxgl:timestamp))
 (defun update ()
+  
   (belt-update 0.01)
   
   (foxgl:clear)

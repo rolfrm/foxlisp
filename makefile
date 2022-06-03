@@ -1,5 +1,5 @@
 OPT = -O3 -g0
-LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c
+LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c process.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
 TARGET = run

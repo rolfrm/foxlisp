@@ -28,6 +28,7 @@ lisp_value unquote_splice_sym = {.type = LISP_SYMBOL};
 lisp_value nil = {0};
 lisp_value t = {.type = LISP_T};
 lisp_value else_sym;
+lisp_value otherwise_sym;
 #undef ASSERT
 void print_call_stack();
 #define lisp_eval2 lisp_eval
@@ -35,6 +36,15 @@ static __thread lisp_value current_error;
 static inline bool lisp_is_in_error(){
   return !is_nil(current_error);
 }
+
+void * lisp_value_pointer(lisp_value val){
+  return val.pointer;
+}
+
+lisp_vector * lisp_value_vector(lisp_value val){
+  return lisp_value_pointer(val);
+}
+
 
 void raise_string(const char * str){
   current_error = (lisp_value){.string = (char *)str, .type = LISP_STRING};
@@ -62,7 +72,7 @@ bool type_assert(lisp_value val, lisp_type type){
 }
 
 bool elem_type_assert(lisp_value vector, lisp_type type){
-  return type_assert(vector.vector->default_value, type);
+  return type_assert(lisp_value_vector(vector)->default_value, type);
 }
 
 
@@ -307,6 +317,7 @@ lisp_context * lisp_context_new(){
   quasiquote_sym = get_symbol("quasiquote");
   unquote_sym = get_symbol("unquote");
   else_sym = get_symbol("else");
+  otherwise_sym = get_symbol("otherwise");
   unquote_splice_sym = get_symbol("unquote-splicing");
   lisp_scope_create_value(current_context->globals, get_symbol("nil"), nil);
   lisp_scope_create_value(current_context->globals, get_symbol("t"), t);
@@ -827,7 +838,7 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
       if(lisp_scope_try_get_value2(scope, first.integer, &s1, &i1, &i2)){
         
         if(s1 == current_context->globals){
-          printf("Optimize!!  "); println(first);
+          //printf("Optimize!!  "); println(first);
           lisp_value new = {.type = LISP_GLOBAL_INDEX, .integer = i1};
           statement.cons->car = new;
         }else{
@@ -842,7 +853,7 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
             .local_index = {.scope_level = cnt, .scope_index = i1 == -1 ? i2 : i1,
                               .scope_type = i2 == -1}};
           statement.cons->car = new;
-          printf("Local var! %i %i %i\n", i2, i1, cnt);
+          //printf("Local var! %i %i %i\n", i2, i1, cnt);
         }
       }
     }
@@ -852,6 +863,14 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
   return c;
 }
 
+void lisp_eval3(lisp_thread * t){
+
+  while(t->call_stack_count > 0){
+    lisp_value code = t->code[t->call_stack_count - 1];
+    
+  }
+}
+
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
  tail_call:;
   switch(value.type){
@@ -859,13 +878,6 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 	 {
       
       var first = car(value);
-      //if(tracing){
-      //  println(first);
-      //}
-      //if(first.type == LISP_NIL){
-      //  raise_string("called with nil");
-      //  return nil;
-      //}
       lisp_value first_value;
 
       lisp_scope * s1;
@@ -878,7 +890,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             first_value = s1->lookup[i2].cdr;
           }
           if(s1 == current_context->globals){
-            printf("Optimize!!  "); println(first);
+            //printf("Optimize!!  "); println(first);
             lisp_value new = {.type = LISP_GLOBAL_INDEX, .integer = i1};
             value.cons->car = new;
             
@@ -1086,7 +1098,22 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             while(is_nil(cases) == false){
               var c = car(cases);
               var test = car(c);
-              if(_lisp_eq(result, test)){
+              bool passed = false;
+              if(test.type == LISP_CONS){
+                while(test.type == LISP_CONS){
+                  if(_lisp_eq(result, car(test))){
+                    passed = true;
+                    break;
+                  }
+                  test = cdr(test);
+                }
+              }else if (_lisp_eq(result, test)){
+                passed = true;
+              }else if(test.integer == otherwise_sym.integer && test.type == LISP_SYMBOL){
+                passed = true;
+              }
+              
+              if(passed){
                 var form = cdr(c);
                 lisp_value ret = nil;
                 while(!is_nil(form)){
@@ -1412,7 +1439,7 @@ int print2(char * buffer, int l2, lisp_value v){
       int l = 0;
       l = snprintf(buffer, LEN1, "#(");
       
-      var vector = v.vector;
+      var vector = lisp_value_vector(v);
       for(size_t i = 0; i < vector->count; i++){
         var elem = vector_ref(v, integer(i));
         if(i != 0) l += snprintf(OBUF, LEN1, " ");
@@ -1448,7 +1475,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_GLOBAL_INDEX:
     return snprintf(buffer, LEN1, "GLOBAL Index (%i)", v.integer);
   case LISP_LOCAL_INDEX:
-    return snprintf(buffer, LEN1, "Local Index %i,%i",v.local_index.scope_level, v.local_index.scope_index);
+    return snprintf(buffer, LEN1, "Local Index (%i,%i)",v.local_index.scope_level, v.local_index.scope_index);
 case LISP_CONS:
     {
       int l = 0;
@@ -1955,13 +1982,13 @@ lisp_value make_vector(lisp_value len, lisp_value _default){
 
 lisp_value vector_length(lisp_value v){
   TYPE_ASSERT(v, LISP_VECTOR);
-  return integer(v.vector->count);
+  return integer(lisp_value_vector(v)->count);
 }
 
 lisp_value vector_ref(lisp_value _vector, lisp_value k){
   TYPE_ASSERT(_vector, LISP_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
-  var vector = _vector.vector;
+  var vector = lisp_value_vector(_vector);
   var v = vector->default_value;
   void * src = vector->data + k.integer * vector->elem_size;
   void * dst;
@@ -1976,6 +2003,7 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
   
   return v;
 }
+
 lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
   TYPE_ASSERT(_vector, LISP_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
@@ -2230,9 +2258,10 @@ lisp_value lisp_trace(lisp_value v){
 }
 
 void foxgl_register();
-
+void lisp_process_module_init();
 void load_modules(){
   foxgl_register();
+  lisp_process_module_init();
 }
 
 void web_update(){
@@ -2245,13 +2274,62 @@ void web_update(){
   //printf("Web update\n");
 }
 
+lisp_value2 lisp_value2_integer(int64_t integer){
+  return (lisp_value2){.tag = LISP_INTEGER2, .tagged_pointer = integer};
+}
+void print_int64_hex(int64_t x){
+  u8 * b= (u8 *) &x;
+  for(int i = 0; i < 8; i++)
+    printf("%x", b[i]);
+  printf("\n");
+}
+lisp_value2 rational_lisp_value2(double r){
+  int64_t v = *((int64_t *)(void *)&r) >> 2;
+  print_int64_hex(v);
+  return (lisp_value2){.tag = LISP_RATIONAL2, .tagged_pointer = v };
+}
+
+double lisp_value2_rational(lisp_value2 v){
+  int64_t val = 0 + v.tagged_pointer;
+  val = val << 2;
+  return ((double *) &val)[0];
+}
+
+void * lisp_value2_pointer(lisp_value2 v){
+  return (void *) v.tagged_pointer;
+}
+
+lisp_value2 pointer_lisp_value2(void * v){
+  int64_t val = (int64_t) v;
+  return (lisp_value2){.tag = LISP_POINTER, .tagged_pointer = val};
+}
+
+lisp_value2 lisp_value2_vector(size_t size){
+  lisp_vector2 * v = lisp_malloc(sizeof(*v));
+  return pointer_lisp_value2(v);
+}
+
+lisp_value2 symbol_lisp_value2(size_t symbol){
+  lisp_value3 v3 = {
+    .tag2 = LISP_SYMBOL2,
+    .value2 = symbol
+  };
+  lisp_value2 v2 = {.tag = LISP_SPECIAL, .tagged_pointer = v3.value};
+  return v2;
+}
+
+size_t lisp_value2_symbol(lisp_value2 v2){
+  lisp_value3 v3 = {
+    .value = v2.tagged_pointer
+  };
+  
+  return v3.value2;
+}
+
 //void setup_signal_handler();
 int main(int argc, char ** argv){
   
   printf("starting..\n");
-  //setup_signal_handler();
-  //ht_mem_malloc = lisp_malloc;
-  //ht_mem_free = lisp_free;
   current_context = lisp_context_new();
   
   lisp_register_native("gc-heap", 0, gc_heap);
@@ -2378,6 +2456,37 @@ int main(int argc, char ** argv){
 #ifdef WASM
   emscripten_set_main_loop(web_update, 0, 1);
 #endif
+  printf("%i %i %i\n", sizeof(lisp_value2), sizeof(lisp_value), sizeof(lisp_value3));
+
+  double test_values[] = {1.0, -1.0, 0.0, 1000000.0, 1.000001};
+  for(size_t i = 0; i < array_count(test_values); i++){
+    var v = rational_lisp_value2(test_values[i]);
+    var r = lisp_value2_rational(v);
+    printf("%f %f\n", test_values[i], r);
+  }
+  for(size_t i = 0; i < 100; i++){
+    var sp = symbol_lisp_value2(i);
+    var i2 = lisp_value2_symbol(sp);
+    ASSERT(i2 == i);
+  }
+  {
+    for(int i = 0; i < 100; i++){
+      var pt1 = lisp_malloc(8 + i) + 1;
+      var pt2 = lisp_malloc(8 + i);
+      
+      var p1 = pointer_lisp_value2(pt1);
+      var p2 = pointer_lisp_value2(pt2);
+      printf("%p\n", pt1);
+      var pt1_2 = lisp_value2_pointer(p1);
+      var pt2_2 = lisp_value2_pointer(p2);
+      ASSERT(pt1_2 == pt1);
+      ASSERT(pt2_2 == pt2);
+      printf("%p\n", pt1_2);
+      printf("%p\n", ((size_t) -1));
+      printf("%p\n", &i);
+    }
+  }
+  
   return 0;
 }
 

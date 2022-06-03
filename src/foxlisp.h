@@ -22,6 +22,13 @@ typedef enum {
       LISP_LOCAL_INDEX
 }lisp_type;
 
+// assuming 5 tags:
+// 00: extended / special NIL/ T/ global index / local index
+// 00 continued: byte, float32, integer32, macro builtin CONS
+// 00   
+// 01: fixnum
+// 10: float
+// 11: pointer
 typedef enum {
 				  LISP_IF = 1,
 				  LISP_QUOTE = 2,
@@ -57,9 +64,44 @@ typedef struct __lisp_scope lisp_scope;
 typedef struct __attribute__((__packed__))
 {
   int8_t scope_type; 
-  int32_t scope_level : 24;
-  int scope_index;
+  int16_t scope_level;
+  int scope_index : 24;
 }lisp_local_index;
+typedef enum{
+  LISP_SPECIAL = 0,
+  LISP_RATIONAL2 = 1,
+  LISP_INTEGER2 = 2,
+  LISP_POINTER = 3
+}lisp_value_tag1;
+
+typedef enum{
+  LISP_NIL2 = 0,
+  LISP_T2 = 1,
+  LISP_SYMBOL2 = 2,
+  LISP_BUILTIN2 = 3,
+  LISP_BYTE_2 = 4,
+  LISP_FLOAT32_2 = 5,
+  LISP_INTEGER32_2=6,
+  LISP_GLOBAL_INDEX2 = 7,
+  LISP_LOCAL_INDEX2 = 8
+}lisp_value_tag2;
+
+typedef struct __attribute__((__packed__)){
+  lisp_value_tag1 tag: 2;
+  int64_t tagged_pointer : 62;
+}lisp_value2;
+
+
+typedef struct __attribute__((__packed__)) {
+  union{
+    int64_t value;
+    struct {
+      lisp_value_tag2 tag2 : 4;
+      int64_t value2 : 58;
+    };
+  };
+}lisp_value3;
+
 
 typedef struct{
   lisp_type type;
@@ -77,6 +119,7 @@ typedef struct{
 	 lisp_vector * vector;    
     lisp_scope * scope;
     lisp_local_index local_index;
+    void * pointer;
   };
 }lisp_value;
 void lisp_push_scope(lisp_scope * scope);
@@ -104,6 +147,18 @@ struct __lisp_scope{
 };
 
 typedef struct __gc_context gc_context;
+typedef struct{
+  lisp_scope ** scopes;
+  size_t scope_count;
+  size_t scope_capacity;
+  lisp_value * code;
+  size_t call_stack_capacity;
+  size_t call_stack_count;
+  lisp_value * stack;
+  size_t stack_capacity;
+  size_t stack_count;
+
+}lisp_thread;
 
 typedef struct{
   hash_table * symbols;
@@ -136,6 +191,14 @@ struct __lisp_vector{
   lisp_value default_value;
 };
 
+typedef struct{
+  lisp_type type;
+  void * data;
+  size_t count;
+  size_t elem_size;
+  lisp_value2 default_value;
+}lisp_vector2;
+
 // globals
 extern lisp_value nil;
 extern lisp_value t;
@@ -166,7 +229,6 @@ const char * lisp_type_to_string(lisp_type t);
 
 lisp_value new_cons(lisp_value a, lisp_value b);
 lisp_value copy_cons(lisp_value a);
-lisp_value lisp_length(lisp_value lst);
 
 lisp_value car(lisp_value v);
 lisp_value cdr(lisp_value v);

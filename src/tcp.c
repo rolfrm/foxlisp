@@ -15,7 +15,7 @@
 #include <poll.h>
 extern lisp_context * current_context;
    
-lisp_value tcp_listen(lisp_value _port)
+static lisp_value tcp_listen(lisp_value _port)
 {
     int port = _port.integer;
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -38,7 +38,7 @@ lisp_value tcp_listen(lisp_value _port)
   	 return new_cons(get_symbol("tcp-listener"), integer(sockfd));
 }
 
-lisp_value tcp_connect(lisp_value _addr, lisp_value _port){
+static lisp_value tcp_connect(lisp_value _addr, lisp_value _port){
   type_assert(_addr, LISP_STRING);
   type_assert(_port, LISP_INTEGER);
   int port = _port.integer;
@@ -67,7 +67,7 @@ static int get_fd(lisp_value value){
   return -1;
 }
 
-lisp_value tcp_set_nonblock(lisp_value l, lisp_value blocking){
+static lisp_value tcp_set_nonblock(lisp_value l, lisp_value blocking){
   int sockfd = get_fd(l);
   bool blk = is_nil(blocking) == false;
   int status;

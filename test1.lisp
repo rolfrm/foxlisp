@@ -372,5 +372,31 @@
 (assert-not (and t nil t))
 (assert-not (or nil nil nil))
 (println pi)
+
+(assert (eq 4 (case :b
+                (:a 2)
+                (:c 3)
+                (otherwise 4)
+                (:d 5)
+                (otherwise 6))))
+
+(assert (eq 5 (println (case :d
+                (:a 2)
+                (:c 3)
+                (:d 5)
+                (otherwise 6)))))
+(assert (eq 2 (case :d
+                ((:a :b) 1)
+                ((:c :d) 2)
+                ((:e :f :g) 3)
+                (otherwise 4))))
+
+(assert (eq 2 (case 'otherwise
+                (:a 1)
+                ((otherwise) 2)
+                (otherwise 3))))
+
+                
+
 (println "Tests Passed")
 
