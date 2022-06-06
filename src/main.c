@@ -12,13 +12,11 @@
 #endif
 
 #include "foxlisp.h"
-
+#include "lisp_value2.c"
 extern bool debug_set;
 bool tracing = false;
 
-inline bool is_float(lisp_value a){
-  return a.type == LISP_RATIONAL || a.type == LISP_FLOAT32;
-}
+
 lisp_value rest_sym = {.type = LISP_SYMBOL};
 lisp_value if_sym = {.type = LISP_SYMBOL};
 lisp_value quote_sym = {.type = LISP_SYMBOL};
@@ -37,17 +35,8 @@ static inline bool lisp_is_in_error(){
   return !is_nil(current_error);
 }
 
-void * lisp_value_pointer(lisp_value val){
-  return val.pointer;
-}
-
-lisp_vector * lisp_value_vector(lisp_value val){
-  return lisp_value_pointer(val);
-}
-
-
 void raise_string(const char * str){
-  current_error = (lisp_value){.string = (char *)str, .type = LISP_STRING};
+  current_error = string_lisp_value(str);
   printf("%s\n", str);
   print_call_stack();
 }
@@ -60,7 +49,7 @@ lisp_value lisp_error(lisp_value value){
 }
 
 bool type_assert(lisp_value val, lisp_type type){
-  if(val.type != type){
+  if(lisp_value_type(val) != type){
     char buffer[1000];
 	 sprintf(buffer, "Invalid type, expected %s, but got %s\n",
             lisp_type_to_string(type),
@@ -75,36 +64,28 @@ bool elem_type_assert(lisp_value vector, lisp_type type){
   return type_assert(lisp_value_vector(vector)->default_value, type);
 }
 
-
 #define ASSERT(x) if(!(x)){raise_string("!!! " #x "\n"); }
 
-inline bool is_nil(lisp_value v){
-  return v.type == LISP_NIL;
-}
-
-inline bool is_integer(lisp_value v){
-  return v.type == LISP_INTEGER;
-}
-
 bool  _lisp_eq(lisp_value a, lisp_value b){
-  if(a.type != b.type) return false;
+  if(lisp_value_type(a) != lisp_value_type(b)) return false;
   if(is_float(a)) return a.rational == b.rational;
   return a.integer == b.integer;
 }
 
 bool  string_eq(lisp_value a, lisp_value b){
-  if(a.type != b.type) return false;
-  if(a.type != LISP_STRING) return false;
-  return strcmp(a.string, b.string) == 0;
+  var a_type = lisp_value_type(a);
+  if(a_type != lisp_value_type(b)) return false;
+  if(a_type != LISP_STRING) return false;
+  return strcmp(lisp_value_string(a), lisp_value_string(b)) == 0;
 }
 
 lisp_value  lisp_is_list(lisp_value a){
-  if(a.type == LISP_NIL || a.type == LISP_CONS)
+  if(is_nil(a) || is_cons(a))
     return t;
   return nil;
 }
 lisp_value lisp_is_cons(lisp_value a){
-  if(a.type == LISP_CONS)
+  if(is_cons(a))
     return t;
   return nil;
 }
@@ -162,9 +143,9 @@ bool _lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * 
   if(scope == NULL) return false;
   if(scope->lookup != NULL){
     for(size_t i = 0; i < scope->argcnt; i++){
-      if(scope->lookup[i].car.type == LISP_NIL)
+      if(is_nil(scope->lookup[i].car))
         break;
-      if(scope->lookup[i].car.integer == sym.integer){
+      if(_lisp_eq(scope->lookup[i].car, sym)){
         *out = scope->lookup[i].cdr;
         return true;
       }
@@ -184,9 +165,9 @@ bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * o
   if(scope->lookup != NULL){
     var argcnt = scope->argcnt;
     for(size_t i = 0; i < argcnt; i++){
-      var v = scope->lookup[i].car.integer;
+      var v = lisp_value_symbol(scope->lookup[i].car);
       if(v == 0) break;
-      if(v == sym.integer){
+      if(v == lisp_value_symbol(sym)){
         
         *out = scope->lookup[i].cdr;
         return true;
@@ -195,7 +176,8 @@ bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * o
   }
   if(scope->values == NULL)
     return lisp_scope_try_get_value(scope->super, sym, out);
-  size_t hash = ht_calc_hash(scope->values_index, &sym.integer);
+  lisp_symbol i = lisp_value_symbol(sym);
+  size_t hash = ht_calc_hash(scope->values_index, &i);
   return _lisp_scope_try_get_value(scope, sym, out, hash);
 }
 
@@ -208,7 +190,7 @@ bool lisp_scope_try_get_value2(lisp_scope * scope, i64 sym, lisp_scope ** out, i
   if(scope->lookup != NULL){
     var argcnt = scope->argcnt;
     for(size_t i = 0; i < argcnt; i++){
-      var v = scope->lookup[i].car.integer;
+      var v = lisp_value_symbol(scope->lookup[i].car);
       if(v == 0) break;
       if(v == sym){
         *scope_index = i;
@@ -235,16 +217,17 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
   }
   if(scope->lookup != NULL){
     for(size_t i = 0; i < scope->argcnt; i++){
-      if(scope->lookup[i].car.type == LISP_NIL)
+      if(is_nil(scope->lookup[i].car))
         break;
-      if(scope->lookup[i].car.integer == sym.integer){
+      if(_lisp_eq(scope->lookup[i].car, sym)){
         scope->lookup[i].cdr = value;
         return t;
       }
     }
   }
   int index;
-  if(scope->values != NULL && ht_get(scope->values_index, &sym.integer, &index)){
+  lisp_symbol i = lisp_value_symbol(sym);
+  if(scope->values != NULL && ht_get(scope->values_index, &i, &index)){
 	 scope->values[index] = value;
 	 return t;
   }
@@ -254,7 +237,7 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
   if(scope->lookup != NULL){
     for(size_t i = 0; i < scope->argcnt; i++){
-      if(scope->lookup[i].car.type == LISP_NIL){
+      if(is_nil(scope->lookup[i].car)){
         scope->lookup[i] = (cons){.car = sym, .cdr = value};
         return nil;
       }
@@ -276,7 +259,8 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   }
   
   int idx = scope->values_count;
-  ht_set(scope->values_index, &sym.integer, &idx);
+  lisp_symbol i = lisp_value_symbol(sym);
+  ht_set(scope->values_index, &i, &idx);
   scope->values[scope->values_count] = value;
   scope->values_count += 1;
   return nil;
@@ -327,14 +311,14 @@ lisp_context * lisp_context_new(){
 }
 
 inline lisp_value car(lisp_value v){
-  if(v.type == LISP_CONS)
-	 return v.cons->car;
+  if(is_cons(v))
+	 return lisp_value_cons(v)->car;
   return nil;
 }
 
 inline lisp_value cdr(lisp_value v){
-  if(v.type == LISP_CONS)
-	 return v.cons->cdr;
+  if(is_cons(v))
+	 return lisp_value_cons(v)->cdr;
   return nil;
 }
 
@@ -348,32 +332,34 @@ lisp_value cadr(lisp_value v){
 
 lisp_value set_cdr(lisp_value cons, lisp_value value){
   TYPE_ASSERT(cons, LISP_CONS);
-  var old = cons.cons->cdr;
-  cons.cons->cdr = value;
+  var c = lisp_value_cons(cons);
+  var old = c->cdr;
+  c->cdr = value;
   return old;
 }
 
 lisp_value set_car(lisp_value cons, lisp_value value){
   TYPE_ASSERT(cons, LISP_CONS);
-  var old = cons.cons->car;
-  cons.cons->car = value;
+  var c = lisp_value_cons(cons);
+  var old = c->car;
+  c->car = value;
   return old;
 }
 
 lisp_value list_length(lisp_value lst){
   size_t l = 0;
-  while(lst.type == LISP_CONS){
+  while(is_cons(lst)){
 	 l += 1;
 	 lst = cdr(lst);
   }
-  return integer(l);
+  return integer_lisp_value(l);
 }
 
 lisp_value pop(lisp_value * v){
-  if(v->type != LISP_CONS)
+  if(!is_cons(*v))
 	 return nil;
   lisp_value val = car(*v);
-  *v= cdr(*v);
+  *v = cdr(*v);
   return val;
 }
 
@@ -391,21 +377,21 @@ lisp_value lisp_append(lisp_value v1, lisp_value v2){
 
 lisp_value lisp_length(lisp_value lst){
   size_t c = 0;
-  while(lst.type == LISP_CONS){
+  while(is_cons(lst)){
     c += 1;
-    lst = lst.cons->cdr;
+    lst = cdr(lst);
   }
-  return integer(c);
+  return integer_lisp_value(c);
 }
 
 lisp_value copy_cons(lisp_value a){
-  if(a.type == LISP_CONS)
+  if(is_cons(a))
     return new_cons(car(a), copy_cons(cdr(a)));
   return a;
 }
 
 lisp_value copy_cons_deep(lisp_value a){
-  if(a.type == LISP_CONS)
+  if(is_cons(a))
     return new_cons(copy_cons(car(a)), copy_cons(cdr(a)));
   return a;
 }
@@ -459,16 +445,13 @@ lisp_value read_token_string(io_reader * rd){
 	 io_write_u8(&wd, c);
   }
   io_write_u8(&wd, 0);
-  lisp_value v = {
-    .type = LISP_STRING,
-    .string = gc_clone(wd.data, strlen(wd.data) + 1)
-  };
+  lisp_value v = string_lisp_value(gc_clone(wd.data, strlen(wd.data) + 1));
   io_writer_clear(&wd);
   return v;
 }
 
 bool is_keyword(lisp_value sym){
-  return sym.type == LISP_SYMBOL && sym.integer >= 0x100000;
+  return is_symbol(sym) && lisp_value_symbol(sym) >= 0x100000;
 }
 
 int64_t get_symbol_id(const char * s){
@@ -494,7 +477,7 @@ lisp_value get_symbol(const char * s){
   if(s == NULL || strlen(s) == 0){
     raise_string("Symbol empty\n");
   }
-  return (lisp_value){.type = LISP_SYMBOL, .integer = get_symbol_id(s)};
+  return symbol_lisp_value(get_symbol_id(s));
 }
 
 const char * symbol_name(int64_t id){
@@ -506,19 +489,19 @@ const char * symbol_name(int64_t id){
 
 lisp_value string_to_symbol(lisp_value string){
   TYPE_ASSERT(string, LISP_STRING);
-  return get_symbol(string.string);
+  return get_symbol(lisp_value_string(string));
 }
 
 lisp_value symbol_to_string(lisp_value sym){
   TYPE_ASSERT(sym, LISP_SYMBOL);
-  char * sym_string = (char *) symbol_name(sym.integer);
-  return (lisp_value) {.type = LISP_STRING, .string = sym_string};
+  char * sym_string = (char *) symbol_name(lisp_value_symbol(sym));
+  return string_lisp_value(sym_string);
 }
 
 lisp_value string_starts_with(lisp_value str, lisp_value str2){
   TYPE_ASSERT(str, LISP_STRING);
   TYPE_ASSERT(str2, LISP_STRING);
-  if(strncmp(str.string, str2.string, strlen(str2.string)) == 0)
+  if(strcmp(lisp_value_string(str), lisp_value_string(str2)) == 0)
     return t;
   return nil;
 }
@@ -530,22 +513,18 @@ lisp_value parse_token(const char * x, int count){
 
   {
 	 int64_t o = strtoll(x, &tp, 10);
-	 if(tp == x + count){
-		return (lisp_value) {.type = LISP_INTEGER, .integer = o }; 
-	 }
+	 if(tp == x + count)
+		return integer_lisp_value(o);
   }
-
+  
   {
 	 double o = strtold(x, &tp);
-	 if(tp == x + count){
-		return (lisp_value) {.type = LISP_RATIONAL, .rational = o }; 
-	 }
+	 if(tp == x + count)
+		return rational_lisp_value(o);
   }
   
   // otherwise it is a symbol
-  lisp_value r = {.type = LISP_SYMBOL, .integer = get_symbol_id(x)};
-
-  return r;
+  return symbol_lisp_value(get_symbol_id(x));
 }
 
 lisp_value read_token_data(io_reader * rd){
@@ -606,10 +585,10 @@ lisp_value tokenize_stream(io_reader * rd){
 	 while(true){
 		var v = tokenize_stream(rd);
 		var new = new_cons(v, nil);
-		if(head.type == LISP_NIL){
+		if(is_nil(head)){
 		  head = new;
 		}else{
-		  next.cons->cdr = new;
+		  set_cdr(next, new);
 		}
 		next = new;
 		skip_comment_and_whitespace(rd);
@@ -628,7 +607,7 @@ lisp_value tokenize_stream(io_reader * rd){
 			 *rd = save;
 		  }else{
 			 var v = tokenize_stream(rd);
-			 next.cons->cdr = v;
+			 set_cdr(next, v);
 			 skip_comment_and_whitespace(rd);
 			 if(io_read_u8(rd) != ')'){
 				raise_string("Unexpected token");
@@ -861,14 +840,6 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
     c += 1;
   }
   return c;
-}
-
-void lisp_eval3(lisp_thread * t){
-
-  while(t->call_stack_count > 0){
-    lisp_value code = t->code[t->call_stack_count - 1];
-    
-  }
 }
 
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
@@ -1516,7 +1487,7 @@ lisp_value value_to_string(lisp_value v){
   int l = print2(NULL,0,  v);
   char * str = lisp_malloc(l+ 1);
   print2(str, l + 1, v);
-  return (lisp_value){.type = LISP_STRING, .string = str};
+  return string_lisp_value(str);
 }
 
 void lisp_register_value(const char * name, lisp_value value){
@@ -1540,29 +1511,6 @@ void lisp_register_macro(const char * name, lisp_builtin builtin){
   };
   
   lisp_register_value(name, v);
-}
-
-static inline bool is_integer_type(lisp_type t){
-  switch(t){
-  case LISP_INTEGER:
-  case LISP_BYTE:
-  case LISP_INTEGER32:
-    return true;
-  default:
-    break;
-  }
-  return false;  
-}
-
-static inline bool is_float_type(lisp_type t){
-  switch(t){
-  case LISP_RATIONAL:
-  case LISP_FLOAT32:
-    return true;
-  default:
-    break;
-  }
-  return false;  
 }
 
 static void normalize_numericals(lisp_value * values, int count){
@@ -1827,7 +1775,7 @@ lisp_value lisp_len(lisp_value a){
     i += 1;
     a = a.cons->cdr;
   }
-  return (lisp_value){.type = LISP_INTEGER, .integer = i};
+  return integer_lisp_value(i);
 }
 
 lisp_value println(lisp_value v){
@@ -1837,10 +1785,7 @@ lisp_value println(lisp_value v){
 }
 
 lisp_value lisp_integer(lisp_value v){
-  if(v.type == LISP_RATIONAL)
-    v.integer = (int64_t) v.rational;
-  v.type = LISP_INTEGER;
-  return v;
+  return integer_lisp_value(lisp_value_as_integer(v));
 }
 
 lisp_value lisp_byte(lisp_value v){
@@ -1885,7 +1830,7 @@ lisp_value lisp_panic(lisp_value v){
 }
 
 lisp_value integer(int64_t v){
-  return (lisp_value){.type = LISP_INTEGER, .integer = v};
+  return integer_lisp_value(v);
 }
 
 lisp_value byte(unsigned char v){
@@ -1992,9 +1937,9 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
   var v = vector->default_value;
   void * src = vector->data + k.integer * vector->elem_size;
   void * dst;
-  if(v.type == LISP_NIL){
+  if(is_nil(v)){
     return ((lisp_value *) vector->data)[k.integer];
-  }else if(v.type == LISP_FLOAT32){
+  }else if(is_float32(v)){
     v.rational = ((float *) vector->data)[k.integer];
     return v;
   }else
@@ -2075,8 +2020,7 @@ lisp_value vector_to_string(lisp_value vector){
     i = i + 1;
   vector = vector_resize(vector, integer(i));
 
-  lisp_value str = {.type = LISP_STRING, .string = vector.vector->data};
-  return str;
+  return string_lisp_value(vector.vector->data);
 }
 
 lisp_value string_to_vector(lisp_value str){
@@ -2109,7 +2053,7 @@ lisp_value parse_hex(lisp_value str){
   char * tp = NULL;
   int64_t o = strtoll(str.string, &tp, 16);
   if(tp != str.string )
-    return (lisp_value) {.type = LISP_INTEGER, .integer = o }; 
+    return integer_lisp_value(o); 
   return nil;
 }
 
@@ -2124,7 +2068,7 @@ lisp_value hex_string(lisp_value i, lisp_value dec){
   buf[l] = 0;
   for(int i = 0; i < MAX(0, l - cnt); i++)
     buf[i] = '0';
-  return (lisp_value){.type = LISP_STRING, .string = buf};
+  return string_lisp_value(buf);
 }
 
 lisp_value lisp_signature(lisp_value func){
@@ -2456,13 +2400,11 @@ int main(int argc, char ** argv){
 #ifdef WASM
   emscripten_set_main_loop(web_update, 0, 1);
 #endif
-  printf("%i %i %i\n", sizeof(lisp_value2), sizeof(lisp_value), sizeof(lisp_value3));
-
+ 
   double test_values[] = {1.0, -1.0, 0.0, 1000000.0, 1.000001};
   for(size_t i = 0; i < array_count(test_values); i++){
     var v = rational_lisp_value2(test_values[i]);
     var r = lisp_value2_rational(v);
-    printf("%f %f\n", test_values[i], r);
   }
   for(size_t i = 0; i < 100; i++){
     var sp = symbol_lisp_value2(i);
@@ -2476,14 +2418,10 @@ int main(int argc, char ** argv){
       
       var p1 = pointer_lisp_value2(pt1);
       var p2 = pointer_lisp_value2(pt2);
-      printf("%p\n", pt1);
       var pt1_2 = lisp_value2_pointer(p1);
       var pt2_2 = lisp_value2_pointer(p2);
       ASSERT(pt1_2 == pt1);
       ASSERT(pt2_2 == pt2);
-      printf("%p\n", pt1_2);
-      printf("%p\n", ((size_t) -1));
-      printf("%p\n", &i);
     }
   }
   
