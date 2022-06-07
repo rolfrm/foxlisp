@@ -46,6 +46,10 @@ inline bool is_float32(lisp_value a){
   return a.type == LISP_FLOAT32;
 }
 
+inline bool is_string(lisp_value a){
+  return a.type == LISP_STRING;
+}
+
 inline bool is_symbol(lisp_value a){
   return a.type == LISP_SYMBOL;
 }
@@ -61,7 +65,6 @@ inline bool is_function_macro(lisp_value a){
 inline bool is_function_native(lisp_value a){
   return a.type == LISP_FUNCTION_NATIVE;
 }
-
 
 inline bool is_macro_builtin(lisp_value a){
   return a.type == LISP_MACRO_BUILTIN;
@@ -141,4 +144,8 @@ inline lisp_value function_lisp_value(lisp_function * f){
 
 inline lisp_function * lisp_value_function(lisp_value val){
   return val.function;
+}
+
+inline lisp_value float32_lisp_value(f32 v){
+  return (lisp_value){.type = LISP_FLOAT32, .rational = v };
 }
