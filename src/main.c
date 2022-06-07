@@ -72,11 +72,20 @@ bool  _lisp_eq(lisp_value a, lisp_value b){
   return a.integer == b.integer;
 }
 
-bool  string_eq(lisp_value a, lisp_value b){
+bool _string_eq(lisp_value a, lisp_value b){
   var a_type = lisp_value_type(a);
   if(a_type != lisp_value_type(b)) return false;
   if(a_type != LISP_STRING) return false;
-  return strcmp(lisp_value_string(a), lisp_value_string(b)) == 0;
+  var as = lisp_value_string(a);
+  var bs = lisp_value_string(b);
+  if(strlen(as) != strlen(bs)) return false;
+  return strncmp(as, bs, strlen(as)) == 0;
+}
+
+lisp_value string_eq(lisp_value a, lisp_value b){
+  if(_string_eq(a, b))
+    return t;
+  return nil;
 }
 
 lisp_value  lisp_is_list(lisp_value a){
@@ -501,15 +510,16 @@ lisp_value symbol_to_string(lisp_value sym){
 lisp_value string_starts_with(lisp_value str, lisp_value str2){
   TYPE_ASSERT(str, LISP_STRING);
   TYPE_ASSERT(str2, LISP_STRING);
-  if(strcmp(lisp_value_string(str), lisp_value_string(str2)) == 0)
+  var astr = lisp_value_string(str);
+  var bstr = lisp_value_string(str2);
+  if(strncmp(astr, bstr, strlen(bstr)) == 0)
     return t;
   return nil;
 }
 
-
 lisp_value parse_token(const char * x, int count){
 
-  char * tp= NULL;
+  char * tp = NULL;
 
   {
 	 int64_t o = strtoll(x, &tp, 10);
