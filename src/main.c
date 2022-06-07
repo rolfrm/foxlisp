@@ -653,11 +653,11 @@ bool lisp_value_eq(lisp_value a, lisp_value b){
   return a.integer == b.integer;
 }
 lisp_value lisp_sub_macro_expand(lisp_scope * scope, lisp_value c){
-  if(c.type == LISP_NIL) return nil;
+  if(is_nil(c)) return nil;
   var current = car(c);
   var next = cdr(c);
   var value = lisp_macro_expand(scope, current);
-  if(next.type != LISP_NIL){
+  if(!is_nil(next)){
 	 var nextr = lisp_sub_macro_expand(scope, next);
 	 if(lisp_value_eq(current, value) && lisp_value_eq(next, nextr))
 		return c;
@@ -670,17 +670,17 @@ lisp_value lisp_sub_macro_expand(lisp_scope * scope, lisp_value c){
 }
 
 lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
-  if(value.type != LISP_CONS)
+  if(!is_cons(value))
 	 return value;
   if(lisp_value_eq(car(value), quote_sym)) return value;
   var value_new = lisp_sub_macro_expand(scope, value);
   if(!lisp_value_eq(value_new, value))
 	 return value_new;
   lisp_value head = car(value);
-  if(head.type != LISP_SYMBOL) return value;
-  if(head.symbol == quote_sym.symbol) return value;
+  if(!is_symbol(head)) return value;
+  if(_lisp_eq(head, quote_sym)) return value;
   lisp_value head_value = lisp_scope_get_value(scope, head);
-  if(head_value.type != LISP_FUNCTION_MACRO) return value;
+  if(!is_function_macro(head_value)) return value;
   lisp_function * f = head_value.function;
   let argcnt = lisp_length(f->args).integer;
   cons args3[argcnt];
@@ -690,11 +690,11 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   lisp_push_scope(function_scope);
   var args = f->args;
   var args2 = cdr(value);
-  while(args.type != LISP_NIL){
+  while(!is_nil(args)){
 	 var arg = car(args);
 	 var argv = car(args2);
 	 
-	 if(arg.type != LISP_SYMBOL){
+	 if(!is_symbol(arg)){
 		println(arg);
 		println(value);
 		println(args);
@@ -703,10 +703,10 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
       lisp_pop_scope(function_scope);
 		return nil;
 	 }
-	 if(arg.symbol == rest_sym.symbol){
+	 if(_lisp_eq(arg, rest_sym)){
 		args = cdr(args);
 		arg = car(args);
-		if(arg.type != LISP_SYMBOL){
+		if(!is_symbol(arg)){
 		  raise_string("(2) arg name must be a symbol.");
         lisp_pop_scope(function_scope);
 		  return nil;
@@ -723,7 +723,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   		
   var it = f->code;
   lisp_value ret = nil;
-  while(it.type != LISP_NIL){
+  while(!is_nil(it)){
 	 ret = lisp_eval(function_scope, car(it));
 	 it = cdr(it);
   }
@@ -734,21 +734,21 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 //lisp_value lisp_eval2(lisp_scope * scope, lisp_value c);
 
 lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
-  if(c.type == LISP_NIL) return nil;
+  if(is_nil(c)) return nil;
   
   var next = cdr(c);
-  if(next.type != LISP_NIL){
+  if(!is_nil(next)){
 
 	 var value = lisp_eval2(scope, car(c));
 	 var nextr = lisp_sub_eval(scope, next, cons_buf + 1);
     lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
-	 cns.cons->car =value;
-    cns.cons->cdr = nextr;
+	 set_car(cns, value);
+    set_cdr(cns, nextr);
     return cns;
   }else{
     lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
-    cns.cons->car = lisp_eval2(scope, car(c));
-    cns.cons->cdr = nil;
+    set_car(cns, lisp_eval2(scope, car(c)));
+    set_cdr(cns, nil);
     return cns;
   }
 }
@@ -760,7 +760,7 @@ lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
   var next = cdr(value);
   bool unsplice = _lisp_eq(car(current), unquote_splice_sym);
   var value2 = lisp_eval_quasiquoted(scope, current);
-  if(next.type != LISP_NIL){
+  if(!is_nil(next)){
 	 var nextr = lisp_eval_quasiquoted_sub(scope, next);
 	 if(lisp_value_eq(current, value2) && lisp_value_eq(next, nextr))
 		return value;
@@ -778,7 +778,7 @@ lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
 }
 
 lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
-  switch(value.type){
+  switch(lisp_value_type(value)){
   case LISP_CONS:
 	 {
 		var fst = car(value);
@@ -797,20 +797,11 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
   }
 }
 
-//static __thread lisp_value call_chain = {0};
 void print_call_stack(){
 
   int id = 1;
   
 }
-
-//lisp_value lisp_eval2(lisp_scope * scope, lisp_value value);
-/*lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
-  if(lisp_is_in_error())
-    return nil;
-  var r = lisp_eval2(scope, value);
-  return r;
-  }*/
 
 lisp_value lisp_collect_garbage(){
   gc_collect_garbage(current_context);
@@ -819,9 +810,9 @@ lisp_value lisp_collect_garbage(){
 
 static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value statement){
   size_t c = 0;
-  while(statement.type == LISP_CONS){
-    var first = statement.cons->car;
-    if(first.type == LISP_SYMBOL){
+  while(is_cons(statement)){
+    var first = car(statement);
+    if(is_symbol(first)){
       lisp_scope * s1;
       int i1, i2;
       if(lisp_scope_try_get_value2(scope, first.integer, &s1, &i1, &i2)){
@@ -829,7 +820,7 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
         if(s1 == current_context->globals){
           //printf("Optimize!!  "); println(first);
           lisp_value new = {.type = LISP_GLOBAL_INDEX, .integer = i1};
-          statement.cons->car = new;
+          set_car(statement, new);
         }else{
           int cnt = 0;
           var scope2 = scope;
@@ -841,12 +832,12 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
           lisp_value new = {.type = LISP_LOCAL_INDEX,
             .local_index = {.scope_level = cnt, .scope_index = i1 == -1 ? i2 : i1,
                               .scope_type = i2 == -1}};
-          statement.cons->car = new;
+          set_car(statement, new);
           //printf("Local var! %i %i %i\n", i2, i1, cnt);
         }
       }
     }
-    statement = statement.cons->cdr;
+    statement = cdr(statement);
     c += 1;
   }
   return c;
@@ -854,7 +845,7 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
 
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
  tail_call:;
-  switch(value.type){
+  switch(lisp_value_type(value)){
   case LISP_CONS:
 	 {
       
@@ -863,7 +854,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 
       lisp_scope * s1;
       int i1, i2;
-      if(first.type == LISP_SYMBOL && lisp_scope_try_get_value2(scope, first.integer, &s1, &i1, &i2))
+      if(is_symbol(first) && lisp_scope_try_get_value2(scope, first.integer, &s1, &i1, &i2))
         {
           if(i2 == -1){
             first_value = s1->values[i1];
@@ -873,7 +864,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           if(s1 == current_context->globals){
             //printf("Optimize!!  "); println(first);
             lisp_value new = {.type = LISP_GLOBAL_INDEX, .integer = i1};
-            value.cons->car = new;
+            set_car(value, new);
             
             var first_value2 = lisp_eval2(scope, new);
             ASSERT(_lisp_eq(first_value, first_value2));
@@ -884,7 +875,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
         first_value = lisp_eval2(scope, first);
       }
 
-		if(first_value.type == LISP_MACRO_BUILTIN){
+		if(is_macro_builtin(first_value)){
 		  switch(first_value.builtin){
 		  case LISP_IF:
 			 {
@@ -916,7 +907,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             lisp_scope_stack(scope1, scope, argsbuf, argcnt);
           
             scope = scope1;
-            while(argform.type != LISP_NIL){
+            while(!is_nil(argform)){
 
               var arg = car(argform);
 				  var sym = car(arg);
@@ -928,7 +919,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				value = cdr(value);
             var body = cdr(value);
 				lisp_value result = nil;
-            while(body.type != LISP_NIL){
+            while(!is_nil(body)){
 				  result = lisp_eval(scope, car(body));
 				  if(lisp_is_in_error()) break;
 				  body = cdr(body);
@@ -939,7 +930,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 {
 				var body = cdr(value);
 				lisp_value result = nil;
-				while(body.type != LISP_NIL){
+				while(!is_nil(body)){
 				  result = lisp_eval2(scope, car(body));
               if(lisp_is_in_error()) break;
 				  body = cdr(body);
@@ -952,9 +943,9 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				var _body = cddr(value);
             
 				lisp_value result = nil;
-				while(lisp_eval2(scope, cond).type != LISP_NIL){
+				while(!is_nil(lisp_eval2(scope, cond))){
 				  var body = _body;;
-				  while(body.type != LISP_NIL){
+				  while(!is_nil(body)){
 					 result = lisp_eval2(scope, car(body));
                 if(lisp_is_in_error()) return result;
                 body = cdr(body);
@@ -986,7 +977,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             //printf("SET %s %i\n", symbol_name(sym.integer), lisp_is_in_error());
             value = cdr(value);
 				var value2 = lisp_eval2(scope, car(value));
-            switch(sym.type){
+            switch(lisp_value_type(sym)){
             case LISP_SYMBOL:
               
               lisp_optimize_statement(scope, ovalue);
@@ -1019,7 +1010,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  case LISP_DEFINE:
 			 {
 				var sym = cadr(value);
-				if(sym.type != LISP_SYMBOL)
+				if(!is_symbol(sym))
 				  return nil; // error
 				
 				var value2 = lisp_eval(scope, caddr(value));
@@ -1031,12 +1022,12 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           {
             var sym = lisp_eval2(scope, cadr(value));
             
-            if(sym.type != LISP_SYMBOL){
+            if(!is_symbol(sym)){
               println(sym);
               printf("Not a symbol\n");
               return nil;
             }
-            if(caddr(value).type != LISP_NIL)
+            if(!is_nil(caddr(value)))
               while(scope->super != NULL)
                 scope = scope->super;
             if(lisp_scope_try_get_value(scope, sym, &value))
@@ -1051,7 +1042,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             }
               
             var sym = lisp_eval(scope, cadr(value));
-            if(sym.type != LISP_SYMBOL)
+            if(!is_symbol(sym))
               return nil;
             
             if(lisp_scope_try_get_value(the_scope, sym, &value))
@@ -1080,8 +1071,8 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
               var c = car(cases);
               var test = car(c);
               bool passed = false;
-              if(test.type == LISP_CONS){
-                while(test.type == LISP_CONS){
+              if(is_cons(test)){
+                while(is_cons(test)){
                   if(_lisp_eq(result, car(test))){
                     passed = true;
                     break;
@@ -1090,7 +1081,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
                 }
               }else if (_lisp_eq(result, test)){
                 passed = true;
-              }else if(test.integer == otherwise_sym.integer && test.type == LISP_SYMBOL){
+              }else if(_lisp_eq(test, otherwise_sym) && is_symbol(test)){
                 passed = true;
               }
               
@@ -1167,7 +1158,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
       if(lisp_is_in_error())
         return nil;
       
-      if(first_value.type == LISP_FUNCTION_NATIVE){
+      if(is_function_native(first_value)){
         var n = first_value.nfunction;
         if(n->fptr == NULL){
           raise_string("function is null");

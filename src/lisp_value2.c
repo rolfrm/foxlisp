@@ -54,6 +54,19 @@ inline bool is_function(lisp_value a){
   return a.type == LISP_FUNCTION;
 }
 
+inline bool is_function_macro(lisp_value a){
+  return a.type == LISP_FUNCTION_MACRO;
+}
+
+inline bool is_function_native(lisp_value a){
+  return a.type == LISP_FUNCTION_NATIVE;
+}
+
+
+inline bool is_macro_builtin(lisp_value a){
+  return a.type == LISP_MACRO_BUILTIN;
+}
+
 inline f64 lisp_value_rational(lisp_value v){
   return v.rational;
 }

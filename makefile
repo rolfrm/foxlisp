@@ -1,11 +1,11 @@
-OPT = -O3 -g0
+OPT = -Og -g0
 LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c process.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 BCOBJECTS =$(LIB_SOURCES:.c=.bc)
-LDFLAGS= -L. $(OPT)  -flto
+LDFLAGS= -L. $(OPT)#  -flto
 LIBS= libmicroio.a -lm -lGL -lglfw3 -lX11 -lopenal
 BCLIBS = -s USE_GLFW=3 -s WASM=1 -s USE_WEBGL2=1 -lm -lglfw3 -lGL -lopenal
 BCFLAGS = -DWASM  
