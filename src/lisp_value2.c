@@ -184,3 +184,14 @@ inline bool is_keyword(lisp_value sym){
   return is_symbol(sym) && lisp_value_symbol(sym) >= 0x100000;
 }
 
+inline lisp_value global_index_lisp_value(size_t i){
+  return (lisp_value){.type = LISP_GLOBAL_INDEX, .integer = i};
+}
+
+inline lisp_value local_index_lisp_value(size_t scope_level, size_t scope_index, bool scope_type){
+  lisp_value new = {.type = LISP_LOCAL_INDEX,
+    .local_index = {.scope_level = scope_level,
+                      .scope_index = scope_index,
+                      .scope_type = scope_type }};
+  return new; 
+}

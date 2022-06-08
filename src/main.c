@@ -485,9 +485,7 @@ lisp_value string_starts_with(lisp_value str, lisp_value str2){
   TYPE_ASSERT(str2, LISP_STRING);
   var astr = lisp_value_string(str);
   var bstr = lisp_value_string(str2);
-  if(strncmp(astr, bstr, strlen(bstr)) == 0)
-    return t;
-  return nil;
+  return bool_lisp_value(strncmp(astr, bstr, strlen(bstr)) == 0);
 }
 
 lisp_value parse_token(const char * x, int count){
@@ -651,8 +649,8 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   if(lisp_value_eq(head, quote_sym)) return value;
   lisp_value head_value = lisp_scope_get_value(scope, head);
   if(!is_function_macro(head_value)) return value;
-  lisp_function * f = head_value.function;
-  let argcnt = lisp_length(f->args).integer;
+  lisp_function * f = lisp_value_function(head_value);
+  let argcnt = list_length(f->args);
   cons args3[argcnt];
   memset(args3, 0, sizeof(args3[0]) * argcnt);
   lisp_scope function_scope[1] = {0};
@@ -701,27 +699,26 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		  
   return ret;
 }
-//lisp_value lisp_eval2(lisp_scope * scope, lisp_value c);
 
 lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
   if(is_nil(c)) return nil;
-  
+
   var next = cdr(c);
+  lisp_value cns = cons_lisp_value(cons_buf);
+	 
   if(!is_nil(next)){
 
 	 var value = lisp_eval2(scope, car(c));
 	 var nextr = lisp_sub_eval(scope, next, cons_buf + 1);
-    lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
-	 set_car(cns, value);
+    set_car(cns, value);
     set_cdr(cns, nextr);
-    return cns;
   }else{
-    lisp_value cns = (lisp_value){.cons = cons_buf, .type = LISP_CONS};
     set_car(cns, lisp_eval2(scope, car(c)));
     set_cdr(cns, nil);
-    return cns;
   }
+  return cns;
 }
+
 lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value);
 
 lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
@@ -734,9 +731,9 @@ lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
 	 var nextr = lisp_eval_quasiquoted_sub(scope, next);
 	 if(lisp_value_eq(current, value2) && lisp_value_eq(next, nextr))
 		return value;
-	 if(unsplice){
+	 if(unsplice)
 		return lisp_append(value2, nextr);
-	 }
+	 
 	 return new_cons(value2, nextr);
   }else{
 	 if(lisp_value_eq(current, value2))
@@ -755,10 +752,8 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
       
 		if(lisp_value_eq(fst, unquote_sym))
 		  return lisp_eval(scope, cadr(value));
-		if(lisp_value_eq(fst, unquote_splice_sym)){
-		  var to_splice = lisp_eval(scope, cadr(value));
-		  return to_splice;
-		}
+		if(lisp_value_eq(fst, unquote_splice_sym))
+		  return lisp_eval(scope, cadr(value));
 		  
 		return lisp_eval_quasiquoted_sub(scope, value);
 	 }
@@ -768,9 +763,6 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
 }
 
 void print_call_stack(){
-
-  int id = 1;
-  
 }
 
 lisp_value lisp_collect_garbage(){
@@ -785,11 +777,10 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
     if(is_symbol(first)){
       lisp_scope * s1;
       int i1, i2;
-      if(lisp_scope_try_get_value2(scope, first.integer, &s1, &i1, &i2)){
+      if(lisp_scope_try_get_value2(scope, lisp_value_symbol(first), &s1, &i1, &i2)){
         
         if(s1 == current_context->globals){
-          //printf("Optimize!!  "); println(first);
-          lisp_value new = {.type = LISP_GLOBAL_INDEX, .integer = i1};
+          lisp_value new = global_index_lisp_value(i1);
           set_car(statement, new);
         }else{
           int cnt = 0;
@@ -799,11 +790,8 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
             scope2 = scope2->super;
           }
           
-          lisp_value new = {.type = LISP_LOCAL_INDEX,
-            .local_index = {.scope_level = cnt, .scope_index = i1 == -1 ? i2 : i1,
-                              .scope_type = i2 == -1}};
+          lisp_value new = local_index_lisp_value(cnt,i1 == -1 ? i2 : i1, i2 == -1);
           set_car(statement, new);
-          //printf("Local var! %i %i %i\n", i2, i1, cnt);
         }
       }
     }
@@ -832,8 +820,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             first_value = s1->lookup[i2].cdr;
           }
           if(s1 == current_context->globals){
-            //printf("Optimize!!  "); println(first);
-            lisp_value new = {.type = LISP_GLOBAL_INDEX, .integer = i1};
+            lisp_value new = global_index_lisp_value(i1);
             set_car(value, new);
             
             var first_value2 = lisp_eval2(scope, new);
@@ -870,7 +857,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 			 {
 
 				var argform = cadr(value);
-            var argcnt = lisp_length(argform).integer;
+            var argcnt = list_length(argform);
             cons argsbuf[argcnt];
             memset(argsbuf, 0, sizeof(argsbuf[0]) * argcnt);
             lisp_scope scope1[1] = {0};
