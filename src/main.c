@@ -53,7 +53,7 @@ bool type_assert(lisp_value val, lisp_type type){
     char buffer[1000];
 	 sprintf(buffer, "Invalid type, expected %s, but got %s\n",
             lisp_type_to_string(type),
-            lisp_type_to_string(val.type));
+            lisp_type_to_string(lisp_value_type(val)));
 	 raise_string(nogc_clone(buffer, strlen(buffer) + 1));
     return false;
   }
@@ -443,7 +443,7 @@ lisp_value read_token_string(io_reader * rd){
 		c = io_peek_u8(rd);
 		if(c == '"'){
         io_read_u8(rd);
-        //printf("double quote!\n");
+        // double quote
 		  io_write_u8(&wd, c);
 		}else{
 		  break;
@@ -1826,28 +1826,19 @@ lisp_value byte(unsigned char v){
   return byte_lisp_value(v);
 }
 
-
 lisp_value native_pointer(void * ptr){
-  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
-  
-}
-
-lisp_value gc_heap(){
-  return integer(0);
+  return native_pointer_lisp_value(ptr);
 }
 
 lisp_value lisp_sin(lisp_value v){
-  var p = lisp_rational(v);
-  p.rational = sin(p.rational);
-  return p;
+  return rational_lisp_value(sin(lisp_value_as_rational(v)));
 }
 
 lisp_value lisp_read(lisp_value v){
   if(!is_string(v))
     return v;
-  return lisp_read_string(v.string);
+  return lisp_read_string(lisp_value_string(v));
 }
-
 
 const char * lisp_type_to_string(lisp_type t){
   switch(t){
@@ -1883,7 +1874,7 @@ lisp_value lisp_type_of(lisp_value v){
 
 lisp_value lisp_load(lisp_value v){
   TYPE_ASSERT(v, LISP_STRING);
-  return lisp_eval_file(v.string);
+  return lisp_eval_file(lisp_value_string(v));
 }
 
 size_t lisp_type_size(lisp_type type){
@@ -1898,7 +1889,7 @@ size_t lisp_type_size(lisp_type type){
 
 lisp_value make_vector(lisp_value len, lisp_value _default){
   TYPE_ASSERT(len, LISP_INTEGER);
-  size_t l = (size_t)len.integer;
+  size_t l = lisp_value_integer(len);
   size_t elem_size = lisp_type_size(_default.type);
   void * data = lisp_malloc(l * elem_size);
 
@@ -1907,9 +1898,9 @@ lisp_value make_vector(lisp_value len, lisp_value _default){
   vector->count = l;
   vector->elem_size = elem_size;
   vector->default_value = _default;
-  lisp_value v = {.type = LISP_VECTOR, .vector = vector};
+  lisp_value v = vector_lisp_value(vector);
   for(size_t i = 0; i < l; i++)
-    vector_set(v, integer(i),_default);
+    vector_set(v, integer_lisp_value(i),_default);
     
   return v;
 }
@@ -1923,13 +1914,14 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
   TYPE_ASSERT(_vector, LISP_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
   var vector = lisp_value_vector(_vector);
+  var i = lisp_value_integer(k);
   var v = vector->default_value;
-  void * src = vector->data + k.integer * vector->elem_size;
+  void * src = vector->data + i * vector->elem_size;
   void * dst;
   if(is_nil(v)){
-    return ((lisp_value *) vector->data)[k.integer];
+    return ((lisp_value *) vector->data)[i];
   }else if(is_float32(v)){
-    v.rational = ((float *) vector->data)[k.integer];
+    v.rational = ((float *) vector->data)[i];
     return v;
   }else
     dst = &v.integer;
@@ -1941,17 +1933,17 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
 lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
   TYPE_ASSERT(_vector, LISP_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
-  
-  var vector = _vector.vector;
+  var i = lisp_value_integer(k);
+  var vector = lisp_value_vector(_vector);
   var v = value;
-  void * dst = vector->data + k.integer * vector->elem_size;
-  if(k.integer >= vector->count){
+  void * dst = vector->data + i * vector->elem_size;
+  if(i >= vector->count){
     raise_string("index outside of the bounds of the vector\n");
     return nil;
   }
   void * src;
-  if(vector->default_value.type == LISP_NIL)
-    ((lisp_value *) vector->data)[k.integer] = value;
+  if(is_nil(vector->default_value))
+    ((lisp_value *) vector->data)[i] = value;
   else{
     TYPE_ASSERT(value, vector->default_value.type);
     src = &v.integer;
@@ -1968,16 +1960,17 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
   TYPE_ASSERT(vector, LISP_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
 
-  size_t l = (size_t)k.integer;
-  size_t elem_size = lisp_type_size(vector.vector->default_value.type);
+  size_t l = (size_t)lisp_value_integer(k);
+  var vec = lisp_value_vector(vector);
+  size_t elem_size = lisp_type_size(lisp_value_type(vec->default_value));
   
   void * new_data = lisp_malloc(l * elem_size);
-  size_t prevCount = MIN(l, vector.vector->count);   
-  memcpy(new_data, vector.vector->data, prevCount * elem_size);
-  vector.vector->data = new_data;
-  vector.vector->count = l;
+  size_t prevCount = MIN(l, vec->count);   
+  memcpy(new_data, vec->data, prevCount * elem_size);
+  vec->data = new_data;
+  vec->count = l;
   for(size_t i = prevCount; i < l; i++){
-    vector_set(vector, integer(i), vector.vector->default_value);
+    vector_set(vector, integer_lisp_value(i), vec->default_value);
   }
 
   return vector;
@@ -1985,36 +1978,39 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
 
 lisp_value vector_elem_type(lisp_value vector){
   TYPE_ASSERT(vector, LISP_VECTOR);
-  return lisp_type_of(vector.vector->default_value);
+  return lisp_type_of(lisp_value_vector(vector)->default_value);
 }
 
 lisp_value vector_copy(lisp_value vector){
   TYPE_ASSERT(vector, LISP_VECTOR);
-  let vector2 = make_vector(integer(vector.vector->count), vector.vector->default_value);
-  memcpy(vector2.vector->data, vector.vector->data, vector2.vector->count * vector2.vector->elem_size);
+  var vec = lisp_value_vector(vector);
+  let vector2 = make_vector(integer_lisp_value(vec->count), vec->default_value);
+  var vec2 = lisp_value_vector(vector2);
+  memcpy(vec2->data, vec->data, vec2->count * vec2->elem_size);
   return vector2;
 }
 
 lisp_value vector_to_string(lisp_value vector){
   vector = vector_copy(vector);
-  vector.vector->count = vector.vector->count * vector.vector->elem_size;
-  vector.vector->default_value = byte(0);
-  var cnt = vector.vector->count;
-  u8 * ptr = vector.vector->data;
+  var dst = lisp_value_vector(vector);
+  dst->count = dst->count * dst->elem_size;
+  dst->default_value = byte(0);
+  var cnt = dst->count;
+  u8 * ptr = dst->data;
   size_t i;
   for(i = 0; i < cnt; i++){
     if(ptr[i] == 0) break;
   }
   if(i == cnt)
     i = i + 1;
-  vector = vector_resize(vector, integer(i));
+  vector = vector_resize(vector, integer_lisp_value(i));
 
-  return string_lisp_value(vector.vector->data);
+  return string_lisp_value(dst->data);
 }
 
 lisp_value string_to_vector(lisp_value str){
   TYPE_ASSERT(str, LISP_STRING);
-  char * strbuf = str.string;
+  char * strbuf = lisp_value_string(str);
   size_t l = strlen(strbuf) + 1;
   size_t elem_size = 1;
 
@@ -2023,32 +2019,29 @@ lisp_value string_to_vector(lisp_value str){
   vector->count = l - 1;
   vector->elem_size = elem_size;
   vector->default_value = byte(0);
-  lisp_value v = {.type = LISP_VECTOR, .vector = vector};
-  return v;
+  return vector_lisp_value(vector);
 }
 
 lisp_value vector_native_element_pointer(lisp_value vector, lisp_value k){
   TYPE_ASSERT(vector, LISP_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
-  
-  void * ptr = vector.vector->data + k.integer * vector.vector->elem_size;
-  
-  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = ptr};
+  var vec = lisp_value_vector(vector);
+  void * ptr = vec->data + lisp_value_integer(k) * vec->elem_size;
+  return native_pointer_lisp_value(ptr);
 }
-
 
 lisp_value parse_hex(lisp_value str){
   TYPE_ASSERT(str, LISP_STRING);
   char * tp = NULL;
   int64_t o = strtoll(str.string, &tp, 16);
-  if(tp != str.string )
+  if(tp != lisp_value_string(str) )
     return integer_lisp_value(o); 
   return nil;
 }
 
 lisp_value hex_string(lisp_value i, lisp_value dec){
-  int v = i.integer;
-  int l = dec.integer;
+  var v = lisp_value_integer(i);
+  var l = lisp_value_integer(dec);
   int cnt = snprintf(NULL, 0, "%x", v);
   if(is_nil(dec))
     l = cnt;
@@ -2061,13 +2054,9 @@ lisp_value hex_string(lisp_value i, lisp_value dec){
 }
 
 lisp_value lisp_signature(lisp_value func){
-  if(func.type == LISP_FUNCTION)
+  if(is_function(func))
     return new_cons(get_symbol("func"), func.function->args);
   return nil;
-}
-
-lisp_value lisp_hash_table(hash_table * table){
-  return (lisp_value){.native_pointer = table, .type = LISP_HASHTABLE};
 }
 
 
@@ -2075,19 +2064,19 @@ lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
   bool weak_keys = !is_nil(weak_key);
   bool weak_values = !is_nil(weak_value);
   hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
-  return lisp_hash_table(ht);
+  return hashtable_lisp_value(ht);
 }
 
 lisp_value lisp_hashtable_set(lisp_value _ht, lisp_value key, lisp_value value){
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
-  hash_table * ht = _ht.native_pointer;
+  hash_table * ht = lisp_value_hashtable(_ht);
   ht_set(ht, &key, &value);
   return nil;
 }
 
 lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
-  hash_table * ht = _ht.native_pointer;
+  hash_table * ht = lisp_value_hashtable(_ht);
   lisp_value value;
   if(ht_get(ht, &key, &value))
     return value;
@@ -2110,7 +2099,7 @@ lisp_value lisp_all_symbols(){
 
 lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
-  hash_table * ht = _ht.native_pointer;
+  hash_table * ht = lisp_value_hashtable(_ht);
   if(ht_remove(ht, &key))
     return t;
   return nil;
@@ -2118,7 +2107,7 @@ lisp_value lisp_hashtable_remove(lisp_value _ht, lisp_value key){
 
 lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
-  hash_table * ht = _ht.native_pointer;
+  hash_table * ht = lisp_value_hashtable(_ht);
   lisp_value value;
   if(ht_get(ht, &key, &value))
     return new_cons(t, value);
@@ -2146,16 +2135,15 @@ lisp_value lisp_plookup(lisp_value lst, lisp_value sym){
 }
 
 lisp_value lisp_mapn(lisp_value f, lisp_value lst){
-  var glob =  current_context->globals;
+  var glob = current_context->globals;
   while(is_cons(lst)){
     var v = car(lst);
     cons e2 = {.car = v, .cdr = nil};
-    lisp_value ev2 = {.type = LISP_CONS, .cons = &e2};
+    lisp_value ev2 = cons_lisp_value(&e2);
     cons e1 = {.car = f, .cdr = ev2};
-    lisp_value ev1 = {.type = LISP_CONS, .cons = &e1};
+    lisp_value ev1 = cons_lisp_value(&e1);
     lisp_eval(glob, ev1);
     lst = cdr(lst);
-
   }
   return nil;
 }
@@ -2188,7 +2176,6 @@ int main(int argc, char ** argv){
   printf("starting..\n");
   current_context = lisp_context_new();
   
-  lisp_register_native("gc-heap", 0, gc_heap);
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
   lisp_register_native("lisp:trace", 1, lisp_trace);

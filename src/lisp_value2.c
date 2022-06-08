@@ -122,6 +122,10 @@ inline lisp_vector * lisp_value_vector(lisp_value val){
   return lisp_value_pointer(val);
 }
 
+inline lisp_value vector_lisp_value(lisp_vector * vector){
+  return (lisp_value){.type = LISP_VECTOR, .vector = vector};
+}
+
 inline lisp_type lisp_value_type(lisp_value val){
   return val.type;
 }
@@ -132,6 +136,11 @@ inline lisp_value symbol_lisp_value(lisp_symbol sym){
 
 inline lisp_symbol lisp_value_symbol(lisp_value val){
   return val.symbol; 
+}
+
+inline lisp_value cons_lisp_value(cons * cns){
+  lisp_value ev2 = {.type = LISP_CONS, .cons = cns};
+  return ev2;
 }
 
 inline cons * lisp_value_cons(lisp_value val){
@@ -148,4 +157,16 @@ inline lisp_function * lisp_value_function(lisp_value val){
 
 inline lisp_value float32_lisp_value(f32 v){
   return (lisp_value){.type = LISP_FLOAT32, .rational = v };
+}
+
+inline lisp_value native_pointer_lisp_value(void * v){
+  return (lisp_value){.type = LISP_NATIVE_POINTER, .pointer = v };
+}
+
+inline hash_table * lisp_value_hashtable(lisp_value v){
+  return v.native_pointer;
+}
+
+inline lisp_value hashtable_lisp_value(hash_table * ht){
+  return (lisp_value){.type = LISP_HASHTABLE, .native_pointer = ht};
 }
