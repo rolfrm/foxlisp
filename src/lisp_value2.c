@@ -170,3 +170,17 @@ inline hash_table * lisp_value_hashtable(lisp_value v){
 inline lisp_value hashtable_lisp_value(hash_table * ht){
   return (lisp_value){.type = LISP_HASHTABLE, .native_pointer = ht};
 }
+
+inline bool lisp_value_eq(lisp_value a, lisp_value b){
+  if(lisp_value_type(a) != lisp_value_type(b)) return false;
+  return a.integer == b.integer;
+}
+
+inline lisp_value bool_lisp_value(bool v){
+  return v ? t : nil;
+}
+
+inline bool is_keyword(lisp_value sym){
+  return is_symbol(sym) && lisp_value_symbol(sym) >= 0x100000;
+}
+
