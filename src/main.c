@@ -284,32 +284,6 @@ void lisp_pop_scope(lisp_scope * scope){
   current_context->scope_count -= 1; 
 }
 
-lisp_context * lisp_context_new(){
-  printf("LISP NEW CONTEXT\n");
-  lisp_context * ctx = lisp_malloc(sizeof(ctx[0]));
-  ctx->gc = gc_context_new();
-  ctx->next_symbol = 1;
-  ctx->symbols = ht_create_strkey(sizeof(u64));
-  ctx->symbols_reverse = ht_create(sizeof(u64), sizeof(char *));
-  ctx->symbols_reverse->hash = symbol_nohash;
-    
-  ctx->globals = lisp_scope_new(NULL);
-  var prev_ctx = current_context;
-  current_context = ctx;
-  rest_sym = get_symbol("&rest");
-  if_sym = get_symbol("if");
-  quote_sym = get_symbol("quote");
-  quasiquote_sym = get_symbol("quasiquote");
-  unquote_sym = get_symbol("unquote");
-  else_sym = get_symbol("else");
-  otherwise_sym = get_symbol("otherwise");
-  unquote_splice_sym = get_symbol("unquote-splicing");
-  lisp_scope_create_value(current_context->globals, get_symbol("nil"), nil);
-  lisp_scope_create_value(current_context->globals, get_symbol("t"), t);
-  current_context = prev_ctx;
-  
-  return ctx;
-}
 
 inline lisp_value car(lisp_value v){
   if(is_cons(v))
@@ -1820,7 +1794,6 @@ lisp_value lisp_signature(lisp_value func){
   return nil;
 }
 
-
 lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
   bool weak_keys = !is_nil(weak_key);
   bool weak_values = !is_nil(weak_value);
@@ -1894,22 +1867,7 @@ lisp_value lisp_plookup(lisp_value lst, lisp_value sym){
   }
   return nil;
 }
-
-lisp_value lisp_mapn(lisp_value f, lisp_value lst){
-  var glob = current_context->globals;
-  while(is_cons(lst)){
-    var v = car(lst);
-    cons e2 = {.car = v, .cdr = nil};
-    lisp_value ev2 = cons_lisp_value(&e2);
-    cons e1 = {.car = f, .cdr = ev2};
-    lisp_value ev1 = cons_lisp_value(&e1);
-    lisp_eval(glob, ev1);
-    lst = cdr(lst);
-  }
-  return nil;
-}
   
-
 lisp_value lisp_exit(){
   exit(0);
   return nil;
@@ -1933,9 +1891,71 @@ void web_update(){
 }
 
 int main(int argc, char ** argv){
-  
-  printf("starting..\n");
   current_context = lisp_context_new();
+  
+#ifndef WASM
+  lisp_register_value("lisp:*test-enabled*", nil);
+  for(int i = 1; i < argc; i++){
+    if(strcmp(argv[i], "--test") == 0){
+      lisp_register_value("lisp:*test-enabled*", t);
+    }else
+      lisp_eval_file(argv[i]);
+  }
+#else
+  lisp_eval_file("ld50.lisp");
+#endif
+  printf("Finished..\n");
+#ifdef WASM
+  emscripten_set_main_loop(web_update, 0, 1);
+#endif
+  
+  return 0;
+}
+
+#ifdef WASM
+EMSCRIPTEN_KEEPALIVE
+void * lisp_read_file(const char * filename){
+  printf("read file: %s\n", filename);
+  return file_to_string(filename);
+}
+EMSCRIPTEN_KEEPALIVE
+void lisp_invoke_string(const char * code){
+  lisp_eval_string(code);
+}
+
+#endif
+
+#include<pthread.h>
+pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
+  pthread_t thread = {0};
+  pthread_create(&thread, NULL, f, data);
+  return thread;
+}
+
+
+lisp_context * lisp_context_new(){
+  printf("LISP NEW CONTEXT\n");
+  lisp_context * ctx = lisp_malloc(sizeof(ctx[0]));
+  ctx->gc = gc_context_new();
+  ctx->next_symbol = 1;
+  ctx->symbols = ht_create_strkey(sizeof(u64));
+  ctx->symbols_reverse = ht_create(sizeof(u64), sizeof(char *));
+  ctx->symbols_reverse->hash = symbol_nohash;
+    
+  ctx->globals = lisp_scope_new(NULL);
+  var prev_ctx = current_context;
+  current_context = ctx;
+
+  rest_sym = get_symbol("&rest");
+  if_sym = get_symbol("if");
+  quote_sym = get_symbol("quote");
+  quasiquote_sym = get_symbol("quasiquote");
+  unquote_sym = get_symbol("unquote");
+  else_sym = get_symbol("else");
+  otherwise_sym = get_symbol("otherwise");
+  unquote_splice_sym = get_symbol("unquote-splicing");
+  lisp_scope_create_value(current_context->globals, get_symbol("nil"), nil);
+  lisp_scope_create_value(current_context->globals, get_symbol("t"), t);
   
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
@@ -1971,7 +1991,6 @@ int main(int argc, char ** argv){
   lisp_register_native("copy-list", 1, copy_cons);
   lisp_register_native("copy-list-deep", 1, copy_cons_deep);
   lisp_register_native("plookup", 2, lisp_plookup);
-  //lisp_register_native("map!", 2, lisp_mapn);
 
   lisp_register_native("=", -1, lisp_value_eqn);
   lisp_register_native("/=", -1, lisp_neqn);
@@ -2043,42 +2062,6 @@ int main(int argc, char ** argv){
 #endif
 
   load_modules();
-  //lisp_register_value("lisp:*root-scope*", nil);
-#ifndef WASM
-  lisp_register_value("lisp:*test-enabled*", nil);
-  for(int i = 1; i < argc; i++){
-    if(strcmp(argv[i], "--test") == 0){
-      lisp_register_value("lisp:*test-enabled*", t);
-    }else
-      lisp_eval_file(argv[i]);
-  }
-#else
-  lisp_eval_file("ld50.lisp");
-#endif
-  printf("Finished..\n");
-#ifdef WASM
-  emscripten_set_main_loop(web_update, 0, 1);
-#endif
-  
-  return 0;
-}
 
-#ifdef WASM
-EMSCRIPTEN_KEEPALIVE
-void * lisp_read_file(const char * filename){
-  printf("read file: %s\n", filename);
-  return file_to_string(filename);
-}
-EMSCRIPTEN_KEEPALIVE
-void lisp_invoke_string(const char * code){
-  lisp_eval_string(code);
-}
-
-#endif
-
-#include<pthread.h>
-pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
-  pthread_t thread = {0};
-  pthread_create(&thread, NULL, f, data);
-  return thread;
+  return ctx;
 }
