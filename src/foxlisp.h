@@ -212,6 +212,51 @@ extern lisp_value unquote_splice_sym;
 extern lisp_value else_sym;
 extern size_t conses_allocated;
 
+// lisp value
+bool is_nil(lisp_value v);
+bool is_t(lisp_value v);
+bool is_cons(lisp_value v);
+bool is_integer(lisp_value v);
+bool is_float(lisp_value a);
+bool is_float32(lisp_value a);
+bool is_string(lisp_value a);
+bool is_symbol(lisp_value a);
+bool is_function(lisp_value a);
+bool is_function_macro(lisp_value a);
+bool is_function_native(lisp_value a);
+bool is_macro_builtin(lisp_value a);
+f64 lisp_value_rational(lisp_value v);
+lisp_value rational_lisp_value(double o);
+int64_t lisp_value_as_integer(lisp_value v);
+f64 lisp_value_as_rational(lisp_value v);
+lisp_value string_lisp_value(const char * str);
+char * lisp_value_string(lisp_value v);
+lisp_value integer_lisp_value(i64 i);
+int64_t lisp_value_integer(lisp_value v);
+lisp_value byte_lisp_value(u8 i);
+u8 lisp_value_byte(lisp_value v);
+void * lisp_value_pointer(lisp_value val);
+lisp_vector * lisp_value_vector(lisp_value val);
+lisp_value vector_lisp_value(lisp_vector * vector);
+lisp_type lisp_value_type(lisp_value val);
+lisp_value symbol_lisp_value(lisp_symbol sym);
+lisp_symbol lisp_value_symbol(lisp_value val);
+lisp_value cons_lisp_value(cons * cns);
+cons * lisp_value_cons(lisp_value val);
+lisp_value function_lisp_value(lisp_function * f);
+lisp_function * lisp_value_function(lisp_value val);
+lisp_value float32_lisp_value(f32 v);
+lisp_value native_pointer_lisp_value(void * v);
+hash_table * lisp_value_hashtable(lisp_value v);
+lisp_value hashtable_lisp_value(hash_table * ht);
+bool lisp_value_eq(lisp_value a, lisp_value b);
+lisp_value bool_lisp_value(bool v);
+bool is_keyword(lisp_value sym);
+lisp_value global_index_lisp_value(size_t i);
+lisp_value local_index_lisp_value(size_t scope_level, size_t scope_index, bool scope_type);
+
+//
+
 void foxlist_thread_init();
 void gc_collect_garbage(lisp_context * context);
 lisp_value lisp_count_allocated();
@@ -220,6 +265,8 @@ void * nogc_clone(const void * mem, size_t s);
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 
+
+int64_t get_symbol_id(const char * s);
 lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
@@ -232,6 +279,8 @@ lisp_value copy_cons(lisp_value a);
 
 lisp_value car(lisp_value v);
 lisp_value cdr(lisp_value v);
+lisp_value set_car(lisp_value cons, lisp_value new_car);
+lisp_value set_cdr(lisp_value cons, lisp_value new_car);
 lisp_value cadr(lisp_value v);
 lisp_value cddr(lisp_value v);
 lisp_value pop(lisp_value * v);
@@ -285,6 +334,9 @@ lisp_scope * lisp_context_get_root_scope();
 
 void lisp_register_value(const char * name, lisp_value value);
 void lisp_register_native(const char * name, int nargs, void * fptr);
+
+lisp_value lisp_read_string(const char * str);
+
 // macros
 
 #define cdddr(x) cdr(cddr(x))
