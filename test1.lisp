@@ -348,6 +348,15 @@
 
 (let ((x 10))
   (assert (eq 30 (eval '(* 3 x) (lisp:get-current-scope)))))
+
+(let ((y 10))
+  (assert (eq 40 (eval '(+ y x) (lisp:sub-scope (lisp:get-current-scope) 'x 30)))))
+
+(let ((x 10))
+  (lisp:scope-set! (lisp:get-current-scope) 'x 20)
+  (assert (eq 20 x)))
+
+
 (assert (eq 3.0 (+ 1.0 2)))
 
 (assert (eq (/ 10 3.0 2.0) (/ 10.0 6.0)))

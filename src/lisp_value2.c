@@ -74,6 +74,9 @@ inline bool is_scope(lisp_value a){
   return a.type == LISP_SCOPE;
 }
 
+inline bool is_keyword(lisp_value sym){
+  return is_symbol(sym) && lisp_value_symbol(sym) >= 0x100000;
+}
 
 inline f64 lisp_value_rational(lisp_value v){
   return v.rational;
@@ -176,6 +179,15 @@ inline lisp_value hashtable_lisp_value(hash_table * ht){
   return (lisp_value){.type = LISP_HASHTABLE, .native_pointer = ht};
 }
 
+inline lisp_value scope_lisp_value(lisp_scope * scope){
+  return (lisp_value){.type = LISP_SCOPE, .pointer = scope };
+}
+
+inline lisp_scope * lisp_value_scope(lisp_value val){
+  return val.pointer;
+}
+
+
 inline bool lisp_value_eq(lisp_value a, lisp_value b){
   if(lisp_value_type(a) != lisp_value_type(b)) return false;
   return a.integer == b.integer;
@@ -185,9 +197,6 @@ inline lisp_value bool_lisp_value(bool v){
   return v ? t : nil;
 }
 
-inline bool is_keyword(lisp_value sym){
-  return is_symbol(sym) && lisp_value_symbol(sym) >= 0x100000;
-}
 
 inline lisp_value global_index_lisp_value(size_t i){
   return (lisp_value){.type = LISP_GLOBAL_INDEX, .integer = i};

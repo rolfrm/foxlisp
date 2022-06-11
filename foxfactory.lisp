@@ -78,13 +78,11 @@
 (defun update ()
   
   (belt-update 0.01)
-  
+  (let ((s (foxgl:window-size win)))
+    (foxgl:viewport (integer (car s)) (integer (cadr s))))
+    
   (foxgl:clear)
-  (foxgl:render-model '(rgb (1.0 1.0 1.0)
-                        (scale (2 2 2)
-                         (ref square-model)
-
-                         )))
+  
   (let ((time (* 0.000001 (- (foxgl:timestamp) start-time )))
         (offset 0.0)
         )
@@ -99,7 +97,7 @@
               )
                 
     (set! offset 0.0)
-    (when nil
+    (when t
     (dotimes! i 10
               (when (vector-ref (cdr belts) i)
                 (foxgl:render-model
@@ -111,7 +109,7 @@
                   ))
     )
     )
-
+    
     
   (foxgl:swap win)
   (foxgl:poll-events)
@@ -121,6 +119,11 @@
 (defun run-update ()
   (update)
 )
+
+(defun a-test ()
+  (println 'x))
+(defun b-test()
+  (a-test))
 
 (println "starting!");
 (foxgl:make-current win)

@@ -146,6 +146,25 @@
     (ref
      
      (foxgl:render-model2 (symbol-value  (cadr model)) t))
+    (bind
+     (println '!!)
+     (foxgl:render-model2 (eval (cadr model))))
+    (for
+     (let ((var (cadr model))
+           (evalues (caddr model))
+           (rest (cdddr model)))
+       (let* ((prev-scope foxgl:current-scope)
+              (new-scope (lisp:sub-scope prev-scope var (car evalues))))
+         (set! foxgl:current-scope new-scope)
+         (for-each v evalues
+                   (lisp:scope-set! foxgl:current-scope var v)
+                   
+                   (foxgl:render-sub-models rest)
+                   )
+         (set! foxgl:current-scope prev-scope)
+         (set! model nil)
+       
+       )))
     (view
      (let ((prev-transform foxgl:current-transform))
        (match p (unbind (plookup (cdr model) :perspective))
@@ -183,7 +202,7 @@
                           (unbind rot))
            )
        (set! foxgl:current-transform new-transform)
-       (foxgl:render-sub-models (cdr model))
+       (foxgl:render-sub-models (cddr model))
        (set! model nil)
        (set! foxgl:current-transform prev-tform)
        ))
@@ -192,13 +211,13 @@
            (new-transform (mat4-identity))
            (rot (unbind (cadr model))))
        (math:*! new-transform new-transform foxgl:current-transform)
-       (math:translate!  new-transform
+       (math:translate! new-transform
                          (unbind (car rot))
                          (or (unbind (cadr rot)) 0.0)
                          (or (unbind (caddr rot)) 0.0))
        
        (set! foxgl:current-transform new-transform)
-       (foxgl:render-sub-models (cdr model))
+       (foxgl:render-sub-models (cddr model))
        (set! foxgl:current-transform prev-tform)
        (set! model nil)
        ))

@@ -1,4 +1,4 @@
-OPT = -Og -g0
+OPT = -O3 -g0
 LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c process.c parser.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc

@@ -616,6 +616,19 @@ lisp_value lisp_function_code(lisp_value function){
   return f->code;
 }
 
+lisp_value lisp_sub_scope(lisp_value scope, lisp_value sym, lisp_value value){
+  lisp_scope s;
+  lisp_scope * super_scope = lisp_value_scope(scope);
+  cons con = {.car = sym, .cdr = value};
+  lisp_scope_stack(&s, super_scope, &con, 1);
+  return scope_lisp_value(lisp_scope_unstack(&s));
+}
+
+lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
+  lisp_scope * s = lisp_value_scope(scope);
+  lisp_scope_set_value(s, sym, value);
+  return nil;
+}
 
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
  tail_call:;
@@ -1061,6 +1074,18 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
       else{
         print(value);
         raise_string(" symbol not found.");
+        int j = 0;
+        var scope2 = scope;
+        println(scope_lisp_value(scope2));
+        while(scope2 != NULL){
+          printf("scope%i\n", j);
+          for(size_t i = 0; i < scope2->argcnt; i++){
+            var c = scope2->lookup[i];
+            println(cons_lisp_value(&c));
+          }
+          j++;
+          scope2 = scope2->super;
+        }
       }
     }
           
@@ -1201,7 +1226,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_HASHTABLE:
     return snprintf(buffer, LEN1, "HashTable");
   case LISP_SCOPE:
-    return snprintf(buffer, LEN1, "Scope(%i)", v.scope->argcnt);
+    return snprintf(buffer, LEN1, "Scope (%p)", v.pointer);
   case LISP_GLOBAL_INDEX:
     return snprintf(buffer, LEN1, "GLOBAL Index (%i)", v.integer);
   case LISP_LOCAL_INDEX:
@@ -1232,7 +1257,7 @@ case LISP_CONS:
 }
 
 lisp_value print(lisp_value v){
-  char buffer[100];
+  char buffer[100] = {0};
   int l = print2(NULL,0,  v);
   char * str = l >= 95 ? malloc(l + 1) : buffer;
   print2(str, l+ 1, v);
@@ -2055,7 +2080,8 @@ lisp_context * lisp_context_new(){
 
   lisp_register_native("optimize-statement", 2, _lisp_optimize_statement);
   lisp_register_native("function->code", 1, lisp_function_code);
-  
+  lisp_register_native("lisp:sub-scope", 3, lisp_sub_scope);
+  lisp_register_native("lisp:scope-set!", 3, lisp_scope_set);
   
   lisp_register_native("eval", 2, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
