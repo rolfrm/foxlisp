@@ -2,7 +2,6 @@
 (load "foxgl.lisp")
 (load "vec2.lisp")
 (load "swank.lisp")
-;(thread:start (lambda () (swank:start-server)))
 (print "FOX FACTORY")
 
 (when nil
@@ -81,6 +80,11 @@
   (belt-update 0.01)
   
   (foxgl:clear)
+  (foxgl:render-model '(rgb (1.0 1.0 1.0)
+                        (scale (2 2 2)
+                         (ref square-model)
+
+                         )))
   (let ((time (* 0.000001 (- (foxgl:timestamp) start-time )))
         (offset 0.0)
         )
@@ -95,6 +99,7 @@
               )
                 
     (set! offset 0.0)
+    (when nil
     (dotimes! i 10
               (when (vector-ref (cdr belts) i)
                 (foxgl:render-model
@@ -104,18 +109,25 @@
                      (transform :translate (-0.5 -0.45 0.0) :scale (0.90 0.90 0.5)
                       (ref square-model))))))
                   ))
-      )
+    )
+    )
+
     
   (foxgl:swap win)
   (foxgl:poll-events)
   (lisp:collect-garbage)
   )
+
+(defun run-update ()
+  (update)
+)
+
 (println "starting!");
 (foxgl:make-current win)
 (loop t
       (with-exception-handler
           (progn
-            (update))
+            (run-update))
         (lambda (x) ()))
       (swank-server-update swnk)
       )

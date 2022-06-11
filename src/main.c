@@ -236,6 +236,7 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
 }
 
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value){
+  
   if(scope->lookup != NULL){
     for(size_t i = 0; i < scope->argcnt; i++){
       if(is_nil(scope->lookup[i].car)){
@@ -244,6 +245,8 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
       }
     }
   }
+  lisp_symbol i = lisp_value_symbol(sym);
+  int idx;
   
   if(scope->values == NULL){
 	 scope->values_index = ht_create2(2048, sizeof(u64), sizeof(int));
@@ -252,6 +255,9 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
     scope->values = malloc(scope->values_capacity * sizeof(lisp_value));
     scope->values[0] = nil;
     scope->values_count = 1;
+  }else if(ht_get(scope->values_index, &i, &idx)){
+    scope->values[idx] = value;
+    return nil;
   }
   
   if(scope->values_count == scope->values_capacity){
@@ -259,8 +265,7 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
     scope->values = realloc(scope->values, scope->values_capacity * sizeof(lisp_value)); 
   }
   
-  int idx = scope->values_count;
-  lisp_symbol i = lisp_value_symbol(sym);
+  idx = scope->values_count;
   ht_set(scope->values_index, &i, &idx);
   scope->values[scope->values_count] = value;
   scope->values_count += 1;
@@ -593,6 +598,24 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
   }
   return c;
 }
+
+lisp_value _lisp_optimize_statement(lisp_value statement, lisp_value _scope){
+  lisp_scope * scope = NULL;
+  if(is_scope(_scope) == false){
+    scope = _scope.scope;
+  }else{
+    scope = current_context->globals;
+  }
+  lisp_optimize_statement(scope, statement);
+  return nil;
+}
+
+lisp_value lisp_function_code(lisp_value function){
+  TYPE_ASSERT(function, LISP_FUNCTION);
+  var f = lisp_value_function(function);
+  return f->code;
+}
+
 
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
  tail_call:;
@@ -1943,7 +1966,6 @@ lisp_context * lisp_context_new(){
   ctx->symbols_reverse->hash = symbol_nohash;
     
   ctx->globals = lisp_scope_new(NULL);
-  var prev_ctx = current_context;
   current_context = ctx;
 
   rest_sym = get_symbol("&rest");
@@ -2030,6 +2052,9 @@ lisp_context * lisp_context_new(){
   lisp_register_native("hashtable-remove", 2, lisp_hashtable_remove);
   lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
   lisp_register_native("function-signature", 1, lisp_signature);
+
+  lisp_register_native("optimize-statement", 2, _lisp_optimize_statement);
+  lisp_register_native("function->code", 1, lisp_function_code);
   
   
   lisp_register_native("eval", 2, lisp_eval_value);

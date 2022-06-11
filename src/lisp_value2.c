@@ -70,6 +70,11 @@ inline bool is_macro_builtin(lisp_value a){
   return a.type == LISP_MACRO_BUILTIN;
 }
 
+inline bool is_scope(lisp_value a){
+  return a.type == LISP_SCOPE;
+}
+
+
 inline f64 lisp_value_rational(lisp_value v){
   return v.rational;
 }
