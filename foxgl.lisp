@@ -122,8 +122,15 @@
 (defun foxgl:render-model2 (model)
   (case (car model)
     (rgb
-     (let ((prev-color foxgl:current-color))
-       (set! foxgl:current-color (unbind (cadr model)))
+     (let* ((prev-color foxgl:current-color)
+            (color (unbind (cadr model)))
+            (color2 (foxgl:color->int
+                     (unbind (car color))
+                     (unbind (cadr color))
+                     (unbind (caddr color))
+                     (unbind (cadddr color))))
+            )
+       (set! foxgl:current-color color2)
        (!render-sub (cddr model))
        (set! foxgl:current-color prev-color)
        ))
@@ -147,7 +154,6 @@
      
      (foxgl:render-model2 (symbol-value  (cadr model)) t))
     (bind
-     (println '!!)
      (foxgl:render-model2 (eval (cadr model))))
     (for
      (let ((var (cadr model))

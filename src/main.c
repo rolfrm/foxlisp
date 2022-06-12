@@ -1617,6 +1617,17 @@ lisp_value lisp_sin(lisp_value v){
   return rational_lisp_value(sin(lisp_value_as_rational(v)));
 }
 
+lisp_value lisp_cos(lisp_value v){
+  return rational_lisp_value(cos(lisp_value_as_rational(v)));
+}
+
+lisp_value lisp_mod(lisp_value a, lisp_value b){
+  if(is_float(a) || is_float(b))
+    return rational_lisp_value(fmod(lisp_value_as_rational(a), lisp_value_as_rational(b)));
+  return integer_lisp_value(lisp_value_as_integer(a) % lisp_value_as_integer(b));
+}
+
+
 lisp_value lisp_read(lisp_value v){
   if(!is_string(v))
     return v;
@@ -2048,6 +2059,8 @@ lisp_context * lisp_context_new(){
   lisp_register_native("float32", 1, lisp_float32);
   lisp_register_native("byte", 1, lisp_byte);
   lisp_register_native("sin", 1, lisp_sin);
+  lisp_register_native("cos", 1, lisp_cos);
+  lisp_register_native("mod", 2, lisp_mod);
   lisp_register_native("type-of", 1, lisp_type_of);
   
   lisp_register_native("read-string", 1, lisp_read);

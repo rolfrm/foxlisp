@@ -26,31 +26,29 @@
     (foxgl:viewport (integer (car s)) (integer (cadr s))))
   
   (foxgl:clear)
-  (let ((dt (* 0.0000005 (- (foxgl:timestamp) start-time))))
-    (println dt)
-  (foxgl:render-model '
-   (scale (4.0 4.0 1.0)
-                        
-   (translate (-0.225 -0.225 0.0)
-   (rgb (0.2 0.2 0.2)
-                         (for i (0 1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0)
-                          (for j (0 1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0)
-                               (scale (0.05 0.05)
-                                      (rgb (bind (list (+ 0.5 (* 0.5 (sin (+ (* 50.0 dt) i j))))
-                                                       (+ 0.5 (* 0.5 (sin (+ (* 50.0 dt 1.01) i j 1.5))))
-                                                       1.0))
-                                            
-                            (translate ((bind i) (bind j) 0)
-                                       (scale (1.1 1.1 1.0)
-                               (rotate (0 0 (bind (+ dt (* dt i)  (* dt j))))
-                              (translate (-0.5 -0.5 0.5)
-                               (ref square-model)))
-                             
-                               ))))))))
-   
-                      )))
-    
-    
+  (let ((dt (math:pow (sin (* 0.0000001 (- (foxgl:timestamp) start-time))) 10.0)))
+    (foxgl:render-model
+     '(scale (4.0 4.0 1.0)
+       (translate (-0.225 -0.225 0.0)
+        (rgb (0.2 0.2 0.2)
+         (for i (0 1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0)
+          (for j (0 1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0)
+           (scale ((bind dt) (bind dt))
+            (rgb ((bind (+ 0.5 (* 0.5 (sin (+ (* 3.14 dt) i j)))))
+                  (bind (+ 0.5 (* 0.5 (sin (+ (* 3.14 dt 1.0) i j 1.5)))))
+                   1.0 1.0)
+             
+             (translate ((bind i) (bind j) 0)
+              (scale (0.95 0.95 1.0)
+               (rotate (0 0 (bind (* pi (+ dt (* dt i)  (* dt j)))))
+                (translate (-0.5 -0.5 0.5)
+                 (ref square-model)))
+               
+               ))))))))
+       
+       )))
+  
+  
   (foxgl:swap win)
   (foxgl:poll-events)
   (lisp:collect-garbage)

@@ -1,3 +1,4 @@
+
 #include <iron/full.h>
 #include <iron/gl.h>
 #include <iron/utf8.h>
@@ -292,8 +293,25 @@ lisp_value foxgl_poll_events(){
 
 blit3d_context * blit3d_current_context = NULL;
 
+lisp_value foxgl_color_to_int(lisp_value r, lisp_value g, lisp_value b, lisp_value a){
+  lisp_value values[] = {r, g, b, a};
+  int v = 0;
+  for(int i = 0; i < array_count(values); i++){
+    var x = values[i];
+    var l = is_nil(x) ? 255 : is_float(x) ? (int)(lisp_value_rational(x) * 255) : lisp_value_integer(x);
+    v += (CLAMP(l, 0, 255) << (i * 8));
+  }
+
+  return integer_lisp_value(v);
+}
+
 lisp_value foxgl_color(lisp_value color){
-  vec4 col = lisp_to_color(color);
+  vec4 col = vec4_zero;
+  if(is_integer(color)){
+    col = color_from_u32(lisp_value_integer(color));   
+  }else{
+    col = lisp_to_color(color);
+  }
   if(blit3d_current_context != NULL)
 	 blit3d_color(blit3d_current_context, col);
   return nil;
@@ -586,6 +604,7 @@ void foxgl_register(){
   lrn("foxgl:get-events", 0, foxgl_get_events);
   
   lrn("foxgl:color", 1, foxgl_color);
+  lrn("foxgl:color->int", 4, foxgl_color_to_int);
   lrn("foxgl:transform", 1, foxgl_transform);
   lrn("foxgl:init", 0, foxgl_init);
   lrn("foxgl:quad", 1, foxgl_square2);
