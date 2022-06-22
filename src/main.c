@@ -1945,37 +1945,41 @@ void load_modules(){
 }
 
 void web_update(){
+  //printf("Web update\n");
   var sym = get_symbol("lisp:*web-update*");
   lisp_eval(current_context->globals, new_cons(sym, nil));
 }
 
 int main(int argc, char ** argv){
   current_context = lisp_context_new();
+  lisp_register_value("lisp:*test-enabled*", nil);
   
 #ifndef WASM
-  lisp_register_value("lisp:*test-enabled*", nil);
   for(int i = 1; i < argc; i++){
     if(strcmp(argv[i], "--test") == 0){
       lisp_register_value("lisp:*test-enabled*", t);
     }else
       lisp_eval_file(argv[i]);
   }
-#else
-  lisp_eval_file("ld50.lisp");
 #endif
-  printf("Finished..\n");
+
 #ifdef WASM
+  lisp_eval_file("foxday2.lisp");
+
   emscripten_set_main_loop(web_update, 0, 1);
-#endif
   
+#endif
+  printf("Finished..\n");  
   return 0;
 }
 
 #ifdef WASM
 EMSCRIPTEN_KEEPALIVE
 void * lisp_read_file(const char * filename){
-  printf("read file: %s\n", filename);
-  return file_to_string(filename);
+  var s = read_file_to_string(filename);
+  //printf("read file: %s\n", filename);
+  //printf("file: %s\n", s);
+  return s;
 }
 EMSCRIPTEN_KEEPALIVE
 void lisp_invoke_string(const char * code){

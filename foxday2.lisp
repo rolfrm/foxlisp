@@ -1,20 +1,15 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 (load "vec2.lisp")
-(load "swank.lisp")
-
+(lisp:collect-garbage)
 (when nil
+  (load "swank.lisp")
   (let ((swnk (swank-server-new 8810)))
     (println swnk)
     (loop t
           (swank-server-update swnk)
           (thread:sleep 0.1))))
 
-(define win (foxgl:create-window (integer 800) (integer 800)))
-(define swnk (swank-server-new 8810))
-(foxgl:set-title win "Demo 2")
-(foxgl:make-current win)
-(foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
 
 (define square-model '(scale (0.5 0.5)
                        (polygon :2d-triangle-strip (-1 -1 1 -1 -1 1 1 1))))
@@ -107,12 +102,47 @@
   (lisp:collect-garbage)
   )
 
-(foxgl:make-current win)
-(loop t
+
+(unless lisp:*web-environment*
+  (loop t
+
+       (foxgl:make-current win)
       (with-exception-handler
           (progn
             (update))
         (lambda (x) ()))
       (swank-server-update swnk)
-      )
+      ))
+(define ld50:initialized nil)
+(define win nil)
 
+(defun ld50:initialize()
+  (set! win (foxgl:create-window (integer 800) (integer 800)))
+  (foxgl:set-title win "Fox Driver")
+  (foxgl:make-current win)
+  (foxgl:load-font "DejaVuSans.ttf" (integer 22))
+  )
+
+(defun lisp:*web-update* ()
+  ;(println 'start-lisp:*web-update*)
+  (unless ld50:initialized
+    (set! ld50:initialized t)
+    (ld50:initialize))
+  ;(define win (foxgl:create-window (integer 800) (integer 800)))
+  ;(define swnk (swank-server-new 8810))
+  (foxgl:set-title win "Demo 2")
+  (foxgl:make-current win)
+  (foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
+  
+  (foxgl:make-current win)
+  (with-exception-handler
+      (progn                            ;(game-update)
+        (update)
+        )
+    
+    (lambda (x)
+      (println x)
+      (thread:sleep 0.5)
+      ))
+
+  )

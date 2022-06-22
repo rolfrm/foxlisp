@@ -35,8 +35,8 @@ libmicroio.bc:
 libiron.bc: iron/libiron.bc
 	cp iron/libiron.bc .
 
-index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp spinning-cube.lisp foxgl.lisp libiron.bc
-	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -sEXPORTED_RUNTIME_METHODS=ccall -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp --embed-file ./spinning-cube.lisp@spinning-cube.lisp --embed-file ./spinning-cube-model.lisp@spinning-cube-model.lisp --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf
+index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp spinning-cube.lisp foxgl.lisp libiron.bc foxday2.lisp
+	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -sEXPORTED_RUNTIME_METHODS=ccall -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp --embed-file ./spinning-cube.lisp@spinning-cube.lisp --embed-file ./spinning-cube-model.lisp@spinning-cube-model.lisp --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf --embed-file ./foxday2.lisp
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .
