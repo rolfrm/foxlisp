@@ -1,7 +1,7 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 (load "vec2.lisp")
-(load "tree-model.lisp")
+(load "demo.lisp")
 (lisp:collect-garbage)
 
 (defun update ()
@@ -31,7 +31,7 @@
   (set! win (foxgl:create-window (integer 800) (integer 800)))
   (foxgl:make-current win)
   (foxgl:load-font "DejaVuSans.ttf" (integer 22))
-  (foxgl:set-title win "Tree")
+  (foxgl:set-title win window-title)
   )
 
 (load "swank.lisp")

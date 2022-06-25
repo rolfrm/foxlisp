@@ -64,7 +64,7 @@
   var Module = {
       canvas : canv,
       preRun: [],
-      postRun: [function () {loadLispCode('tree-model.lisp');}],
+      postRun: [function () {loadLispCode('demo.lisp');}],
       print: (function () {
           var element = document.querySelector('#output');
           if (element) element.value = ''; // clear browser cache

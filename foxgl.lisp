@@ -164,7 +164,7 @@
           '(
             (set! foxgl:current-scope (lisp:get-current-scope))
             (loop evalues
-                 (lisp:scope-set! foxgl:current-scope var (car evalues))
+                 (lisp:scope-set! foxgl:current-scope var (unbind (car evalues)))
                  (foxgl:render-sub-models rest)
                  (set! evalues (cdr evalues)))
             ))
@@ -450,7 +450,7 @@
 (define foxgl:key-s 83)
 (define foxgl:key-d 68)
 
-
+(define window-title "window")
 
 ;(render-model2 nil)
 ;(lisp:exit 0)
