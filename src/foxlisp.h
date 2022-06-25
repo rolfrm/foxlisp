@@ -104,7 +104,10 @@ typedef struct __attribute__((__packed__)) {
 
 
 typedef struct{
-  lisp_type type;
+  union{
+    lisp_type type;
+    u64 reserved;
+  };
   union{
 	 cons * cons;
 	 int64_t integer;

@@ -156,21 +156,36 @@
     (bind
      (foxgl:render-model2 (eval (cadr model))))
     (for
-     (let ((var (cadr model))
-           (evalues (caddr model))
-           (rest (cdddr model)))
-       (let* ((prev-scope foxgl:current-scope)
-              (new-scope (lisp:sub-scope prev-scope var (car evalues))))
-         (set! foxgl:current-scope new-scope)
-         (for-each v evalues
-                   (lisp:scope-set! foxgl:current-scope var v)
-                   
-                   (foxgl:render-sub-models rest)
-                   )
-         (set! foxgl:current-scope prev-scope)
-         (set! model nil)
-       
-       )))
+     (let* ((var (cadr model))
+            (evalues (caddr model))
+            (rest (cdddr model))
+            (prev-scope foxgl:current-scope))
+       (lisp:with-scope-variable prev-scope (lisp:get-current-scope) '(evalues rest var) var
+          '(
+            (set! foxgl:current-scope (lisp:get-current-scope))
+            (loop evalues
+                 (lisp:scope-set! foxgl:current-scope var (car evalues))
+                 (foxgl:render-sub-models rest)
+                 (set! evalues (cdr evalues)))
+            ))
+       (set! foxgl:current-scope prev-scope)
+       (set! model nil)
+       ))
+    
+    (let
+        (let ((vars (cadr model))
+              (body (cddr model))
+              (prev-scope foxgl:current-scope))
+          (lisp:with-scope-binding prev-scope (lisp:get-current-scope) '(body) vars
+                                   '((set! foxgl:current-scope (lisp:get-current-scope))
+                                     (foxgl:render-sub-models body)
+
+                   ))
+      
+      
+      (set! model nil)
+      (set! foxgl:current-scope prev-scope)))
+          
     (view
      (let ((prev-transform foxgl:current-transform))
        (match p (unbind (plookup (cdr model) :perspective))

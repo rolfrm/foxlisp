@@ -624,6 +624,95 @@ lisp_value lisp_sub_scope(lisp_value scope, lisp_value sym, lisp_value value){
   return scope_lisp_value(lisp_scope_unstack(&s));
 }
 
+lisp_value lisp_with_sub_scope(lisp_value scope, lisp_value sym, lisp_value value, lisp_value body){
+  lisp_scope s;
+  lisp_scope * super_scope = lisp_value_scope(scope);
+  cons con = {.car = sym, .cdr = value};
+  lisp_scope_stack(&s, super_scope, &con, 1);
+
+  lisp_value ret = nil;
+  while(is_cons(body)){
+    ret = lisp_eval(&s, car(body));
+    if(lisp_is_in_error()) return nil;
+    
+    body = cdr(body);
+  }
+  return ret;
+  
+}
+
+
+lisp_value lisp_with_scope_binding(lisp_value scope, lisp_value scope2, lisp_value syms, lisp_value values, lisp_value body){
+  lisp_scope s;
+  lisp_scope * super_scope = lisp_value_scope(scope);
+  lisp_scope * scope22 = lisp_value_scope(scope2);
+  size_t len = lisp_value_integer(lisp_length(values));
+  size_t len2 = lisp_value_integer(lisp_length(syms));
+  cons con[len + len2];
+  lisp_value it = values;
+  for(size_t i = 0; i < len; i++){
+    lisp_value form = car(it);
+    it = cdr(it);
+    var sym = car(form);
+    var body = cadr(form);
+    con[i].car = sym;
+    con[i].cdr = body;
+  }
+  it = syms;
+  
+  for(size_t i = 0; i < len2; i++){
+    con[len + i].car = car(it);
+    con[len + i].cdr = lisp_scope_get_value(scope22, con[len + i].car);
+    it = cdr(it);
+  }
+  lisp_scope_stack(&s, super_scope, con, len + len2);
+  
+  for(size_t i = 0; i < len; i++){
+    con[i].cdr = lisp_eval(&s, con[i].cdr); 
+    if(lisp_is_in_error()) return nil;
+    
+  }
+  lisp_value ret = nil;
+  while(is_cons(body)){
+    ret = lisp_eval(&s, car(body));
+    if(lisp_is_in_error()) return nil;
+    
+    body = cdr(body);
+  }
+  return ret;
+  
+}
+
+lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2, lisp_value syms, lisp_value variable, lisp_value body){
+  lisp_scope s;
+  lisp_scope * super_scope = lisp_value_scope(scope);
+  lisp_scope * scope22 = lisp_value_scope(scope2);
+  size_t len2 = lisp_value_integer(lisp_length(syms));
+  cons con[len2 + 1];
+  lisp_value it = syms;
+  
+  for(size_t i = 0; i < len2; i++){
+    con[i].car = car(it);
+    con[i].cdr = lisp_scope_get_value(scope22, con[i].car);
+    it = cdr(it);
+  }
+  con[len2].car = variable;
+  con[len2].cdr = nil;
+  
+  lisp_scope_stack(&s, super_scope, con, len2 + 1);
+  
+  lisp_value ret = nil;
+  while(is_cons(body)){
+    ret = lisp_eval(&s, car(body));
+    if(lisp_is_in_error()) return nil;
+    
+    body = cdr(body);
+  }
+  return ret;
+  
+}
+
+
 lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
   lisp_scope * s = lisp_value_scope(scope);
   lisp_scope_set_value(s, sym, value);
@@ -631,6 +720,7 @@ lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
 }
 
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+  lisp_value orig_value = value;
  tail_call:;
   switch(lisp_value_type(value)){
   case LISP_CONS:
@@ -1224,7 +1314,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_MACRO_BUILTIN:
     return snprintf(buffer, LEN1, "MacroBuiltin");
   case LISP_HASHTABLE:
-    return snprintf(buffer, LEN1, "HashTable");
+    return snprintf(buffer, LEN1, "HashTable(%i)", lisp_value_hashtable(v)->count);
   case LISP_SCOPE:
     return snprintf(buffer, LEN1, "Scope (%p)", v.pointer);
   case LISP_GLOBAL_INDEX:
@@ -2098,6 +2188,9 @@ lisp_context * lisp_context_new(){
   lisp_register_native("optimize-statement", 2, _lisp_optimize_statement);
   lisp_register_native("function->code", 1, lisp_function_code);
   lisp_register_native("lisp:sub-scope", 3, lisp_sub_scope);
+  lisp_register_native("lisp:with-sub-scope", 4, lisp_with_sub_scope);
+  lisp_register_native("lisp:with-scope-binding", 5, lisp_with_scope_binding);
+  lisp_register_native("lisp:with-scope-variable", 5, lisp_with_scope_vars);
   lisp_register_native("lisp:scope-set!", 3, lisp_scope_set);
   
   lisp_register_native("eval", 2, lisp_eval_value);

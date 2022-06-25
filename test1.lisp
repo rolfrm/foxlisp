@@ -126,6 +126,7 @@
 
 (let ((ht (make-hashtable nil nil)))
   (hashtable-set ht 5 10)
+  (println (list ht (hashtable-ref ht 5)))
   (assert (eq 10 (hashtable-ref ht 5)))
   (assert-not (hashtable-ref ht 10))
   (hashtable-remove ht 5)
@@ -405,7 +406,8 @@
                 ((otherwise) 2)
                 (otherwise 3))))
 
-                
+(lisp:with-scope-binding (lisp:get-current-scope) '((x 10) (y (+ x 5)))
+  '((println (list x y))))
 
 (println "Tests Passed")
 
