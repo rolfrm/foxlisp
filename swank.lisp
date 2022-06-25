@@ -257,7 +257,7 @@
 (println (swank:autodoc (car swank-test-3)))
 
 (define swank-test-4 '(swank:autodoc (quote ("define" "sample1" ("make-vector" swank::%cursor-marker%))) :print-right-margin 141))
-(swank:autodoc (car swank-test-4))
-(define swank-test-5 '("defun" "swank-event-loop" ("slime") ("let" (("len-buf" ("make-vector" "6" ("byte" "0"))) ("active" "t")) ("loop" "active" swank::%cursor-marker%))))
+;(swank:autodoc (car swank-test-4))
+;(define swank-test-5 '("defun" "swank-event-loop" ("slime") ("let" (("len-buf" ("make-vector" "6" ("byte" "0"))) ("active" "t")) ("loop" "active" swank::%cursor-marker%))))
 
 (println 'test-done)

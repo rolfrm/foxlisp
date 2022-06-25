@@ -1639,10 +1639,6 @@ lisp_value lisp_neqn(lisp_value * values, int count){
   return t;
 }
 
-bool eq(lisp_value a, lisp_value b){
-  return lisp_value_eq(a, b);
-}
-
 lisp_value lisp_len(lisp_value a){
   int64_t i = 0;
   while(is_cons(a)){
@@ -1716,7 +1712,6 @@ lisp_value lisp_mod(lisp_value a, lisp_value b){
     return rational_lisp_value(fmod(lisp_value_as_rational(a), lisp_value_as_rational(b)));
   return integer_lisp_value(lisp_value_as_integer(a) % lisp_value_as_integer(b));
 }
-
 
 lisp_value lisp_read(lisp_value v){
   if(!is_string(v))

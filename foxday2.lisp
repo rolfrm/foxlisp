@@ -8,7 +8,6 @@
   (let ((s (foxgl:window-size win)))
     (foxgl:viewport (integer (car s)) (integer (cadr s))))
   (foxgl:clear)
-  
     
   (let ((first (lisp:count-allocated)))
     (foxgl:render-model model)
@@ -27,7 +26,7 @@
 
 (define ld50:initialized nil)
 (define win nil)
-
+(define swnk nil)
 (defun ld50:initialize()
   (set! win (foxgl:create-window (integer 800) (integer 800)))
   (foxgl:make-current win)
@@ -35,15 +34,10 @@
   (foxgl:set-title win "Tree")
   )
 
-
+(load "swank.lisp")
+  
 (unless lisp:*web-environment*
-  (when nil
-  (load "swank.lisp")
-  (let ((swnk (swank-server-new 8810)))
-    (println swnk)
-    (loop t
-          (swank-server-update swnk)
-          (thread:sleep 0.1))))
+  (set! swnk (swank-server-new 8810))
 
   (ld50:initialize)
   (foxgl:make-current win)
@@ -51,9 +45,13 @@
   (loop t
        (with-exception-handler
            (progn
-             (update))
+             (update)
+             (when swnk
+               (swank-server-update swnk))
+        
+             )
          (lambda (x) ()))
-       ;(swank-server-update swnk)
+                                        ;(swank-server-update swnk)
        ))
 
 (defun lisp:*web-update* ()
