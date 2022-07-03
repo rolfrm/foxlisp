@@ -1,7 +1,13 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 (load "vec2.lisp")
-(load "demo.lisp")
+
+(define window-title "funky")
+(define square-model '(polygon :2d-triangle-strip (-1 -1 1 -1 -1 1 1 1)))
+(define model '())
+
+(progn
+  (load "demo.lisp"))
 (lisp:collect-garbage)
 
 (defun update ()
@@ -33,8 +39,8 @@
   (foxgl:load-font "DejaVuSans.ttf" (integer 22))
   (foxgl:set-title win window-title)
   )
-
-(load "swank.lisp")
+;(unless lisp:*web-environment*
+  (load "swank.lisp");)
   
 (unless lisp:*web-environment*
   (set! swnk (swank-server-new 8810))

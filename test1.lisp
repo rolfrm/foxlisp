@@ -406,8 +406,21 @@
                 ((otherwise) 2)
                 (otherwise 3))))
 
-(lisp:with-scope-binding (lisp:get-current-scope) '((x 10) (y (+ x 5)))
-  '((println (list x y))))
+(lisp:with-scope-binding (lisp:get-current-scope) nil nil '((x 10) (y (+ x 5)))
+                         '((println (list x y))))
 
+(let ((test-scope
+       (let ((a 10) (b 20))
+         (lisp:get-current-scope)))
+      (test-scope2
+       (let ((c 20) (d 30) (e 40))
+         (lisp:get-current-scope))))
+  (let ((r (lisp:with-scope-variable test-scope test-scope2 '(c d) 'x
+                                     '((+ a b c d)))))
+    (assert (eq r 80))
+    )
+  (let (( r (lisp:with-sub-scope test-scope 'c 30 '((+ a b c)))))
+    (assert (eq r 60))
+  ))
 (println "Tests Passed")
 

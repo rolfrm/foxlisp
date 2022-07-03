@@ -36,6 +36,9 @@
 (defmacro unless (test &rest body)
   `(if ,test () (progn ,@body)))
 
+(defmacro unless!(test &rest body)
+  (when (eval test) body))
+
 (defun map (lst f2)
   (when lst
     (cons (f2 (car lst))

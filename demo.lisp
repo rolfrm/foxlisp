@@ -1,14 +1,18 @@
 (define window-title "funky")
 (define square-model '(polygon :2d-triangle-strip (-1 -1 1 -1 -1 1 1 1)))
 
+(defun sin2(x)
+  (let ((x (sin x)))
+    (* x x)))
+
 (define start-time (foxgl:timestamp))
 (define model
     '(scale (1 1 1)
       (let ((dt (* 0.000001 (- (foxgl:timestamp) start-time)))
-            (dt2 (+ 0.0 (* 4.0 (cos dt))))
-            (dt3 (* 0.5 (+ (cos dt) 1.0)))
-            (dt4 (* 0.5 (+ (cos (* 0.5 dt)) 1.0)))
-            (dt5 (* 0.5 (+ (cos (* 0.25 dt)) 1.0)))
+            (dt2 (+ 0.0 (* 4.0 (sin dt))))
+            (dt3 (* 0.5 (+ (sin dt) 1.0)))
+            (dt4 (* 0.5 (+ (sin (* 0.5 dt)) 1.0)))
+            (dt5 (* 0.5 (+ (sin (* 0.25 dt)) 1.0)))
             )
         (translate (0 0 0)
           (rgb ((bind dt5) (bind dt4) (bind dt3))

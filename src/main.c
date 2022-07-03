@@ -645,7 +645,7 @@ lisp_value lisp_with_sub_scope(lisp_value scope, lisp_value sym, lisp_value valu
 lisp_value lisp_with_scope_binding(lisp_value scope, lisp_value scope2, lisp_value syms, lisp_value values, lisp_value body){
   lisp_scope s;
   lisp_scope * super_scope = lisp_value_scope(scope);
-  lisp_scope * scope22 = lisp_value_scope(scope2);
+  lisp_scope * scope22 = is_nil(scope2) ? NULL : lisp_value_scope(scope2);
   size_t len = lisp_value_integer(lisp_length(values));
   size_t len2 = lisp_value_integer(lisp_length(syms));
   cons con[len + len2];
@@ -680,7 +680,6 @@ lisp_value lisp_with_scope_binding(lisp_value scope, lisp_value scope2, lisp_val
     body = cdr(body);
   }
   return ret;
-  
 }
 
 lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2, lisp_value syms, lisp_value variable, lisp_value body){
@@ -1316,7 +1315,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_HASHTABLE:
     return snprintf(buffer, LEN1, "HashTable(%i)", lisp_value_hashtable(v)->count);
   case LISP_SCOPE:
-    return snprintf(buffer, LEN1, "Scope (%p)", v.pointer);
+    return snprintf(buffer, LEN1, "Scope (%i)", lisp_value_scope(v)->argcnt);
   case LISP_GLOBAL_INDEX:
     return snprintf(buffer, LEN1, "GLOBAL Index (%i)", v.integer);
   case LISP_LOCAL_INDEX:
@@ -2054,7 +2053,6 @@ int main(int argc, char ** argv){
   emscripten_set_main_loop(web_update, 0, 1);
   
 #endif
-  printf("Finished..\n");  
   return 0;
 }
 
@@ -2062,8 +2060,6 @@ int main(int argc, char ** argv){
 EMSCRIPTEN_KEEPALIVE
 void * lisp_read_file(const char * filename){
   var s = read_file_to_string(filename);
-  //printf("read file: %s\n", filename);
-  //printf("file: %s\n", s);
   return s;
 }
 EMSCRIPTEN_KEEPALIVE
