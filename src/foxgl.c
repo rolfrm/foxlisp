@@ -18,10 +18,24 @@ lisp_value math_sqrt(lisp_value a){
   return rational(sqrt(a.rational));
 }
 
-
 lisp_value math_sqrtf(lisp_value a){
   return float32(sqrtf(lisp_float32(a).rational));
 }
+
+lisp_value math_mod(lisp_value a, lisp_value b){
+  if(is_integer(a) && is_integer(b))
+    return integer_lisp_value(lisp_value_integer(a) % lisp_value_integer(b));
+  return rational_lisp_value(fmod(lisp_value_as_rational(a), lisp_value_as_rational(b)));
+}
+
+lisp_value math_atan(lisp_value a){
+  return rational_lisp_value(atan(lisp_value_as_rational(a)));
+}
+lisp_value math_tan(lisp_value a){
+  return rational_lisp_value(atan(lisp_value_as_rational(a)));
+}
+
+
 
 lisp_value math_random(lisp_value range){
   if(range.type == LISP_INTEGER){
@@ -160,6 +174,12 @@ lisp_value math_translate_in_place(lisp_value m, lisp_value x, lisp_value y, lis
 lisp_value math_scale_in_place(lisp_value m, lisp_value x, lisp_value y, lisp_value z){
   var m1 = (mat4 *) m.vector->data;
   *m1 = mat4_mul(*m1, mat4_scaled(as_rational(x), as_rational(y), as_rational(z)));
+  return nil;
+}
+
+lisp_value math_mat4_identity_in_place(lisp_value m){
+  var m1 = (mat4 *) m.vector->data;
+  *m1 = mat4_identity();
   return nil;
 }
 
@@ -418,6 +438,11 @@ lisp_value foxgl_get_events(){
         levt = new_cons(get_symbol("mouse-button-up"),
                         new_cons(integer(evt.mouse_btn.button), nil));
         break;
+      case EVT_MOUSE_SCROLL:
+        levt = new_cons(get_symbol("mouse-scroll"),
+                        new_cons(rational(evt.mouse_scroll.x), new_cons(rational(evt.mouse_scroll.y), nil)));
+        
+        break;
       case EVT_KEY_DOWN:
       case EVT_KEY_UP:
       case EVT_KEY_REPEAT:
@@ -533,10 +558,12 @@ lisp_value foxgl_blend(lisp_value blend){
 
 
 lisp_value foxgl_depth(lisp_value blend){
-  if(!is_nil(blend))
+  if(!is_nil(blend)){
     glEnable(GL_DEPTH_TEST);
-  else
+  }
+  else{
     glDisable(GL_DEPTH_TEST);
+  }
   return nil;
 }
 
@@ -578,6 +605,9 @@ void foxgl_register(){
   lrn("math:sqrt", 1, math_sqrt);
   lrn("math:sqrtf", 1, math_sqrtf);
   lrn("math:random", 1, math_random);
+  lrn("math:mod", 2, math_mod);
+  lrn("math:tan", 1, math_tan);
+  lrn("math:atan", 1, math_atan);
   lrn("foxgl:load-font", 2, foxgl_load_font);
   lrn("foxgl:load-texture-from-path", 1, foxgl_load_texture_from_path);
   lrn("foxgl:create-window", 2, foxgl_create_window);
@@ -596,6 +626,7 @@ void foxgl_register(){
   lrn("mat4:rotate", 3, math_mat4_rotate);
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);
+  lrn("mat4:identity!", 1, math_mat4_identity_in_place);
   lrn("mat4:print", 1, math_mat4_print);
   lrn("vec2:len", 1, lisp_vec2_len);
 

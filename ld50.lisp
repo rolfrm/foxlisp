@@ -11,39 +11,7 @@
   (set! swank-loaded t)
   (thread:start swank:start-server)
   )
-
-(define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
-
-(define cube-model '(polygon :3d-triangle-strip (0 0 0
-                                                 1 0 0
-                                                 0 1 0
-                                                 1 1 0
-                                                 0 1 1
-                                                 1 1 1
-                                                 0 0 1
-                                                 1 0 1
-                                                 0 0 0
-                                                 1 0 0
-                                                 ;; side 1
-                                                 1 0 0
-                                                 1 0 1
-                                                 1 1 0
-                                                 1 1 1
-                                                 ;; step to side 2
-                                                 0 1 1
-                                                 ;; side 2
-                                                 0 1 1
-                                                 0 0 1
-                                                 0 1 0
-                                                 0 0 0
-                                                 
-                                                 )))
-
-(define tile-model '(polygon :3d-triangle-strip (0 0 0
-                                                 1 0 0
-                                                 0 0 1
-                                                 1 0 1)))
-
+(load "models.lisp")
 
 
 (define wheel-model

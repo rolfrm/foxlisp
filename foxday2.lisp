@@ -5,30 +5,42 @@
 (define window-title "funky")
 (define square-model '(polygon :2d-triangle-strip (-1 -1 1 -1 -1 1 1 1)))
 (define model '())
+(defun game-update()
 
-(progn
-  (load "demo.lisp"))
+  )
+
+
+(load "demo.lisp")
 (lisp:collect-garbage)
 
+(defun poll-events2 ()
+  (let ((evts (foxgl:get-events)))
+    (let ((evts2 (map evts (lambda (evt)
+                             (let* ((tsl (cddr evt))
+                                    (ts (car tsl))
+                                    (tsl (cdr tsl))
+                                    (e (car tsl)))
+                               (cons e (cdr tsl)))))))
+      evts2
+      )))
+
+
 (defun update ()
+  
+  (lisp:collect-garbage)
   (let ((s (foxgl:window-size win)))
     (foxgl:viewport (integer (car s)) (integer (cadr s))))
   (foxgl:clear)
-    
+  (game-update (poll-events2))
   (let ((first (lisp:count-allocated)))
+    
     (foxgl:render-model model)
-    (when nil
-  
-      (print "allocated: ")
-      (print first)
-      (print " ")
-      (println (lisp:count-allocated))
-      ))
+    ;(println (list first (lisp:count-allocated) (/ (- (lisp:count-allocated) first) (* 16 4))))
+
+    )
   (foxgl:swap win)
   (foxgl:poll-events)
-  (lisp:collect-garbage)
   )
-
 
 (define ld50:initialized nil)
 (define win nil)
@@ -39,8 +51,8 @@
   (foxgl:load-font "DejaVuSans.ttf" (integer 22))
   (foxgl:set-title win window-title)
   )
-;(unless lisp:*web-environment*
-  (load "swank.lisp");)
+;(unless! lisp:*web-environment*
+(load "swank.lisp")
   
 (unless lisp:*web-environment*
   (set! swnk (swank-server-new 8810))
@@ -49,16 +61,20 @@
   (foxgl:make-current win)
   
   (loop t
-       (with-exception-handler
-           (progn
-             (update)
-             (when swnk
-               (swank-server-update swnk))
-        
-             )
-         (lambda (x) ()))
-                                        ;(swank-server-update swnk)
-       ))
+        (with-exception-handler
+            (progn
+              (when swnk
+                (swank-server-update swnk))
+              (update)
+              )
+          (lambda (x)
+            (println x)
+            (thread:sleep 0.2)
+      
+            ))
+        )
+  (println 'exiting)
+  )
 
 (defun lisp:*web-update* ()
   (unless ld50:initialized
@@ -69,7 +85,7 @@
   (with-exception-handler
       (update)
     (lambda (x)
-      (println x)
+      (println 'exception-handler)
       (thread:sleep 0.5)
       ))
   

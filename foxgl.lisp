@@ -43,13 +43,19 @@
 
 (defun mat4-identity ()
   (let ((m (make-vector 16 (float32 0.0))))
-    (vector-set! m 0 (float32 1.0))
-    (vector-set! m 5 (float32 1.0))
-    (vector-set! m 10 (float32 1.0))
-    (vector-set! m 15 (float32 1.0))
+    (mat4:identity! m)
     m
     ))
-
+(defun mat4-print (mat)
+  (dotimes! i 4
+            (dotimes! j 4
+                      
+         (print (vector-ref mat (+ (* j 4) i)))
+         (print " "))
+     (println ""))
+  mat
+  )
+  
 (defun mat4-translation (x y z)
   (let ((m (mat4-identity)))
     (vector-set! m 12 (float32 x))
@@ -118,7 +124,21 @@
       (foxgl:render-sub-models ,model)
       (set! model nil)
       ))
-   
+(defvar matrix-cache nil)
+(defun prepare-matrix(m)
+  
+  (mat4:identity! m)
+  m)
+
+(defun get-matrix()
+  (if matrix-cache
+      (prepare-matrix (pop! matrix-cache))
+      (mat4-identity)))
+
+(defun release-matrix(mat)
+  (push! matrix-cache mat)
+  )
+
 (defun foxgl:render-model2 (model)
   (case (car model)
     (rgb
@@ -160,9 +180,9 @@
             (evalues (caddr model))
             (rest (cdddr model))
             (prev-scope foxgl:current-scope))
-       (lisp:with-scope-variable prev-scope (lisp:get-current-scope) '(evalues rest var) var
+       (lisp:with-scope-variable prev-scope (lisp:get-current-scope!!) '(evalues rest var) var
           '(
-            (set! foxgl:current-scope (lisp:get-current-scope))
+            (set! foxgl:current-scope (lisp:get-current-scope!!))
             (loop evalues
                  (lisp:scope-set! foxgl:current-scope var (unbind (car evalues)))
                  (foxgl:render-sub-models rest)
@@ -209,7 +229,7 @@
        ))
     (rotate
      (let ((prev-tform foxgl:current-transform)
-           (new-transform (mat4-identity))
+           (new-transform (get-matrix))
            (rot (unbind (cadr model))))
        (math:*! new-transform new-transform foxgl:current-transform)
        (if (cons? rot)
@@ -226,10 +246,11 @@
        (foxgl:render-sub-models (cddr model))
        (set! model nil)
        (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
        ))
     (translate
      (let ((prev-tform foxgl:current-transform)
-           (new-transform (mat4-identity))
+           (new-transform (get-matrix))
            (rot (unbind (cadr model))))
        (math:*! new-transform new-transform foxgl:current-transform)
        (math:translate! new-transform
@@ -241,25 +262,31 @@
        (foxgl:render-sub-models (cddr model))
        (set! foxgl:current-transform prev-tform)
        (set! model nil)
+       (release-matrix new-transform)
        ))
     (scale
      (let ((prev-tform foxgl:current-transform)
-           (new-transform (mat4-identity))
+           (new-transform (get-matrix))
            (rot (unbind (cadr model))))
        (math:*! new-transform new-transform foxgl:current-transform)
-       (math:scale! new-transform
-                    (unbind (car rot))
-                    (or (unbind (cadr rot)) 0.0)
-                    (or (unbind (caddr rot)) 0.0))
+       (if (list? rot)
+           (math:scale! new-transform
+                        (unbind (car rot))
+                        (or (unbind (cadr rot)) 1.0)
+                        (or (unbind (caddr rot)) 1.0))
+           (math:scale! new-transform
+                        rot rot rot))
+           
        
        (set! foxgl:current-transform new-transform)
        (foxgl:render-sub-models (cddr model))
        (set! model nil)
        (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
        ))
     (transform
      (let ((prev-tform foxgl:current-transform)
-           (new-transform (mat4-identity)))
+           (new-transform (get-matrix)))
        (when foxgl:current-transform
          (math:*! new-transform new-transform foxgl:current-transform))
        
@@ -285,6 +312,7 @@
        (foxgl:render-sub-models (cdr model))
        (set! model nil)
        (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
        ))
     (render-callback
      ((cadr model) model)
@@ -305,7 +333,7 @@
      (set! model nil)
      (foxgl:blend nil))
     (depth
-     (foxgl:depth t)
+     (foxgl:depth 123)
      (foxgl:render-sub-models (cdr model))
      (set! model nil)
      (foxgl:depth nil)

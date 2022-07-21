@@ -240,6 +240,7 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   if(scope->lookup != NULL){
     for(size_t i = 0; i < scope->argcnt; i++){
       if(is_nil(scope->lookup[i].car)){
+         
         scope->lookup[i] = (cons){.car = sym, .cdr = value};
         return nil;
       }
@@ -249,6 +250,7 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   int idx;
   
   if(scope->values == NULL){
+         
 	 scope->values_index = ht_create2(2048, sizeof(u64), sizeof(int));
     scope->values_index->hash = symbol_nohash;
     scope->values_capacity = 2048;
@@ -701,7 +703,7 @@ lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2, lisp_value 
   lisp_scope_stack(&s, super_scope, con, len2 + 1);
   
   lisp_value ret = nil;
-  while(is_cons(body)){
+    while(is_cons(body)){
     ret = lisp_eval(&s, car(body));
     if(lisp_is_in_error()) return nil;
     
@@ -719,8 +721,7 @@ lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
 }
 
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
-  lisp_value orig_value = value;
- tail_call:;
+  tail_call:;
   switch(lisp_value_type(value)){
   case LISP_CONS:
 	 {
@@ -831,7 +832,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 		  case LISP_LAMBDA:
 		  case LISP_MACRO:
 			 {
-				var args = cadr(value);
+            var args = cadr(value);
 				var body = cddr(value);
 				lisp_function * f = lisp_malloc(sizeof(*f));
 				f->code = body;
@@ -1026,6 +1027,10 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           {
 				return (lisp_value){.scope = lisp_scope_unstack(scope), .type = LISP_SCOPE}; 
           }
+        case LISP_GET_SCOPE_UNSAFE:
+          {
+				return (lisp_value){.scope = scope, .type = LISP_SCOPE}; 
+          }
         }
       }
       size_t argcnt = lisp_optimize_statement(scope, cdr(value));
@@ -1129,10 +1134,12 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
               raise_string("(4) arg name must be a symbol");
               return nil;
             }
+            
             lisp_scope_create_value(function_scope, arg, copy_cons(args2));
             break;
           }
           var argv = car(args2);
+            
           lisp_scope_create_value(function_scope, arg, argv);
 			 
           args = cdr(args);
@@ -1161,7 +1168,8 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
       if(lisp_scope_try_get_value(scope, value, &r))
         return r;
       else{
-        print(value);
+        lisp_error(new_cons(string_lisp_value("Symbol not found"), value));
+          //        print(value);
         raise_string(" symbol not found.");
         int j = 0;
         var scope2 = scope;
@@ -1705,6 +1713,9 @@ lisp_value lisp_sin(lisp_value v){
 lisp_value lisp_cos(lisp_value v){
   return rational_lisp_value(cos(lisp_value_as_rational(v)));
 }
+lisp_value lisp_abs(lisp_value v){
+  return rational_lisp_value(fabs(lisp_value_as_rational(v)));
+}
 
 lisp_value lisp_mod(lisp_value a, lisp_value b){
   if(is_float(a) || is_float(b))
@@ -1997,6 +2008,26 @@ lisp_value lisp_is_symbol(lisp_value v){
   return nil;
 }
 
+lisp_value lisp_is_integer(lisp_value v){
+  if(is_integer(v))
+    return t;
+  return nil;
+}
+
+lisp_value lisp_is_rational(lisp_value v){
+  if(is_float(v))
+    return t;
+  return nil;
+}
+
+
+lisp_value lisp_is_number(lisp_value v){
+  if(is_float(v) || is_integer(v))
+    return t;
+  return nil;
+}
+
+
 lisp_value lisp_plookup(lisp_value lst, lisp_value sym){
   while(is_cons(lst)){
     if(is_symbol(car(lst))){
@@ -2078,7 +2109,6 @@ pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
 
 
 lisp_context * lisp_context_new(){
-  printf("LISP NEW CONTEXT\n");
   lisp_context * ctx = lisp_malloc(sizeof(ctx[0]));
   ctx->gc = gc_context_new();
   ctx->next_symbol = 1;
@@ -2105,6 +2135,9 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:trace", 1, lisp_trace);
   lisp_register_native("symbol?", 1, lisp_is_symbol);
   lisp_register_native("list?", 1, lisp_is_list);
+  lisp_register_native("integer?", 1, lisp_is_integer);
+  lisp_register_native("number?", 1, lisp_is_number);
+  lisp_register_native("rational?", 1, lisp_is_rational);
   lisp_register_native("cons?", 1, lisp_is_cons);
   lisp_register_native("+", -1, lisp_addn);
   lisp_register_native("-", -1, lisp_subn);
@@ -2145,6 +2178,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("byte", 1, lisp_byte);
   lisp_register_native("sin", 1, lisp_sin);
   lisp_register_native("cos", 1, lisp_cos);
+  lisp_register_native("abs", 1, lisp_abs);
   lisp_register_native("mod", 2, lisp_mod);
   lisp_register_native("type-of", 1, lisp_type_of);
   
@@ -2204,6 +2238,7 @@ lisp_context * lisp_context_new(){
   lisp_register_macro("bound?", LISP_BOUND);
   lisp_register_macro("with-exception-handler", LISP_WITH_EXCEPTION_HANDLER);
   lisp_register_macro("lisp:get-current-scope", LISP_GET_SCOPE);
+  lisp_register_macro("lisp:get-current-scope!!", LISP_GET_SCOPE_UNSAFE);
 
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 #ifndef WASM

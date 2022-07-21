@@ -50,6 +50,7 @@ typedef enum {
               LISP_AND,
               LISP_OR,
               LISP_GET_SCOPE,
+              LISP_GET_SCOPE_UNSAFE,
 }lisp_builtin;
 
 // structs

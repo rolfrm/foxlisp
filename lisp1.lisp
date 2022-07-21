@@ -109,6 +109,8 @@
 
 (defun cdddr (l)
   (cdr (cddr l)))
+(defun caaar (l)
+  (car (caar l)))
 (defun cadar (l)
   (car (cdar l)))
 

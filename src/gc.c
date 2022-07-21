@@ -13,11 +13,7 @@
 static void * heap_start = NULL;
 static void * heap_end = NULL;
 
-int allccc = 0;
 static void * _alloc(size_t v){
-  allccc += 1;
-  if(allccc == 30000)
-    raise(SIGINT);
   void * ptr = malloc(v);
   heap_end = MAX(heap_end, ptr + v);
   if(heap_start == NULL)
