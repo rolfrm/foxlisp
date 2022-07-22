@@ -18,7 +18,6 @@ lisp_value lisp_read_stream(io_reader * rd);
 extern bool debug_set;
 bool tracing = false;
 
-
 lisp_value rest_sym = {.type = LISP_SYMBOL};
 lisp_value if_sym = {.type = LISP_SYMBOL};
 lisp_value quote_sym = {.type = LISP_SYMBOL};
@@ -498,25 +497,6 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   lisp_pop_scope(function_scope);
 		  
   return ret;
-}
-
-lisp_value lisp_sub_eval(lisp_scope * scope, lisp_value c, cons * cons_buf){
-  if(is_nil(c)) return nil;
-
-  var next = cdr(c);
-  lisp_value cns = cons_lisp_value(cons_buf);
-	 
-  if(!is_nil(next)){
-
-	 var value = lisp_eval2(scope, car(c));
-	 var nextr = lisp_sub_eval(scope, next, cons_buf + 1);
-    set_car(cns, value);
-    set_cdr(cns, nextr);
-  }else{
-    set_car(cns, lisp_eval2(scope, car(c)));
-    set_cdr(cns, nil);
-  }
-  return cns;
 }
 
 lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value);
@@ -1090,7 +1070,6 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           return f.n4(args[0], args[1], args[2], args[3]);
         case 5:
           return f.n5(args[0], args[1], args[2], args[3], args[4]);
-          
         case 6:
           return f.n6(args[0], args[1], args[2], args[3], args[4], args[5]);
         default:
@@ -1101,9 +1080,21 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
          
         lisp_value things;
         {
-          memset(args0, 0, sizeof(args0[0]) * argcnt);
+          lisp_value arg0 = cdr(value);
+
           // evaluate the arguments
-          things = lisp_sub_eval(scope, cdr(value), args0);
+          for(size_t i = 0; i < argcnt; i++){
+            args0[i].car = lisp_eval2(scope, car(arg0));
+            arg0 = cdr(arg0);
+          }
+          
+          for(ssize_t i = 0; i < (ssize_t)(argcnt - 1); i++)
+            args0[i].cdr = cons_lisp_value(args0 + i + 1);
+          
+          if(argcnt > 0)
+            args0[argcnt -1].cdr = nil;
+          
+          things = cons_lisp_value(args0);
         }
         
         var f = first_value.function;
