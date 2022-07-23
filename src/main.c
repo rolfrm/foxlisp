@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <iron/full.h>
+#include <setjmp.h>
 
 #ifdef EMSCRIPTEN
 #include "emscripten.h"
@@ -24,6 +25,8 @@ lisp_value quote_sym = {.type = LISP_SYMBOL};
 lisp_value quasiquote_sym = {.type = LISP_SYMBOL};
 lisp_value unquote_sym = {.type = LISP_SYMBOL};
 lisp_value unquote_splice_sym = {.type = LISP_SYMBOL};
+lisp_value fpe_sym = {.type = LISP_SYMBOL};
+lisp_value current_error_sym = {.type = LISP_SYMBOL};
 lisp_value nil = {0};
 lisp_value t = {.type = LISP_T};
 lisp_value else_sym;
@@ -33,6 +36,8 @@ lisp_value otherwise_sym;
 void print_call_stack();
 #define lisp_eval2 lisp_eval
 static __thread lisp_value current_error;
+static __thread bool is_in_lisp;
+
 static inline bool lisp_is_in_error(){
   return !is_nil(current_error);
 }
@@ -700,6 +705,8 @@ lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
   return nil;
 }
 
+sigjmp_buf error_resume_jmp;
+      
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   tail_call:;
   switch(lisp_value_type(value)){
@@ -911,8 +918,10 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             if(lisp_is_in_error()){
               var error = current_error;
               current_error = nil;
+              printf("WITH EXCEPTION HANDLER\n");
               var error_handler = lisp_eval(scope, caddr(value));
-              var result2 = lisp_eval(scope, new_cons(error_handler, new_cons(error, nil)));
+              lisp_scope_create_value(current_context->globals, current_error_sym, error);
+              var result2 = lisp_eval(scope, new_cons(error_handler, new_cons(current_error_sym, nil)));
               return result2;
             }
             return result;
@@ -1029,6 +1038,9 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
         for(size_t i = 0; i < argcnt; i++){
           args[i] = lisp_eval2(scope, car(arglist));
           arglist = cdr(arglist);
+          if(lisp_is_in_error())
+            return nil;
+      
         }
         
         if(n->nargs != -1){
@@ -1054,6 +1066,12 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
         }f;
 
         f.n0 = n->fptr;
+
+        int r111 = sigsetjmp(error_resume_jmp, 0);
+        if(r111 == 1){
+          return nil;
+        }
+  
         
         switch(n->nargs){
         case -1:
@@ -1146,6 +1164,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
         lisp_pop_scope(function_scope);
         return ret;
       }else{
+        println(value);
         raise_string("not a function");
         return nil;
       }
@@ -2052,12 +2071,41 @@ void load_modules(){
 
 void web_update(){
   //printf("Web update\n");
+  is_in_lisp = true;
+  
   var sym = get_symbol("lisp:*web-update*");
   lisp_eval(current_context->globals, new_cons(sym, nil));
+  is_in_lisp = false;
+}
+
+void sig_handler(int signum){
+  printf("Caught signal! %i\n", signum);
+  current_error = fpe_sym;
+  siglongjmp(error_resume_jmp, 1);
+}
+
+
+void setup_fpe_handler(){
+  struct sigaction new_action;
+  
+  struct sigaction old_action;
+  new_action.sa_handler = sig_handler;
+  //new_action.sa_sigaction = sig_handler2;
+  sigemptyset (&new_action.sa_mask);
+  new_action.sa_flags =SA_NODEFER | SA_NOMASK;
+  
+  
+  sigaction (SIGFPE, &new_action, &old_action);
+  
+
 }
 
 int main(int argc, char ** argv){
   current_context = lisp_context_new();
+  
+  setup_fpe_handler();
+  
+  is_in_lisp = true;
   lisp_register_value("lisp:*test-enabled*", nil);
   
 #ifndef WASM
@@ -2075,6 +2123,7 @@ int main(int argc, char ** argv){
   emscripten_set_main_loop(web_update, 0, 1);
   
 #endif
+  is_in_lisp = false;
   return 0;
 }
 
@@ -2118,6 +2167,8 @@ lisp_context * lisp_context_new(){
   else_sym = get_symbol("else");
   otherwise_sym = get_symbol("otherwise");
   unquote_splice_sym = get_symbol("unquote-splicing");
+  fpe_sym = get_symbol("floating-point-error");
+  current_error_sym = get_symbol("lisp:+current-error+");
   lisp_scope_create_value(current_context->globals, get_symbol("nil"), nil);
   lisp_scope_create_value(current_context->globals, get_symbol("t"), t);
   
