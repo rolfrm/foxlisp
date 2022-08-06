@@ -378,14 +378,12 @@
     (line
      (set! foxgl:-points-array-count 0)
      (foxgl:render-sub-models (cdr model))
-     (println (list 'line-count foxgl:-points-array-count (vector-length foxgl:-points-array)))
+     
      (when (> (* foxgl:-points-array-count 2) (vector-length foxgl:-points-array)) 
        (vector-resize foxgl:-points-array (* (vector-length foxgl:-points-array) 2)))
      (let ((cnt (/ foxgl:-points-array-count 2))
            (array foxgl:-points-array)
            (line-width 0.3))
-       ;(println array)
-       ;(println cnt)
        (dotimes! _i cnt
                  (let ((i (- (- cnt _i) 1)))
                    (let ((i1 (* i 2))

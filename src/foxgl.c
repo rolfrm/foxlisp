@@ -37,7 +37,6 @@ lisp_value math_round(lisp_value a, lisp_value dec){
     }else{
       var decimals = lisp_value_integer(dec);
       var amount = pow(10, decimals);
-      printf("asd %f %f\n", v, amount);
       
       v = round(v * amount) / amount;
     }
