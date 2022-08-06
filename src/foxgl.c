@@ -28,6 +28,26 @@ lisp_value math_mod(lisp_value a, lisp_value b){
   return rational_lisp_value(fmod(lisp_value_as_rational(a), lisp_value_as_rational(b)));
 }
 
+lisp_value math_round(lisp_value a, lisp_value dec){
+  if(is_integer(a)) return a;
+  if(is_float(a)){
+    var v = lisp_value_as_rational(a);
+    if(is_nil(dec)){
+      v = round(v);
+    }else{
+      var decimals = lisp_value_integer(dec);
+      var amount = pow(10, decimals);
+      printf("asd %f %f\n", v, amount);
+      
+      v = round(v * amount) / amount;
+    }
+    if(is_float32(a)) return float32_lisp_value(v);
+    return rational_lisp_value(v);
+  }
+  raise_string("Not roundable");
+  return nil;
+}
+
 lisp_value math_atan(lisp_value a){
   return rational_lisp_value(atan(lisp_value_as_rational(a)));
 }
@@ -365,7 +385,7 @@ lisp_value foxgl_square2(){
   return nil;
 }
 
-lisp_value load_polygon (lisp_value val, lisp_value dim){
+lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, lisp_value opt_count){
   if(blit3d_current_context == NULL) return nil;
   type_assert(val, LISP_VECTOR);
   type_assert(val.vector->default_value, LISP_FLOAT32);
@@ -374,10 +394,30 @@ lisp_value load_polygon (lisp_value val, lisp_value dim){
     type_assert(dim, LISP_INTEGER);
     dimensions = dim.integer;
   }
+
+  ssize_t offset = 0;
+  if(!is_nil(opt_offset))
+    offset = lisp_value_integer(opt_offset);
+  size_t l = val.vector->count;
+  if(!is_nil(opt_count)){
+    size_t l2 = lisp_value_integer(opt_count);
+    
+    l = l2;
+  }
+  if(offset < 0){
+    raise_string("offset may not be negative");
+    return nil;
+  }
+  if(offset + l > val.vector->count){
+    raise_string("Index out of range");
+    return nil;
+  }
+  
+
   var pts = (float *) val.vector->data;
 
   var poly = blit3d_polygon_new();
-  blit3d_polygon_load_data(poly, pts,  val.vector->count * val.vector->elem_size);
+  blit3d_polygon_load_data(poly, pts + offset,  l * val.vector->elem_size);
   blit3d_polygon_configure(poly, dimensions);
 
   return native_pointer(poly);
@@ -608,6 +648,7 @@ void foxgl_register(){
   lrn("math:mod", 2, math_mod);
   lrn("math:tan", 1, math_tan);
   lrn("math:atan", 1, math_atan);
+  lrn("math:round", 2, math_round);
   lrn("foxgl:load-font", 2, foxgl_load_font);
   lrn("foxgl:load-texture-from-path", 1, foxgl_load_texture_from_path);
   lrn("foxgl:create-window", 2, foxgl_create_window);
@@ -639,7 +680,7 @@ void foxgl_register(){
   lrn("foxgl:transform", 1, foxgl_transform);
   lrn("foxgl:init", 0, foxgl_init);
   lrn("foxgl:quad", 1, foxgl_square2);
-  lrn("foxgl:load-polygon", 2, load_polygon);
+  lrn("foxgl:load-polygon", 4, load_polygon);
   lrn("foxgl:blit-polygon", 1, blit_polygon);
   lrn("foxgl:delete-polygon", 1, delete_polygon);
 

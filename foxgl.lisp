@@ -139,6 +139,9 @@
   (push! matrix-cache mat)
   )
 
+(define foxgl:-points-array (make-vector 32 (float32 0.0)))
+(define foxgl:-points-array-count 0)
+
 (defun foxgl:render-model2 (model)
   (case (car model)
     (rgb
@@ -177,7 +180,7 @@
      (foxgl:render-model2 (eval (cadr model))))
     (for
      (let* ((var (cadr model))
-            (evalues (caddr model))
+            (evalues (or (unbind (caddr model)) nil))
             (rest (cdddr model))
             (prev-scope foxgl:current-scope))
        (lisp:with-scope-variable prev-scope (lisp:get-current-scope!!) '(evalues rest var) var
@@ -198,6 +201,7 @@
               (prev-scope foxgl:current-scope))
           (lisp:with-scope-binding prev-scope (lisp:get-current-scope) '(body) vars
                                    '((set! foxgl:current-scope (lisp:get-current-scope))
+                                     
                                      (foxgl:render-sub-models body)
 
                    ))
@@ -341,7 +345,7 @@
     (text
      (foxgl:color foxgl:current-color)
      (foxgl:transform (or foxgl:current-transform (mat4-identity)))
-     (foxgl:blit-text (cadr model)(or foxgl:current-transform (mat4-identity)))
+     (foxgl:blit-text (value->string (unbind (cadr model))) (or foxgl:current-transform (mat4-identity)))
      )
     (flat
      (let ((fb (foxgl:get-framebuffer model))
@@ -371,6 +375,79 @@
        (foxgl:bind-texture nil)
        (set! model nil)
        ))
+    (line
+     (set! foxgl:-points-array-count 0)
+     (foxgl:render-sub-models (cdr model))
+     (println (list 'line-count foxgl:-points-array-count (vector-length foxgl:-points-array)))
+     (when (> (* foxgl:-points-array-count 2) (vector-length foxgl:-points-array)) 
+       (vector-resize foxgl:-points-array (* (vector-length foxgl:-points-array) 2)))
+     (let ((cnt (/ foxgl:-points-array-count 2))
+           (array foxgl:-points-array)
+           (line-width 0.3))
+       ;(println array)
+       ;(println cnt)
+       (dotimes! _i cnt
+                 (let ((i (- (- cnt _i) 1)))
+                   (let ((i1 (* i 2))
+                         (i2 (+ (* i 2) 1)))
+                 ;(println (cons i1 i2))
+                 (let ((x1 (vector-ref array i1))
+                       (y1 (vector-ref array i2)))
+                   (let ((x2 x1)
+                         (y2 y1))
+                     (when (> i 0)
+                       (set! x2 (vector-ref array (- i1 2)))
+                       (set! y2 (vector-ref array (- i2 2))))
+                     (when (= i 0)
+                       (set! x2 (vector-ref array (+ i1 2)))
+                       (set! y2 (vector-ref array (+ i2 2))))
+                     
+                   (let ((dx (- x2 x1))
+                         (dy (- y2 y1)))
+                     (let ((l (math:sqrtf (+ (* dx dx) (* dy dy)))))
+                       
+                       (set! dx (/ dx l))
+                       (set! dy (/ dy l))
+                       )
+                     (when (> i 0)
+                       (set! dx (* -1 dx)))
+                     ;(println (list dx dy x1 y1 x2 y2))
+                     (set! dx (float32 (* dx line-width 0.5)))
+                     (set! dy (float32 (* dy line-width 0.5)))
+                     
+                     (let ((i3 (* i1 2)))
+                       ;(println i3)
+                       (vector-set! array (+ i3 2) (- x1 dy))
+                       (vector-set! array (+ i3 3) (- y1 dx))
+                       (vector-set! array (+ i3 0) (+ x1 dy))
+                       (vector-set! array (+ i3 1) (+ y1 dx)))
+                     
+                     ))))))
+       ;(print array)
+       (let ((poly (foxgl:load-polygon array 2 0 (* foxgl:-points-array-count 2))))
+         (foxgl:color foxgl:current-color)
+         (foxgl:transform foxgl:current-transform)
+         (foxgl:blit-polygon poly)
+         (foxgl:delete-polygon poly)
+       ))
+     
+     (set! model nil)
+     )
+    (point
+     (let ((x (unbind (cadr model)))
+           (y (unbind (caddr model))))
+       (when (> (+ foxgl:-points-array-count 2) (vector-length foxgl:-points-array)) 
+         (vector-resize foxgl:-points-array (* (vector-length foxgl:-points-array) 2)))
+         
+
+         (vector-set! foxgl:-points-array foxgl:-points-array-count (float32 x))
+         (vector-set! foxgl:-points-array (+ foxgl:-points-array-count 1) (float32 y))
+         (incf foxgl:-points-array-count 2)
+       )
+     
+     (set! model nil)
+     )
+    
     (polygon
      (let ((dims 2)
            (poly (plookup (cdr model) :2d-triangle-strip)))

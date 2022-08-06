@@ -259,7 +259,9 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
     scope->values_index->hash = symbol_nohash;
     scope->values_capacity = 2048;
     scope->values = malloc(scope->values_capacity * sizeof(lisp_value));
+    scope->value_symbol = malloc(scope->values_capacity * sizeof(lisp_symbol));
     scope->values[0] = nil;
+    scope->value_symbol[0] = 0;
     scope->values_count = 1;
   }else if(ht_get(scope->values_index, &i, &idx)){
     scope->values[idx] = value;
@@ -269,11 +271,13 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   if(scope->values_count == scope->values_capacity){
     scope->values_capacity *= 2;
     scope->values = realloc(scope->values, scope->values_capacity * sizeof(lisp_value)); 
+    scope->value_symbol = realloc(scope->value_symbol, scope->values_capacity * sizeof(lisp_symbol)); 
   }
   
   idx = scope->values_count;
   ht_set(scope->values_index, &i, &idx);
   scope->values[scope->values_count] = value;
+  scope->value_symbol[scope->values_count] = i;
   scope->values_count += 1;
   return nil;
 }
@@ -630,6 +634,7 @@ lisp_value lisp_with_sub_scope(lisp_value scope, lisp_value sym, lisp_value valu
 
 
 lisp_value lisp_with_scope_binding(lisp_value scope, lisp_value scope2, lisp_value syms, lisp_value values, lisp_value body){
+  
   lisp_scope s;
   lisp_scope * super_scope = lisp_value_scope(scope);
   lisp_scope * scope22 = is_nil(scope2) ? NULL : lisp_value_scope(scope2);
@@ -655,15 +660,19 @@ lisp_value lisp_with_scope_binding(lisp_value scope, lisp_value scope2, lisp_val
   lisp_scope_stack(&s, super_scope, con, len + len2);
   
   for(size_t i = 0; i < len; i++){
-    con[i].cdr = lisp_eval(&s, con[i].cdr); 
-    if(lisp_is_in_error()) return nil;
+    var code = con[i].cdr;
+    con[i].cdr = lisp_eval(&s, code); 
+    if(lisp_is_in_error()){
+      lisp_error(new_cons(new_cons(string_lisp_value("scope binding"), code),  current_error));
+      return nil;
+    }
     
   }
   lisp_value ret = nil;
   while(is_cons(body)){
     ret = lisp_eval(&s, car(body));
     if(lisp_is_in_error()) return nil;
-    
+    //println(body);
     body = cdr(body);
   }
   return ret;
@@ -1180,7 +1189,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
       else{
         lisp_error(new_cons(string_lisp_value("Symbol not found"), value));
           //        print(value);
-        raise_string(" symbol not found.");
+        //raise_string(" symbol not found.");
         int j = 0;
         var scope2 = scope;
         println(scope_lisp_value(scope2));
@@ -1317,7 +1326,7 @@ int print2(char * buffer, int l2, lisp_value v){
       return snprintf(buffer, LEN1, "%p", v.integer);
   case LISP_FLOAT32:
   case LISP_RATIONAL:
-    return snprintf(buffer, LEN1, "%f", v.rational);
+    return snprintf(buffer, LEN1, "%g", v.rational);
   case LISP_STRING:
     return snprintf(buffer, LEN1, "\"%s\"", v.string);
   case LISP_SYMBOL:
@@ -1335,7 +1344,10 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_SCOPE:
     return snprintf(buffer, LEN1, "Scope (%i)", lisp_value_scope(v)->argcnt);
   case LISP_GLOBAL_INDEX:
-    return snprintf(buffer, LEN1, "GLOBAL Index (%i)", v.integer);
+    {
+      var sym = current_context->globals->value_symbol[v.integer];
+      return snprintf(buffer, LEN1, "%s", symbol_name(sym));
+    }
   case LISP_LOCAL_INDEX:
     return snprintf(buffer, LEN1, "Local Index (%i,%i)",v.local_index.scope_level, v.local_index.scope_index);
 case LISP_CONS:
@@ -1456,7 +1468,7 @@ static void normalize_numericals(lisp_value * values, int count){
       if(is_float_type(values[0].type)){                 \
         double sum = values[0].rational;                 \
         sum = ff(sum, values[1].rational);               \
-        return rational(sum);                            \
+        return values[0].type == LISP_FLOAT32 ? float32(sum) : rational(sum); \
       }else{                                             \
         i64 sum = values[0].integer;                     \
         sum = lf(sum, values[1].integer);                \
@@ -1469,7 +1481,7 @@ static void normalize_numericals(lisp_value * values, int count){
       double sum = values[0].rational;                   \
       for(int i = 1; i < count; i++)                     \
         sum = ff(sum, values[i].rational);                 \
-      return rational(sum);                              \
+      return values[0].type == LISP_FLOAT32 ? float32(sum) : rational(sum); \
     }else{                                               \
       i64 sum = values[0].integer;                       \
       for(int i = 1; i < count; i++)                     \
@@ -1483,7 +1495,7 @@ static inline lisp_value lisp_procn(lisp_value * values, int count, void (*ff )(
     if(is_float_type(values[0].type)){
       double sum = values[0].rational;
       ff(&sum, &(values[1]).rational);
-      return rational(sum);
+      return values[0].type == LISP_FLOAT32 ? float32(sum) : rational(sum);;
     }else{
       i64 sum = values[0].integer;
       lf(&sum, &(values[1]).integer);
@@ -1496,7 +1508,7 @@ static inline lisp_value lisp_procn(lisp_value * values, int count, void (*ff )(
     double sum = values[0].rational;
     for(int i = 1; i < count; i++)
       ff(&sum, &(values[i]).rational);
-    return rational(sum);
+    return values[0].type == LISP_FLOAT32 ? float32(sum) : rational(sum);
   }else{
     i64 sum = values[0].integer;
     for(int i = 1; i < count; i++)
@@ -2228,7 +2240,6 @@ lisp_context * lisp_context_new(){
   lisp_register_native("load", 1, lisp_load);
   
   lisp_register_native("make-vector", 2, make_vector);
-  lisp_register_native("vector-length", 1, vector_length);
   lisp_register_native("vector-ref", 2, vector_ref);
   lisp_register_native("vector-set!", 3, vector_set);
   lisp_register_native("vector-element-type", 1, vector_elem_type);

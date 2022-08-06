@@ -142,6 +142,7 @@ struct __lisp_scope{
   lisp_scope * super;
   hash_table * values_index;
   lisp_value * values;
+  lisp_symbol * value_symbol;
   size_t values_count;
   size_t values_capacity;
   cons * lookup;

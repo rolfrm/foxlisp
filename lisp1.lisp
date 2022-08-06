@@ -128,7 +128,11 @@
 (defmacro pop! (lst)
   `(let ((fst (car ,lst)))
      (set! ,lst (cdr ,lst))
-     fst))
+    fst))
+(defmacro swap (position value)
+  `(let ((v ,position))
+    (set! ,position ,value)
+    v))
 
 (defmacro push! (lst v)
   `(set! ,lst (cons ,v ,lst)))

@@ -5,14 +5,17 @@
 (define window-title "funky")
 (define square-model '(polygon :2d-triangle-strip (-1 -1 1 -1 -1 1 1 1)))
 (define model '())
-(defun game-update()
+(defun game-update(events)
 
   )
 
 
 (load "demo.lisp")
 (lisp:collect-garbage)
-
+(defvar +custom-events+ ())
+(defun push-event (event)
+  (push! +custom-events+ event)
+  )
 (defun poll-events2 ()
   (let ((evts (foxgl:get-events)))
     (let ((evts2 (map evts (lambda (evt)
@@ -21,7 +24,7 @@
                                     (tsl (cdr tsl))
                                     (e (car tsl)))
                                (cons e (cdr tsl)))))))
-      evts2
+      (concat evts2 (swap +custom-events+))
       )))
 
 
@@ -35,7 +38,6 @@
   (let ((first (lisp:count-allocated)))
     
     (foxgl:render-model model)
-    ;(println (list first (lisp:count-allocated) (/ (- (lisp:count-allocated) first) (* 16 4))))
 
     )
   (foxgl:swap win)
@@ -69,7 +71,7 @@
               )
           (lambda (x)
             (println x)
-            (thread:sleep 0.2)
+            (thread:sleep 0.1)
       
             ))
         )
