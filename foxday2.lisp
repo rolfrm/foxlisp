@@ -29,7 +29,6 @@
 
 
 (defun update ()
-  
   (lisp:collect-garbage)
   (let ((s (foxgl:window-size win)))
     (foxgl:viewport (integer (car s)) (integer (cadr s))))
@@ -54,7 +53,7 @@
   (foxgl:set-title win window-title)
   )
 ;(unless! lisp:*web-environment*
-(load "swank.lisp")
+;(load "swank.lisp")
   
 (unless lisp:*web-environment*
   (set! swnk (swank-server-new 8810))

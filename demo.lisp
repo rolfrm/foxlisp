@@ -2,9 +2,9 @@
 (load "models.lisp")
 
 
-(defvar +dt+ 0.0)
-(defvar +dt2+ 0.0)
-(defvar zoom 0.05)
+(defvar +dt+ 3.12)
+(defvar +dt2+ 0.12)
+(defvar zoom 0.08)
 (defvar time2 0.0)
 (defvar game-update
   (let ((mx nil) (my nil))
@@ -29,36 +29,29 @@
                         (my2 (rational (cddr x))))
                     (when (and mx my)
                       (push-event (list 'mouse-move-delta (- mx2 mx) (- my2 my))))
-                    
+                   
                     (set! mx mx2)
                     (set! my my2)
-                  
+                 
                     ))
       ))))
 
-(defvar center-cube
-    '(translate (-0.5 -0.5 -0.5)
-      (bind cube-model)))
-
-(defvar line
-  '(translate ((bind (caar points)) (bind (cdar points)))
-    (rotate (bind 0.5)
-     (ref square-model))))
-
 (defvar dots nil)
-(dotimes! i 500
-          (push! dots (cons (* (- i 250) 0.03) (* (- (- i 1) 500) 0.03))))
+(dotimes! i 100
+          (push! dots (* (- i 50) 0.3)))
 
 (define start-time (foxgl:timestamp))
 
 (defun yfunc(x2)
-  (let ((x (* 0.2 (+ (* time2 40.0) x2))))
+  (let ((x (* 0.1 (+ (* time2 40.0) x2))))
     (* 10.0 (cos (* x 3.3)) (sin x))))
-;(defun yfunc(x2)
-;  (* x2 0.01))
-;(defvar line '())
+
 (define model
     '(view :perspective (1.0 1.0 0.01 100.0)
+      (scale (40.0 40.0)
+        (translate (-0.5 -0.5 -2)
+         (rgb (0 0 0)
+            (bind square-model))))
       (depth
        (translate (-0.0 -0.0 -2)
         (scale (bind zoom)
@@ -73,13 +66,26 @@
               (bind square-model)))
             ))
           (rgb (1.0 1.0 0.0)
-          (line 
+          (line
            (for i (bind dots)
-            (point (bind (car i)) (bind (yfunc (car i))))
+            (point (bind i) (bind (yfunc i)))
             ))
            )
+          (translate (0 0 0.5)
+          (rgb (1.0 0.0 0.0)
           (line
-           ;(point 1.0 2.0)
+           (for i (bind dots)
+            (point (bind i) (bind (yfunc (+ 100.0 i))))
+            ))
+           ))
+          (translate (0 0 1)
+          (rgb (0.0 0.0 1.0)
+          (line
+           (for i (bind dots)
+            (point (bind i) (bind (* 0.5 (+ (yfunc i) (yfunc (+ 100.0  i)) ))))
+            ))
+           ))
+          (line
            (point -10.0 -10.0)
            (point -9.0 9.0)
            (point -11.0 11.0)
@@ -88,9 +94,9 @@
            (point -10.0 -10.0)
            )
           (translate (0 (bind (yfunc 0.0)))
-          (translate (0 -1)
+          (translate (0.5 -1)
 
            (scale 0.05
-           (text (bind (math:round (yfunc 0.0) 1))))
+            (text (bind (math:round (yfunc 0.0) 2))))
           )))))
         )))
