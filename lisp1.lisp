@@ -311,3 +311,6 @@
 
 (define pi 3.141592653589793)
 (define pi_2 (/ pi 2.0))
+
+(defun lisp:function-location (func)
+  (lisp:code-location (function->code func)))

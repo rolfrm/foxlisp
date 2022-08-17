@@ -19,7 +19,9 @@ typedef enum {
       LISP_INTEGER32,
       LISP_SCOPE,
       LISP_GLOBAL_INDEX,
-      LISP_LOCAL_INDEX
+      LISP_LOCAL_INDEX,
+      // marks a GC-managed pointer
+      LISP_ALLOCATED_POINTER
 }lisp_type;
 
 // assuming 5 tags:
@@ -149,21 +151,10 @@ struct __lisp_scope{
   size_t argcnt;
   bool stack_scope;
   bool lookup_on_stack;
+  lisp_scope * sub_scope;
 };
 
 typedef struct __gc_context gc_context;
-typedef struct{
-  lisp_scope ** scopes;
-  size_t scope_count;
-  size_t scope_capacity;
-  lisp_value * code;
-  size_t call_stack_capacity;
-  size_t call_stack_count;
-  lisp_value * stack;
-  size_t stack_capacity;
-  size_t stack_count;
-
-}lisp_thread;
 
 typedef struct{
   hash_table * symbols;
@@ -171,9 +162,6 @@ typedef struct{
   size_t next_symbol;
   lisp_scope * globals;
   gc_context * gc;
-  lisp_scope ** scopes;
-  size_t scope_count;
-  size_t scope_capacity;
 }lisp_context;
 
 struct __lisp_function{
@@ -226,6 +214,7 @@ bool is_float(lisp_value a);
 bool is_float32(lisp_value a);
 bool is_string(lisp_value a);
 bool is_symbol(lisp_value a);
+bool is_regular_symbol(lisp_value a);
 bool is_function(lisp_value a);
 bool is_function_macro(lisp_value a);
 bool is_function_native(lisp_value a);
@@ -241,6 +230,7 @@ int64_t lisp_value_integer(lisp_value v);
 lisp_value byte_lisp_value(u8 i);
 u8 lisp_value_byte(lisp_value v);
 void * lisp_value_pointer(lisp_value val);
+lisp_value allocated_pointer_lisp_value(void * ptr);
 lisp_vector * lisp_value_vector(lisp_value val);
 lisp_value vector_lisp_value(lisp_vector * vector);
 lisp_type lisp_value_type(lisp_value val);
@@ -261,9 +251,23 @@ lisp_value global_index_lisp_value(size_t i);
 lisp_value local_index_lisp_value(size_t scope_level, size_t scope_index, bool scope_type);
 
 //
-
 void foxlist_thread_init();
+// mark an sweep garbage collector
 void gc_collect_garbage(lisp_context * context);
+
+// the three functions bellow are called by gc_collect_garbage
+// clear the GC marks
+void gc_clear(gc_context * gc);
+// mark active objects
+void gc_mark(lisp_context * lisp);
+// recover unmarked objects.
+void gc_recover_unmarked(gc_context * gc);
+
+bool gc_mark_cons(gc_context * gc, cons * c);
+bool cons_is_marked(gc_context * gc, cons * c);
+
+bool vector_is_marked(gc_context * gc, void * vector);
+
 lisp_value lisp_count_allocated();
 void * gc_clone(const void * mem, size_t s);
 void * nogc_clone(const void * mem, size_t s);
@@ -275,6 +279,7 @@ int64_t get_symbol_id(const char * s);
 lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
+lisp_value println_shallow(lisp_value v);
 lisp_value lisp_len(lisp_value lst);
 lisp_value lisp_length(lisp_value lst);
 const char * lisp_type_to_string(lisp_type t);
@@ -297,6 +302,15 @@ void lisp_free(void * p);
 lisp_value lisp_trace_allocations(lisp_value c);
 lisp_value lisp_get_allocated();
 gc_context * gc_context_new();
+lisp_value lisp_code_location(lisp_value cons);
+lisp_value lisp_print_code_location(lisp_value cons);
+
+lisp_value lisp_string(const char *str );
+
+lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value);
+lisp_value lisp_hashtable_set(lisp_value ht, lisp_value key, lisp_value value);
+lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key);
+lisp_value lisp_hashtable_count(lisp_value ht);
 //void * lisp_realloc(void * p, size_t v);
 
 lisp_value get_symbol(const char * s);
@@ -304,7 +318,9 @@ bool eq(lisp_value a, lisp_value b);
 const char * symbol_name(int64_t id);
 
 lisp_context * lisp_context_new();
-
+// mostly for testing. creates a context without any content.
+lisp_context * lisp_context_new_bare();
+  
 lisp_value make_vector(lisp_value len, lisp_value _default);
 lisp_value vector_length(lisp_value v);
 lisp_value vector_ref(lisp_value _vector, lisp_value k);
@@ -321,7 +337,6 @@ lisp_value native_pointer(void * ptr);
 lisp_value lisp_rational(lisp_value value);
 lisp_value lisp_float32(lisp_value value);
 
-
 size_t lisp_type_size(lisp_type type);
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
@@ -334,7 +349,7 @@ lisp_scope * lisp_scope_new(lisp_scope * super);
 void lisp_scope_stack(lisp_scope *stack_scope, lisp_scope * super, cons * argsbuffer, size_t cnt);
 bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out);
 lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value);
-
+lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 lisp_scope * lisp_context_get_root_scope();
 
 void lisp_register_value(const char * name, lisp_value value);

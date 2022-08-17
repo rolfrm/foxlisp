@@ -4,6 +4,15 @@
 #include <iron/full.h>
 #include "foxlisp.h"
 
+void on_read_cons(io_reader * rd, cons * c);
+
+// like new_cons, but marks the code location as well.
+lisp_value new_cons_r(io_reader * rd, lisp_value a, lisp_value b){
+  lisp_value newcons =  new_cons(a, b);
+  on_read_cons(rd, lisp_value_cons(newcons));
+  return newcons;
+}
+
 void skip_comment_and_whitespace(io_reader * rd){
   while(true){
 	 uint8_t c = io_peek_u8(rd);
@@ -53,7 +62,7 @@ lisp_value read_token_string(io_reader * rd){
 	 io_write_u8(&wd, c);
   }
   io_write_u8(&wd, 0);
-  lisp_value v = string_lisp_value(gc_clone(wd.data, strlen(wd.data) + 1));
+  lisp_value v = lisp_string(wd.data);
   io_writer_clear(&wd);
   return v;
 }
@@ -109,20 +118,21 @@ lisp_value tokenize_stream(io_reader * rd){
   }
   if(c == '\''){
 	 io_read_u8(rd);
-  	 var c = new_cons(quote_sym, new_cons(tokenize_stream(rd), nil));
+  	 var c = new_cons_r(rd, quote_sym, new_cons_r(rd,tokenize_stream(rd), nil));
+    
     return c;
   }
   if(c == '`'){
 	 io_read_u8(rd);
-	 return new_cons(quasiquote_sym, new_cons(tokenize_stream(rd), nil));
+	 return new_cons_r(rd, quasiquote_sym, new_cons_r(rd,tokenize_stream(rd), nil));
   }
   if(c == ','){
 	 io_read_u8(rd);
 	 if(io_peek_u8(rd) == '@'){
 		io_read_u8(rd);
-		return new_cons(unquote_splice_sym, new_cons(tokenize_stream(rd), nil));
+		return new_cons_r(rd, unquote_splice_sym, new_cons_r(rd,tokenize_stream(rd), nil));
 	 }
-	 return new_cons(unquote_sym, new_cons(tokenize_stream(rd), nil));
+	 return new_cons_r(rd,unquote_sym, new_cons_r(rd,tokenize_stream(rd), nil));
   }
   if(c == '('){
 	 io_read_u8(rd);
@@ -136,7 +146,7 @@ lisp_value tokenize_stream(io_reader * rd){
 	 var next = head;
 	 while(true){
 		var v = tokenize_stream(rd);
-		var new = new_cons(v, nil);
+		var new = new_cons_r(rd, v, nil);
 		if(is_nil(head)){
 		  head = new;
 		}else{

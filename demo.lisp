@@ -1,3 +1,5 @@
+;;to profile: ./run foxday2.lisp | sort | uniq -c |sort -n
+
 (define window-title "funky")
 (load "models.lisp")
 
@@ -86,12 +88,20 @@
             ))
            ))
           (line
-           (point -10.0 -10.0)
-           (point -9.0 9.0)
-           (point -11.0 11.0)
-           (point 10.0 10.0)
-           (point 10.0 -10.0)
-           (point -10.0 -10.0)
+           (point -10.0 -9.0)
+
+           (point -10.0 9.0)
+           (point -9.0 10.0)
+
+           (point 9.0 10.0)
+           (point 10.0 9.0)
+
+           (point 10.0 -9.0)
+           (point 9.0 -10.0)
+
+           (point -9.0 -10.0)
+           (point -10.0 -9.0)
+
            )
           (translate (0 (bind (yfunc 0.0)))
           (translate (0.5 -1)

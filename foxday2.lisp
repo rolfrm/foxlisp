@@ -8,14 +8,14 @@
 (defun game-update(events)
 
   )
-
-
+(define should-exit nil)
 (load "demo.lisp")
 (lisp:collect-garbage)
 (defvar +custom-events+ ())
 (defun push-event (event)
   (push! +custom-events+ event)
   )
+
 (defun poll-events2 ()
   (let ((evts (foxgl:get-events)))
     (let ((evts2 (map evts (lambda (evt)
@@ -27,15 +27,28 @@
       (concat evts2 (swap +custom-events+))
       )))
 
-
+(defvar foxday-debug-state nil)
 (defun update ()
   (lisp:collect-garbage)
   (let ((s (foxgl:window-size win)))
     (foxgl:viewport (integer (car s)) (integer (cadr s))))
   (foxgl:clear)
-  (game-update (poll-events2))
+  (let ((events (poll-events2)))
+    (for-each evt events
+              (when (eq (car evt) 'char)
+                (print evt)
+                (when (eq (cadr evt) 'd)
+                  (lisp:debug (swap foxday-debug-state (not foxday-debug-state))))
+                (when (eq (cadr evt) 'q)
+                  (set! should-exit t))
+
+
+                )
+              ;(println evt)
+              )
+    (game-update events))
   (let ((first (lisp:count-allocated)))
-    
+    ;(println first)
     (foxgl:render-model model)
 
     )
@@ -56,12 +69,12 @@
 ;(load "swank.lisp")
   
 (unless lisp:*web-environment*
-  (set! swnk (swank-server-new 8810))
+  ;(set! swnk (swank-server-new 8810))
 
   (ld50:initialize)
   (foxgl:make-current win)
   
-  (loop t
+  (loop (not should-exit)
         (with-exception-handler
             (progn
               (when swnk

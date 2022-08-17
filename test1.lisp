@@ -1,5 +1,9 @@
 
+
+
 (load "lisp1.lisp" )
+
+
 (let ((x2 10))
   (println x2))
 (do-times 4 (lambda () (println (quote hej))))
@@ -421,6 +425,23 @@
     )
   (let (( r (lisp:with-sub-scope test-scope 'c 30 '((+ a b c)))))
     (assert (eq r 60))
-  ))
+    ))
+
+(defvar asd '(asd))
+(println (list (hashtable-ref lisp:++cons-file-offset++ asd) (hashtable-ref lisp:++cons-file++ asd)))
+(println lisp:++cons-file++) 
+(println lisp:++current-file++)
+(println (lisp:code-location asd))
+
+(defun test-func-1 () (+ 1 2))
+;;; blank line!!
+(defun test-func-2 () (+ 1 2))
+
+(assert (eq (cadr (lisp:function-location test-func-1))
+            (- (cadr (lisp:function-location test-func-2)) 2)))
+
+(println (lisp:code-location (function->code test-func-1)))
+                                        ;(println (hashtable-values lisp:++cons-file++))
+
 (println "Tests Passed")
 

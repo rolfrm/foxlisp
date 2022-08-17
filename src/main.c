@@ -17,6 +17,8 @@ lisp_value lisp_read_stream(io_reader * rd);
 #include "lisp_value2.c"
 
 extern bool debug_set;
+bool debug_enabled = false;
+
 bool tracing = false;
 
 lisp_value rest_sym = {.type = LISP_SYMBOL};
@@ -31,6 +33,11 @@ lisp_value nil = {0};
 lisp_value t = {.type = LISP_T};
 lisp_value else_sym;
 lisp_value otherwise_sym;
+
+// debug info
+lisp_value read_current_file = {0};
+lisp_value read_cons_offset = {0};
+lisp_value read_cons_file = {0};
 
 #undef ASSERT
 void print_call_stack();
@@ -99,11 +106,11 @@ lisp_scope * lisp_scope_new(lisp_scope * super){
   lisp_scope * s = lisp_malloc(sizeof(*super));
   *s = (lisp_scope){0};
   s->super = super;
-  s->values = NULL;
   return s;
 }
 
 void lisp_scope_stack(lisp_scope * s, lisp_scope * super, cons * lookup, size_t cnt){
+  s->sub_scope = NULL;
   s->super = super;
   s->values = NULL;
   s->lookup = lookup;
@@ -132,7 +139,7 @@ lisp_scope * lisp_scope_unstack(lisp_scope * scope){
     scope->lookup = gc_clone(scope->lookup, sizeof(scope->lookup[0]) * scope->argcnt);
     
   }
-  var newscope = (lisp_scope *) gc_clone(scope, sizeof(*scope));
+  lisp_scope * newscope = gc_clone(scope, sizeof(newscope[0]));
   newscope->stack_scope = false;
   return newscope;
 }
@@ -165,7 +172,6 @@ bool _lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * 
 }
 
 bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out){
-  //printf("Slow fetch: "); println(sym);
   if(scope == NULL) return false;
   if(scope->lookup != NULL){
     var argcnt = scope->argcnt;
@@ -255,11 +261,11 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   
   if(scope->values == NULL){
          
-	 scope->values_index = ht_create2(2048, sizeof(u64), sizeof(int));
+    scope->values_index = ht_create2(2048, sizeof(u64), sizeof(int));
     scope->values_index->hash = symbol_nohash;
     scope->values_capacity = 2048;
-    scope->values = malloc(scope->values_capacity * sizeof(lisp_value));
-    scope->value_symbol = malloc(scope->values_capacity * sizeof(lisp_symbol));
+    scope->values = alloc0(scope->values_capacity * sizeof(lisp_value));
+    scope->value_symbol = alloc0(scope->values_capacity * sizeof(lisp_symbol));
     scope->values[0] = nil;
     scope->value_symbol[0] = 0;
     scope->values_count = 1;
@@ -283,21 +289,6 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
 }
 
 lisp_context * current_context;
-void lisp_push_scope(lisp_scope * scope){
-  if(current_context->scope_count == current_context->scope_capacity){
-    current_context->scope_capacity = MAX(8, current_context->scope_capacity * 2);
-    current_context->scopes = realloc(current_context->scopes, sizeof(current_context->scopes[0]) * current_context->scope_capacity);
-  }
-  current_context->scopes[current_context->scope_count] = scope;
-  current_context->scope_count += 1;
-}
-
-void lisp_pop_scope(lisp_scope * scope){
-  ASSERT(current_context->scope_count > 0);
-  ASSERT(current_context->scopes[current_context->scope_count - 1] == scope);
-  current_context->scopes[current_context->scope_count - 1] = NULL;
-  current_context->scope_count -= 1; 
-}
 
 
 inline lisp_value car(lisp_value v){
@@ -428,6 +419,21 @@ lisp_value string_starts_with(lisp_value str, lisp_value str2){
 
 lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value);
 
+// new cons for macros
+// this makes sure that the code location is maintained.
+lisp_value new_cons_m(lisp_value a, lisp_value b, lisp_value cons){
+  
+  var offset = lisp_hashtable_get(read_cons_offset, cons);
+  var file = lisp_hashtable_get(read_cons_file, cons);
+  
+  cons = new_cons(a, b);
+  if(is_nil(offset) || is_nil(file))
+     return cons;
+  lisp_hashtable_set(read_cons_offset, cons, offset);
+  lisp_hashtable_set(read_cons_file, cons, file);
+  return cons;
+}
+
 lisp_value lisp_sub_macro_expand(lisp_scope * scope, lisp_value c){
   if(is_nil(c)) return nil;
   var current = car(c);
@@ -437,11 +443,11 @@ lisp_value lisp_sub_macro_expand(lisp_scope * scope, lisp_value c){
 	 var nextr = lisp_sub_macro_expand(scope, next);
 	 if(lisp_value_eq(current, value) && lisp_value_eq(next, nextr))
 		return c;
-	 return new_cons(value, nextr);
+	 return new_cons_m(value, nextr, c);
   }else{
 	 if(lisp_value_eq(current, value))
 		return c;
-	 return new_cons(value, nil);
+	 return new_cons_m(value, nil, c);
   }
 }
 
@@ -463,7 +469,8 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
   memset(args3, 0, sizeof(args3[0]) * argcnt);
   lisp_scope function_scope[1] = {0};
   lisp_scope_stack(function_scope, f->closure, args3, argcnt);
-  lisp_push_scope(function_scope);
+  var prev_scope = scope->sub_scope; 
+  scope->sub_scope = function_scope;
   var args = f->args;
   var args2 = cdr(value);
   while(!is_nil(args)){
@@ -476,7 +483,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		println(args);
 		println(args2);
 		raise_string("arg name must be a symbol\n");
-      lisp_pop_scope(function_scope);
+                scope->sub_scope = prev_scope;
 		return nil;
 	 }
 	 if(lisp_value_eq(arg, rest_sym)){
@@ -484,7 +491,7 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 		arg = car(args);
 		if(!is_symbol(arg)){
 		  raise_string("(2) arg name must be a symbol.");
-        lisp_pop_scope(function_scope);
+                  scope->sub_scope = prev_scope;
 		  return nil;
 		}
 		lisp_scope_create_value(function_scope, arg, args2);
@@ -503,8 +510,8 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value){
 	 ret = lisp_eval(function_scope, car(it));
 	 it = cdr(it);
   }
-  lisp_pop_scope(function_scope);
-		  
+  scope->sub_scope = prev_scope;
+  
   return ret;
 }
 
@@ -523,13 +530,13 @@ lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
 	 if(unsplice)
 		return lisp_append(value2, nextr);
 	 
-	 return new_cons(value2, nextr);
+	 return new_cons_m(value2, nextr, value);
   }else{
 	 if(lisp_value_eq(current, value2))
 		return value;
 	 if(unsplice)
 		return value2;
-	 return new_cons(value2, nil);
+	 return new_cons_m(value2, nil, value);
   }
 }
 
@@ -563,7 +570,8 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
   size_t c = 0;
   while(is_cons(statement)){
     var first = car(statement);
-    if(is_symbol(first)){
+    
+    if(is_regular_symbol(first)){
       lisp_scope * s1;
       int i1, i2;
       if(lisp_scope_try_get_value2(scope, lisp_value_symbol(first), &s1, &i1, &i2)){
@@ -721,8 +729,16 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   switch(lisp_value_type(value)){
   case LISP_CONS:
 	 {
-      
       var first = car(value);
+
+      if(debug_enabled){
+        if(!is_nil(lisp_print_code_location(value)))
+          {
+            printf(" ");
+           println(first);
+          }
+      }
+      //println_shallow(value);
       lisp_value first_value;
 
       lisp_scope * s1;
@@ -735,6 +751,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             first_value = s1->lookup[i2].cdr;
           }
           if(s1 == current_context->globals){
+            
             lisp_value new = global_index_lisp_value(i1);
             set_car(value, new);
             
@@ -777,14 +794,19 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             memset(argsbuf, 0, sizeof(argsbuf[0]) * argcnt);
             lisp_scope scope1[1] = {0};
             lisp_scope_stack(scope1, scope, argsbuf, argcnt);
-          
+            scope->sub_scope = scope1;
+            var scope_old = scope;
+            
             scope = scope1;
             while(!is_nil(argform)){
 
               var arg = car(argform);
 				  var sym = car(arg);
 				  var value = lisp_eval(scope, cadr(arg));
-				  if(lisp_is_in_error()) return nil;
+				  if(lisp_is_in_error()){
+                scope_old->sub_scope = NULL;
+                return nil;
+              }
               lisp_scope_create_value(scope, sym, value);
               argform = cdr(argform);
 				}
@@ -796,6 +818,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
 				  if(lisp_is_in_error()) break;
 				  body = cdr(body);
 				}
+            scope_old->sub_scope = NULL;
 				return result;
 			 }
 		  case LISP_PROGN:
@@ -846,7 +869,6 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
             var ovalue = value;
             value = cdr(value);
 				var sym = car(value);
-            //printf("SET %s %i\n", symbol_name(sym.integer), lisp_is_in_error());
             value = cdr(value);
 				var value2 = lisp_eval2(scope, car(value));
             switch(lisp_value_type(sym)){
@@ -1131,8 +1153,9 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
         lisp_scope function_scope[1];
         
         lisp_scope_stack(function_scope, f->closure,  args3, argcnt);
-        lisp_push_scope(function_scope);
-		  
+        var prev_scope = scope->sub_scope;
+        scope->sub_scope = function_scope;
+        
         var args = f->args;
         var args2 = things;
 
@@ -1141,6 +1164,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           if(!is_symbol(arg)){
             println(f->args);
             raise_string("(3) arg name must be a symbol");
+            scope->sub_scope = prev_scope;
             return nil;
           }
           if(lisp_value_eq(arg, rest_sym)){
@@ -1150,6 +1174,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
               // error
               println(arg);
               raise_string("(4) arg name must be a symbol");
+              scope->sub_scope = prev_scope;
               return nil;
             }
             
@@ -1170,7 +1195,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           ret = lisp_eval(function_scope, car(it));
           it = cdr(it);
         }
-        lisp_pop_scope(function_scope);
+        scope->sub_scope = prev_scope;
         return ret;
       }else{
         println(value);
@@ -1245,6 +1270,83 @@ lisp_value lisp_eval_value(lisp_value code, lisp_value scope){
   return lisp_eval(scopeptr, code);
 }
 
+void on_read_cons(io_reader * rd, lisp_value c){
+  if(!is_nil(read_cons_offset)){
+    int offset = rd->offset;
+    lisp_hashtable_set(read_cons_offset, c, integer_lisp_value(offset));
+  }
+  if(!is_nil(read_current_file) && !is_nil(read_cons_file))
+    lisp_hashtable_set(read_cons_file, c, read_current_file);
+}
+
+lisp_value lisp_code_location(lisp_value cons){
+  var offset = lisp_hashtable_get(read_cons_offset, cons);
+  var file = lisp_hashtable_get(read_cons_file, cons);
+  if(lisp_value_type(offset) != LISP_INTEGER)
+    return nil;
+  if(lisp_value_type(file) != LISP_STRING)
+    return nil;
+  var filepath = lisp_value_string(file); 
+  var code = read_file_to_string(filepath);
+  if(code == NULL) return nil;
+  var ptr = code;
+  int lines = 0;
+  int col = 0;
+  int offs = lisp_value_integer(offset);
+  while(*code && (offs-- > 0)){
+    if(*code == '\n'){
+      lines++;
+      col = 0;
+    }else{
+      col++;
+    }
+    code++;
+  }
+  if(*code){
+    // found line
+    dealloc(ptr);
+    return new_cons(file, new_cons(integer_lisp_value(lines + 1), new_cons(integer_lisp_value(col), nil)));
+  }
+
+  dealloc(ptr);
+  return nil;
+}
+
+lisp_value lisp_print_code_location(lisp_value cons){
+  var offset = lisp_hashtable_get(read_cons_offset, cons);
+  var file = lisp_hashtable_get(read_cons_file, cons);
+  if(lisp_value_type(offset) != LISP_INTEGER)
+    return nil;
+  if(lisp_value_type(file) != LISP_STRING)
+    return nil;
+  var filepath = lisp_value_string(file); 
+  var code = read_file_to_string(filepath);
+  if(code == NULL) return nil;
+  var ptr = code;
+  int lines = 0;
+  int col = 0;
+  int offs = lisp_value_integer(offset);
+  while(*code && (offs-- > 0)){
+    if(*code == '\n'){
+      lines++;
+      col = 0;
+    }else{
+      col++;
+    }
+    code++;
+  }
+  if(*code){
+    // found line
+    dealloc(ptr);
+    printf("%s:%i:%i", filepath, lines + 1, col);
+    return t;
+  }
+
+  dealloc(ptr);
+  return nil;
+}
+
+
 lisp_value lisp_eval_stream(io_reader * rd){
   lisp_value result = nil;
   while(true){
@@ -1262,7 +1364,7 @@ lisp_value lisp_eval_stream(io_reader * rd){
         break;
       code = next_code;
     }
-    println(code);
+    //println(code);
     lisp_register_value("lisp:++current-toplevel++", code);
     result = lisp_eval(current_context->globals, code);
     if(lisp_is_in_error())
@@ -1277,8 +1379,17 @@ lisp_value lisp_eval_string(const char * str){
   return lisp_eval_stream(&w);
 }
 
+
+lisp_value read_current_files = {0};
+
 lisp_value lisp_eval_file(const char * filepath){
   char * buffer = read_file_to_string(filepath);
+  println(read_current_file);
+  read_current_file = lisp_string(filepath);
+  read_current_files = new_cons(read_current_file, read_current_files);
+
+  lisp_register_value("lisp:++current-file++", read_current_file);
+  lisp_register_value("lisp:++current-files++", read_current_files);
   if(buffer == NULL) {
     printf("FILE: %s\n", filepath);
     raise_string("Unable to read file");
@@ -1286,9 +1397,15 @@ lisp_value lisp_eval_file(const char * filepath){
   }
   lisp_value r = lisp_eval_string(buffer);
   free(buffer);
+  read_current_files = cdr(read_current_files);
+  read_current_file = car(read_current_files);
+  
+  lisp_register_value("lisp:++current-file++", read_current_file);
+  lisp_register_value("lisp:++current-files++", read_current_files);
+  
   return r;
 }
-
+static int lisp_print_depth = 10;
 int print2(char * buffer, int l2, lisp_value v){
   char * initbuf = buffer;
   int l = 0;
@@ -1349,7 +1466,7 @@ int print2(char * buffer, int l2, lisp_value v){
       return snprintf(buffer, LEN1, "%s", symbol_name(sym));
     }
   case LISP_LOCAL_INDEX:
-    return snprintf(buffer, LEN1, "Local Index (%i,%i)",v.local_index.scope_level, v.local_index.scope_index);
+    return snprintf(buffer, LEN1, "[Local Index (%i,%i)]",v.local_index.scope_level, v.local_index.scope_index);
 case LISP_CONS:
     {
       int l = 0;
@@ -1361,7 +1478,12 @@ case LISP_CONS:
         }else{
           l += snprintf(OBUF, LEN1, " ");
         }
-        l += print2(OBUF, LEN1, v.cons->car);
+        lisp_print_depth--;
+        if(lisp_print_depth > 0)
+          l += print2(OBUF, LEN1, v.cons->car);
+        else
+          l += snprintf(OBUF, LEN1, ".");
+        lisp_print_depth++;
         v = v.cons->cdr;
       }
       if(!is_nil(v)){
@@ -1371,8 +1493,20 @@ case LISP_CONS:
       l += snprintf(OBUF, LEN1, ")");
       return l;
     }
+  case LISP_ALLOCATED_POINTER:
+    l += snprintf(OBUF, LEN1, "[GC'd pointer %p]", lisp_value_pointer(v));
+    return l;
   }
   return 0;
+}
+
+
+lisp_value println_shallow(lisp_value v){
+  int p = lisp_print_depth;
+  lisp_print_depth = 2;
+  println(v);
+  lisp_print_depth = p;
+  return nil;
 }
 
 lisp_value print(lisp_value v){
@@ -1397,7 +1531,7 @@ void lisp_register_value(const char * name, lisp_value value){
   lisp_scope_create_value(current_context->globals, get_symbol(name), value);
 }
 void lisp_register_native(const char * name, int nargs, void * fptr){
-  native_function *nf= lisp_malloc(sizeof(*nf));
+  native_function *nf = lisp_malloc(sizeof(*nf));
   nf->nargs = nargs;
   nf->fptr = fptr;
   lisp_value v = {
@@ -1773,6 +1907,7 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_SCOPE: return "SCOPE";
   case LISP_GLOBAL_INDEX: return "GLOBAL_INDEX";
   case LISP_LOCAL_INDEX: return "LOCAL_INDEX";
+  case LISP_ALLOCATED_POINTER: return "ALLOCATED_POINTER";
   }
   raise_string("Unknown type:\n");
   
@@ -1964,6 +2099,10 @@ lisp_value hex_string(lisp_value i, lisp_value dec){
   return string_lisp_value(buf);
 }
 
+lisp_value lisp_string(const char *str ){
+  return string_lisp_value(gc_clone(str, strlen(str) + 1));
+}
+
 lisp_value lisp_signature(lisp_value func){
   if(is_function(func))
     return new_cons(get_symbol("func"), func.function->args);
@@ -1973,7 +2112,10 @@ lisp_value lisp_signature(lisp_value func){
 lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value){
   bool weak_keys = !is_nil(weak_key);
   bool weak_values = !is_nil(weak_value);
-  hash_table * ht = ht_create(sizeof(lisp_value), sizeof(lisp_value));
+  hash_table * ht = lisp_malloc(sizeof(*ht));
+  ht_create3(ht, 1, sizeof(lisp_value), sizeof(lisp_value));
+  ht_set_alloc(ht, lisp_malloc, lisp_free);
+  
   return hashtable_lisp_value(ht);
 }
 
@@ -1991,6 +2133,12 @@ lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
   if(ht_get(ht, &key, &value))
     return value;
   return nil;
+}
+
+lisp_value lisp_hashtable_count(lisp_value ht){
+  TYPE_ASSERT(ht, LISP_HASHTABLE);
+  var ht2 = lisp_value_hashtable(ht);
+  return integer_lisp_value(ht2->count);
 }
 
 void it_symbols(void * k1, void * k2, void * target){
@@ -2022,6 +2170,34 @@ lisp_value lisp_hashtable_get2(lisp_value _ht, lisp_value key){
   if(ht_get(ht, &key, &value))
     return new_cons(t, value);
   return nil;
+}
+
+static void iter_add_key(void * key, void * elem, void * user_data){
+  UNUSED(elem);
+  lisp_value * ud = user_data;
+  *ud = new_cons(((lisp_value *) key)[0], *ud);
+}
+
+lisp_value lisp_hashtable_keys(lisp_value _ht){
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
+  hash_table * ht = lisp_value_hashtable(_ht);
+  lisp_value keys = nil;
+  ht_iterate(ht, iter_add_key, &keys);
+  return keys;
+}
+
+static void iter_add_value(void * key, void * elem, void * user_data){
+  UNUSED(key);
+  lisp_value * ud = user_data;
+  *ud = new_cons(((lisp_value *) elem)[0], *ud);
+}
+
+lisp_value lisp_hashtable_values(lisp_value _ht){
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
+  hash_table * ht = lisp_value_hashtable(_ht);
+  lisp_value keys = nil;
+  ht_iterate(ht, iter_add_value, &keys);
+  return keys;
 }
 
 lisp_value lisp_is_symbol(lisp_value v){
@@ -2082,7 +2258,6 @@ void load_modules(){
 }
 
 void web_update(){
-  //printf("Web update\n");
   is_in_lisp = true;
   
   var sym = get_symbol("lisp:*web-update*");
@@ -2106,13 +2281,19 @@ void setup_fpe_handler(){
   sigemptyset (&new_action.sa_mask);
   new_action.sa_flags =SA_NODEFER | SA_NOMASK;
   
-  
   sigaction (SIGFPE, &new_action, &old_action);
-  
-
 }
 
+void test_gc();
+
 int main(int argc, char ** argv){
+  for(int i = 1; i < argc; i++){
+    if(strcmp(argv[i], "--test-gc") == 0){
+      test_gc();
+      return 0;
+    }
+  }
+
   current_context = lisp_context_new();
   
   setup_fpe_handler();
@@ -2158,17 +2339,32 @@ pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
   pthread_create(&thread, NULL, f, data);
   return thread;
 }
+lisp_value lisp_debug(lisp_value v){
+  debug_enabled = !is_nil(v);
+  return nil;
+}
 
+extern void * (* ht_mem_malloc)(size_t s);
+extern void (* ht_mem_free)(void *);
 
-lisp_context * lisp_context_new(){
-  lisp_context * ctx = lisp_malloc(sizeof(ctx[0]));
+lisp_context * lisp_context_new_bare(){
+  lisp_context * ctx = alloc0(sizeof(ctx[0]));
   ctx->gc = gc_context_new();
+ 
   ctx->next_symbol = 1;
   ctx->symbols = ht_create_strkey(sizeof(u64));
   ctx->symbols_reverse = ht_create(sizeof(u64), sizeof(char *));
   ctx->symbols_reverse->hash = symbol_nohash;
-    
+  var prevctx = current_context;
+  current_context = ctx;
   ctx->globals = lisp_scope_new(NULL);
+  current_context = prevctx;
+  return ctx;
+}
+
+lisp_context * lisp_context_new(){
+  
+  lisp_context * ctx = lisp_context_new_bare();
   current_context = ctx;
 
   rest_sym = get_symbol("&rest");
@@ -2218,6 +2414,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:collect-garbage", 0, lisp_collect_garbage);
   lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);
   lisp_register_native("lisp:trace-allocations", 1, lisp_trace_allocations);
+  lisp_register_native("lisp:debug", 1, lisp_debug);
   lisp_register_native("copy-list", 1, copy_cons);
   lisp_register_native("copy-list-deep", 1, copy_cons_deep);
   lisp_register_native("plookup", 2, lisp_plookup);
@@ -2261,6 +2458,8 @@ lisp_context * lisp_context_new(){
   lisp_register_native("hashtable-set", 3, lisp_hashtable_set);
   lisp_register_native("hashtable-remove", 2, lisp_hashtable_remove);
   lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
+  lisp_register_native("hashtable-keys", 1, lisp_hashtable_keys);
+  lisp_register_native("hashtable-values", 1, lisp_hashtable_values);
   lisp_register_native("function-signature", 1, lisp_signature);
 
   lisp_register_native("optimize-statement", 2, _lisp_optimize_statement);
@@ -2270,6 +2469,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:with-scope-binding", 5, lisp_with_scope_binding);
   lisp_register_native("lisp:with-scope-variable", 5, lisp_with_scope_vars);
   lisp_register_native("lisp:scope-set!", 3, lisp_scope_set);
+  lisp_register_native("lisp:code-location", 1, lisp_code_location);
   
   lisp_register_native("eval", 2, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
@@ -2300,6 +2500,13 @@ lisp_context * lisp_context_new(){
   lisp_register_value("lisp:*web-environment*", t);
   lisp_register_value("lisp:*web-update*", nil);
 #endif
+
+  // keeping track of debug information
+  read_cons_offset = lisp_make_hashtable(nil, nil);
+  read_cons_file = lisp_make_hashtable(nil, nil);
+  lisp_register_value("lisp:++cons-file-offset++", read_cons_offset);
+  lisp_register_value("lisp:++cons-file++", read_cons_file);
+  
 
   load_modules();
 

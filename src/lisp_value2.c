@@ -54,6 +54,10 @@ inline bool is_symbol(lisp_value a){
   return a.type == LISP_SYMBOL;
 }
 
+inline bool is_regular_symbol(lisp_value a){
+  return is_symbol(a) && !is_keyword(a);
+}
+
 inline bool is_function(lisp_value a){
   return a.type == LISP_FUNCTION;
 }
@@ -169,6 +173,10 @@ inline lisp_value float32_lisp_value(f32 v){
 
 inline lisp_value native_pointer_lisp_value(void * v){
   return (lisp_value){.type = LISP_NATIVE_POINTER, .pointer = v };
+}
+
+inline lisp_value allocated_pointer_lisp_value(void * ptr){
+  return (lisp_value){.type = LISP_ALLOCATED_POINTER, .pointer = ptr };
 }
 
 inline hash_table * lisp_value_hashtable(lisp_value v){
