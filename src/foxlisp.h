@@ -21,7 +21,9 @@ typedef enum {
       LISP_GLOBAL_INDEX,
       LISP_LOCAL_INDEX,
       // marks a GC-managed pointer
-      LISP_ALLOCATED_POINTER
+      LISP_ALLOCATED_POINTER,
+      // a native pointer to a lisp_value
+      LISP_NATIVE_POINTER_TO_VALUE
 }lisp_type;
 
 // assuming 5 tags:
@@ -204,7 +206,7 @@ extern lisp_value unquote_sym;
 extern lisp_value unquote_splice_sym;
 extern lisp_value else_sym;
 extern size_t conses_allocated;
-
+extern lisp_value lisp_stack;
 // lisp value
 bool is_nil(lisp_value v);
 bool is_t(lisp_value v);
@@ -231,6 +233,7 @@ lisp_value byte_lisp_value(u8 i);
 u8 lisp_value_byte(lisp_value v);
 void * lisp_value_pointer(lisp_value val);
 lisp_value allocated_pointer_lisp_value(void * ptr);
+lisp_value lisp_pointer_to_lisp_value(lisp_value * ptr);
 lisp_vector * lisp_value_vector(lisp_value val);
 lisp_value vector_lisp_value(lisp_vector * vector);
 lisp_type lisp_value_type(lisp_value val);

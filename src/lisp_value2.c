@@ -179,6 +179,11 @@ inline lisp_value allocated_pointer_lisp_value(void * ptr){
   return (lisp_value){.type = LISP_ALLOCATED_POINTER, .pointer = ptr };
 }
 
+inline lisp_value lisp_pointer_to_lisp_value(lisp_value * ptr){
+  return (lisp_value){.type = LISP_NATIVE_POINTER_TO_VALUE, .pointer = ptr};
+                   
+}
+
 inline hash_table * lisp_value_hashtable(lisp_value v){
   return v.native_pointer;
 }

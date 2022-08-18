@@ -177,7 +177,12 @@ void visit_value(gc_context * gc, lisp_value val){
   case LISP_ALLOCATED_POINTER:
     if(!mark_vector(gc, val.native_pointer))
       return;
-    
+  case LISP_NATIVE_POINTER_TO_VALUE:
+    // assuming a non-gc'd pointer
+    lisp_value * ptr_to_value = val.native_pointer;
+    if(ptr_to_value != NULL)
+      visit_value(gc, *ptr_to_value);
+    break;
   case LISP_SCOPE:
     mark_scope(gc, val.scope);
     break;
@@ -209,7 +214,7 @@ void visit_value(gc_context * gc, lisp_value val){
     case LISP_NATIVE_POINTER:
     case LISP_SCOPE:
     case LISP_ALLOCATED_POINTER:
-  
+    case LISP_NATIVE_POINTER_TO_VALUE:
     case LISP_HASHTABLE:
       // elem type is lisp_value
       {

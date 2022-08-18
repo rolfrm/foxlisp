@@ -67,7 +67,20 @@
   )
 ;(unless! lisp:*web-environment*
 ;(load "swank.lisp")
-  
+
+(defun lisp:print-stack-trace()
+  (for-each y (deref-pointer lisp:++current-error-stack++)
+            (print y)
+                      
+            (let ((cd (lisp:code-location y)))
+              (when cd
+                (print (car cd))
+                (print ":")
+                (print (cadr cd))
+                ))
+            (println "")
+            ))
+            
 (unless lisp:*web-environment*
   ;(set! swnk (swank-server-new 8810))
 
@@ -82,6 +95,7 @@
               (update)
               )
           (lambda (x)
+            (lisp:print-stack-trace)
             (println x)
             (thread:sleep 0.1)
       

@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -42,7 +43,8 @@ lisp_value read_cons_file = {0};
 #undef ASSERT
 void print_call_stack();
 #define lisp_eval2 lisp_eval
-static __thread lisp_value current_error;
+static __thread lisp_value current_error = {0};
+static lisp_value current_error_stack = {0};
 static __thread bool is_in_lisp;
 
 static inline bool lisp_is_in_error(){
@@ -51,12 +53,14 @@ static inline bool lisp_is_in_error(){
 
 void raise_string(const char * str){
   current_error = string_lisp_value(str);
+  current_error_stack = copy_cons(lisp_stack);
   printf("%s\n", str);
   print_call_stack();
 }
 
 lisp_value lisp_error(lisp_value value){
   current_error = value;
+  current_error_stack = copy_cons(lisp_stack);
   println(current_error);
   print_call_stack();
   return nil;
@@ -416,6 +420,13 @@ lisp_value string_starts_with(lisp_value str, lisp_value str2){
   return bool_lisp_value(strncmp(astr, bstr, strlen(bstr)) == 0);
 }
 
+lisp_value lisp_value_deref(lisp_value ptr){
+  TYPE_ASSERT(ptr, LISP_NATIVE_POINTER_TO_VALUE);
+  lisp_value * pt = ptr.pointer;
+  if(pt == NULL) return nil;
+  return *pt;
+}
+
 
 lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value);
 
@@ -715,7 +726,6 @@ lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2, lisp_value 
   
 }
 
-
 lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
   lisp_scope * s = lisp_value_scope(scope);
   lisp_scope_set_value(s, sym, value);
@@ -723,8 +733,17 @@ lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
 }
 
 sigjmp_buf error_resume_jmp;
-      
+lisp_value lisp_stack;
+lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+  cons stk = {.car = value, .cdr = lisp_stack};
+  lisp_stack = cons_lisp_value(&stk);
+  var r = lisp_eval_inner(scope, value);
+  lisp_stack = cdr(lisp_stack);
+  return r;
+}
+
+lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
   tail_call:;
   switch(lisp_value_type(value)){
   case LISP_CONS:
@@ -735,7 +754,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
         if(!is_nil(lisp_print_code_location(value)))
           {
             printf(" ");
-           println(first);
+            println(first);
           }
       }
       //println_shallow(value);
@@ -945,16 +964,20 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
           }
         case LISP_WITH_EXCEPTION_HANDLER:
           {
+            var stk0 = lisp_stack;
+            lisp_stack = nil;
             var result = lisp_eval(scope, cadr(value));
             if(lisp_is_in_error()){
               var error = current_error;
               current_error = nil;
-              printf("WITH EXCEPTION HANDLER\n");
               var error_handler = lisp_eval(scope, caddr(value));
               lisp_scope_create_value(current_context->globals, current_error_sym, error);
               var result2 = lisp_eval(scope, new_cons(error_handler, new_cons(current_error_sym, nil)));
-              return result2;
+              current_error_stack = nil;
+              
+              result = result2;
             }
+            lisp_stack = stk0;
             return result;
             
             break;
@@ -1496,6 +1519,18 @@ case LISP_CONS:
   case LISP_ALLOCATED_POINTER:
     l += snprintf(OBUF, LEN1, "[GC'd pointer %p]", lisp_value_pointer(v));
     return l;
+  case LISP_NATIVE_POINTER_TO_VALUE:
+    {
+      l += snprintf(OBUF, LEN1, "*[");
+      lisp_value * val = lisp_value_pointer(v);
+      if(val != NULL)
+        l += print2(OBUF, LEN1, *val);
+      else
+        l += snprintf(OBUF, LEN1, "NULL");
+      l += snprintf(OBUF, LEN1, "]");
+      
+      return l;
+    }
   }
   return 0;
 }
@@ -1908,6 +1943,7 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_GLOBAL_INDEX: return "GLOBAL_INDEX";
   case LISP_LOCAL_INDEX: return "LOCAL_INDEX";
   case LISP_ALLOCATED_POINTER: return "ALLOCATED_POINTER";
+  case LISP_NATIVE_POINTER_TO_VALUE: return "NATIVE_POINTER_TO_VALUE";
   }
   raise_string("Unknown type:\n");
   
@@ -2470,6 +2506,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:with-scope-variable", 5, lisp_with_scope_vars);
   lisp_register_native("lisp:scope-set!", 3, lisp_scope_set);
   lisp_register_native("lisp:code-location", 1, lisp_code_location);
+  lisp_register_native("deref-pointer", 1, lisp_value_deref);
   
   lisp_register_native("eval", 2, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
@@ -2506,6 +2543,10 @@ lisp_context * lisp_context_new(){
   read_cons_file = lisp_make_hashtable(nil, nil);
   lisp_register_value("lisp:++cons-file-offset++", read_cons_offset);
   lisp_register_value("lisp:++cons-file++", read_cons_file);
+
+  lisp_register_value("lisp:++stack++", lisp_pointer_to_lisp_value(&lisp_stack));
+  lisp_register_value("lisp:++current-error++", lisp_pointer_to_lisp_value(&current_error));
+  lisp_register_value("lisp:++current-error-stack++", lisp_pointer_to_lisp_value(&current_error_stack));
   
 
   load_modules();

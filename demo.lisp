@@ -11,6 +11,7 @@
 (defvar game-update
   (let ((mx nil) (my nil))
     (lambda (events)
+      ;(println mz)
       (incf time2 (+ 0.0005 (* (+ 1.0 (sin time2)) 0.0025)))
       (push-event (list 'frame time2))
       (for-each x events
