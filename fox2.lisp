@@ -32,12 +32,12 @@
 (register-finalizer (cons 1 2) (lambda (x) (println (list 'finalized x))))
 (register-finalizer (cons 3 4) (lambda (x) (println (list 'finalized x))))
 
-(let ((ht2 (make-hashtable nil nil)))
+(let ((ht2 (make-hashtable)))
   (hashtable-set ht2 (cons 1 2) (cons 2 3)))
 
 (defun test-f1 ()
   (let ((do-finalize (lambda (x) (println (list 'finalized x)))))
-    (let ((ht2 (make-hashtable t nil))
+    (let ((ht2 (make-hashtable))
           (item1 (cons 'aitem 2))
           (item2 (cons 'bitem 3)))
       (register-finalizer item1 do-finalize)

@@ -310,7 +310,7 @@ lisp_value lisp_print_code_location(lisp_value cons);
 
 lisp_value lisp_string(const char *str );
 
-lisp_value lisp_make_hashtable(lisp_value weak_key, lisp_value weak_value);
+lisp_value lisp_make_hashtable();
 lisp_value lisp_hashtable_set(lisp_value ht, lisp_value key, lisp_value value);
 lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key);
 lisp_value lisp_hashtable_count(lisp_value ht);

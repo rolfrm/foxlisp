@@ -128,7 +128,7 @@
 (match x (plookup '(:a 1 :b 2) ':c)
 		 (assert nil))
 
-(let ((ht (make-hashtable nil nil)))
+(let ((ht (make-hashtable)))
   (hashtable-set ht 5 10)
   (println (list ht (hashtable-ref ht 5)))
   (assert (eq 10 (hashtable-ref ht 5)))
@@ -184,7 +184,7 @@
   (assert (eq 1 a)))
 
 (defun ht-stress ()
-  (let ((ht (make-hashtable nil nil)))
+  (let ((ht (make-hashtable)))
     (do-times 20 (lambda (i)
                     (hashtable-set ht (cons i i) i)
                     (vector->string (string->vector (value->string '(1 2 3))))
