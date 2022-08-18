@@ -1111,7 +1111,6 @@ Restart by pressing [Enter]
 
           )))))))
                                         ;
-(define last-conses-allocated 0);
 (defun game-update ()
                                         ;(audio:update)
 
@@ -1125,7 +1124,10 @@ Restart by pressing [Enter]
   (measure2 'swap
    ;(thread:sleep 0.005)
    (foxgl:swap win)
-   (measure2 'GC (lisp:collect-garbage))
+   (println (lisp:count-allocated))
+                                        ;(let ((a (foxgl:timestamp)))
+   (lisp:collect-garbage)
+   ;  (println (- (foxgl:timestamp) a)))
    (foxgl:poll-events))
   )
 

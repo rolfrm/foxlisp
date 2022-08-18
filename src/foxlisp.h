@@ -62,6 +62,8 @@ typedef int64_t lisp_symbol;
 typedef struct _cons cons;
 typedef struct __lisp_function lisp_function;
 typedef struct __native_function native_function;
+typedef native_function lisp_native_function;
+
 typedef struct __alien_function alien_function;
 typedef struct __lisp_vector lisp_vector;
 typedef struct __lisp_scope lisp_scope;
@@ -243,6 +245,7 @@ lisp_value cons_lisp_value(cons * cns);
 cons * lisp_value_cons(lisp_value val);
 lisp_value function_lisp_value(lisp_function * f);
 lisp_function * lisp_value_function(lisp_value val);
+lisp_native_function * lisp_value_native_function(lisp_value val);
 lisp_value float32_lisp_value(f32 v);
 lisp_value native_pointer_lisp_value(void * v);
 hash_table * lisp_value_hashtable(lisp_value v);

@@ -74,7 +74,7 @@ gc_context * gc_context_new(){
   return ctx;
 }
 
-bool * cons_marker_pointer(gc_context * gc, cons * c){
+inline bool * cons_marker_pointer(gc_context * gc, cons * c){
   cons_buffer * pool = gc->cons_pool;
   while(pool){
     size_t offset = c - pool->buffer;
@@ -96,7 +96,7 @@ static bool mark_cons(gc_context * gc, cons * c){
   *marker = true;
   return true;
 }
-bool visit_cons(gc_context * gc, cons * c);
+static inline bool visit_cons(gc_context * gc, cons * c);
 bool gc_mark_cons(gc_context * gc, cons * c){
   return visit_cons(gc, c);
 }
@@ -108,7 +108,7 @@ bool cons_is_marked(gc_context * gc, cons * c){
   return *marker;
 }
 
-static bool mark_vector(gc_context * gc, void * vector){
+static inline bool mark_vector(gc_context * gc, void * vector){
   if(vector == NULL) return false;
   array_header * mark = vector - sizeof(array_header);
   ASSERT(mark->check == 0x123);
@@ -129,7 +129,7 @@ bool vector_is_marked(gc_context * gc, void * vector){
 }
 
 
-void visit_value(gc_context * gc, lisp_value val);
+static inline void visit_value(gc_context * gc, lisp_value val);
 void iterate_value(void * key, void * value, void * data);
 void iterate_scope(gc_context * ctx, lisp_scope * scope);
 void mark_scope(gc_context * gc, lisp_scope * scope){
@@ -140,14 +140,14 @@ void mark_scope(gc_context * gc, lisp_scope * scope){
   iterate_scope(gc, scope);
 }
 
-bool visit_cons(gc_context * gc, cons * c){
+static inline bool visit_cons(gc_context * gc, cons * c){
   if(is_heap_ptr(c) && !mark_cons(gc, c)) 
     return false;
   visit_value(gc, c->car);
   visit_value(gc, c->cdr);
   return true;
 }
-void visit_value(gc_context * gc, lisp_value val){
+static inline void visit_value(gc_context * gc, lisp_value val){
   
   switch(val.type){
   case LISP_CONS:

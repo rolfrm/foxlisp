@@ -167,6 +167,9 @@ inline lisp_function * lisp_value_function(lisp_value val){
   return val.function;
 }
 
+lisp_native_function * lisp_value_native_function(lisp_value val){ return val.nfunction;}
+
+
 inline lisp_value float32_lisp_value(f32 v){
   return (lisp_value){.type = LISP_FLOAT32, .rational = v };
 }
@@ -180,8 +183,7 @@ inline lisp_value allocated_pointer_lisp_value(void * ptr){
 }
 
 inline lisp_value lisp_pointer_to_lisp_value(lisp_value * ptr){
-  return (lisp_value){.type = LISP_NATIVE_POINTER_TO_VALUE, .pointer = ptr};
-                   
+  return (lisp_value){.type = LISP_NATIVE_POINTER_TO_VALUE, .pointer = ptr};                   
 }
 
 inline hash_table * lisp_value_hashtable(lisp_value v){

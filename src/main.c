@@ -537,13 +537,13 @@ lisp_value lisp_eval_quasiquoted_sub(lisp_scope * scope, lisp_value value){
 	 if(unsplice)
 		return lisp_append(value2, nextr);
 	 
-	 return new_cons_m(value2, nextr, value);
+	 return new_cons(value2, nextr);
   }else{
 	 if(lisp_value_eq(current, value2))
 		return value;
 	 if(unsplice)
 		return value2;
-	 return new_cons_m(value2, nil, value);
+	 return new_cons(value2, nil);
   }
 }
 
@@ -746,6 +746,19 @@ lisp_value lisp_eval_if(lisp_scope * scope, lisp_value cond, lisp_value true_for
     return lisp_eval(scope, false_form);
   return lisp_eval(scope, true_form);
 }
+
+lisp_value lisp_eval_symbol(lisp_scope * scope, lisp_value sym){
+
+  // a keyword is defined as a symbol, storing its own value.
+  if(is_keyword(sym))
+    return sym;
+  
+  lisp_value r = nil;
+  if(!lisp_scope_try_get_value(scope, sym, &r))
+    lisp_error(new_cons(string_lisp_value("Symbol not found"), sym));
+  return r;
+}
+
 
 lisp_value lisp_eval_let(lisp_scope * scope, lisp_value argform, lisp_value body){
 
@@ -965,7 +978,149 @@ lisp_value lisp_eval_define(lisp_scope * scope, lisp_value sym, lisp_value value
   return value2;
 }
 
-sigjmp_buf error_resume_jmp;
+static sigjmp_buf error_resume_jmp;
+
+lisp_value lisp_eval_native_functions(lisp_scope * scope, native_function * n, size_t argcnt, lisp_value arg_form){
+  if(n->fptr == NULL){
+    raise_string("function is null");
+    return nil;
+  }
+  lisp_value args[n->nargs == -1 ? argcnt : MAX(argcnt, n->nargs)];
+  lisp_value arglist = arg_form;
+  for(size_t i = 0; i < argcnt; i++){
+    args[i] = lisp_eval2(scope, car(arglist));
+    arglist = cdr(arglist);
+    if(lisp_is_in_error())
+      return nil;
+  }
+        
+  if(n->nargs != -1){
+    for(int i = argcnt; i < n->nargs; i++){
+      args[i] = nil;
+    }
+    if(argcnt > n->nargs){
+      raise_string("Invalid number of arguments");
+      return nil;
+    }
+  }
+
+  union{
+    lisp_value (* nvar)(lisp_value * values, int count);
+    lisp_value (* n0)();
+    lisp_value (* n1)(lisp_value);
+    lisp_value (* n2)(lisp_value, lisp_value);
+    lisp_value (* n3)(lisp_value, lisp_value, lisp_value);
+    lisp_value (* n4)(lisp_value, lisp_value, lisp_value, lisp_value);
+    lisp_value (* n5)(lisp_value, lisp_value, lisp_value, lisp_value, lisp_value);
+    lisp_value (* n6)(lisp_value, lisp_value, lisp_value, lisp_value, lisp_value, lisp_value);
+    
+  }f;
+  
+  f.n0 = n->fptr;
+  
+  int r111 = sigsetjmp(error_resume_jmp, 0);
+  if(r111 == 1){
+    return nil;
+  }
+  
+  switch(n->nargs){
+  case -1:
+    return f.nvar(args, argcnt);
+  case 0:
+    return f.n0();
+  case 1:
+    return f.n1(args[0]);
+  case 2:
+    return f.n2(args[0], args[1]);
+  case 3:
+    return f.n3(args[0], args[1], args[2]);       
+  case 4:
+    return f.n4(args[0], args[1], args[2], args[3]);
+  case 5:
+    return f.n5(args[0], args[1], args[2], args[3], args[4]);
+  case 6:
+    return f.n6(args[0], args[1], args[2], args[3], args[4], args[5]);
+  default:
+    raise_string("Unsupported number of args");
+  }
+  return nil;
+}
+
+lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * f, size_t argcnt, lisp_value args_form){
+  cons args0[argcnt];
+  
+  lisp_value things;
+  {
+    lisp_value arg0 = args_form;
+
+    // evaluate the arguments
+    for(size_t i = 0; i < argcnt; i++){
+      args0[i].car = lisp_eval2(scope, car(arg0));
+      arg0 = cdr(arg0);
+    }
+          
+    for(ssize_t i = 0; i < (ssize_t)(argcnt - 1); i++)
+      args0[i].cdr = cons_lisp_value(args0 + i + 1);
+          
+    if(argcnt > 0)
+      args0[argcnt -1].cdr = nil;
+          
+    things = cons_lisp_value(args0);
+  }
+  
+  cons args3[argcnt];
+  memset(args3, 0, sizeof(args3[0]) * (argcnt));
+        
+  lisp_scope function_scope[1];
+        
+  lisp_scope_stack(function_scope, f->closure,  args3, argcnt);
+  var prev_scope = scope->sub_scope;
+  scope->sub_scope = function_scope;
+        
+  var args = f->args;
+  var args2 = things;
+
+  while(!is_nil(args)){
+    var arg = car(args);
+    if(!is_symbol(arg)){
+      println(f->args);
+      raise_string("(3) arg name must be a symbol");
+      scope->sub_scope = prev_scope;
+      return nil;
+    }
+    if(lisp_value_eq(arg, rest_sym)){
+      args = cdr(args);
+      arg = car(args);
+      if(!is_symbol(arg)){
+        // error
+        println(arg);
+        raise_string("(4) arg name must be a symbol");
+        scope->sub_scope = prev_scope;
+        return nil;
+      }
+            
+      lisp_scope_create_value(function_scope, arg, copy_cons(args2));
+      break;
+    }
+    var argv = car(args2);
+            
+    lisp_scope_create_value(function_scope, arg, argv);
+			 
+    args = cdr(args);
+    args2 = cdr(args2);
+  }
+
+  var it = f->code;
+  lisp_value ret = nil;
+  while(!is_nil(it)){
+    ret = lisp_eval(function_scope, car(it));
+    it = cdr(it);
+  }
+  scope->sub_scope = prev_scope;
+  return ret;
+
+}
+
 lisp_value lisp_stack;
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
@@ -991,7 +1146,6 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
             println(first);
           }
       }
-      //println_shallow(value);
       lisp_value first_value;
 
       lisp_scope * s1;
@@ -1064,183 +1218,24 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
           return lisp_eval_get_scope_unsafe(scope);
         }
       }
-      size_t argcnt = lisp_optimize_statement(scope, cdr(value));
+      size_t argcnt = lisp_optimize_statement(scope, value) - 1;
       
       if(lisp_is_in_error())
         return nil;
       
-      if(is_function_native(first_value)){
-        var n = first_value.nfunction;
-        if(n->fptr == NULL){
-          raise_string("function is null");
-          return nil;
-        }
-        lisp_value args[n->nargs == -1 ? argcnt : MAX(argcnt, n->nargs)];
-        lisp_value arglist = cdr(value);
-        for(size_t i = 0; i < argcnt; i++){
-          args[i] = lisp_eval2(scope, car(arglist));
-          arglist = cdr(arglist);
-          if(lisp_is_in_error())
-            return nil;
-      
-        }
-        
-        if(n->nargs != -1){
-          for(int i = argcnt; i < n->nargs; i++){
-            args[i] = nil;
-          }
-          if(argcnt > n->nargs){
-            raise_string("Invalid number of arguments");
-            return nil;
-          }
-        }
-
-        union{
-          lisp_value (* nvar)(lisp_value * values, int count);
-          lisp_value (* n0)();
-          lisp_value (* n1)(lisp_value);
-          lisp_value (* n2)(lisp_value, lisp_value);
-          lisp_value (* n3)(lisp_value, lisp_value, lisp_value);
-          lisp_value (* n4)(lisp_value, lisp_value, lisp_value, lisp_value);
-          lisp_value (* n5)(lisp_value, lisp_value, lisp_value, lisp_value, lisp_value);
-          lisp_value (* n6)(lisp_value, lisp_value, lisp_value, lisp_value, lisp_value, lisp_value);
-			 
-        }f;
-
-        f.n0 = n->fptr;
-
-        int r111 = sigsetjmp(error_resume_jmp, 0);
-        if(r111 == 1){
-          return nil;
-        }
-  
-        
-        switch(n->nargs){
-        case -1:
-          return f.nvar(args, argcnt);
-        case 0:
-          return f.n0();
-        case 1:
-          return f.n1(args[0]);
-        case 2:
-          return f.n2(args[0], args[1]);
-        case 3:
-          return f.n3(args[0], args[1], args[2]);       
-        case 4:
-          return f.n4(args[0], args[1], args[2], args[3]);
-        case 5:
-          return f.n5(args[0], args[1], args[2], args[3], args[4]);
-        case 6:
-          return f.n6(args[0], args[1], args[2], args[3], args[4], args[5]);
-        default:
-          raise_string("Unsupported number of args");
-        }
-      }else if(is_function(first_value)){
-        cons args0[argcnt];
-         
-        lisp_value things;
-        {
-          lisp_value arg0 = cdr(value);
-
-          // evaluate the arguments
-          for(size_t i = 0; i < argcnt; i++){
-            args0[i].car = lisp_eval2(scope, car(arg0));
-            arg0 = cdr(arg0);
-          }
-          
-          for(ssize_t i = 0; i < (ssize_t)(argcnt - 1); i++)
-            args0[i].cdr = cons_lisp_value(args0 + i + 1);
-          
-          if(argcnt > 0)
-            args0[argcnt -1].cdr = nil;
-          
-          things = cons_lisp_value(args0);
-        }
-        
-        var f = first_value.function;
-        cons args3[argcnt];
-        memset(args3, 0, sizeof(args3[0]) * (argcnt));
-        
-        lisp_scope function_scope[1];
-        
-        lisp_scope_stack(function_scope, f->closure,  args3, argcnt);
-        var prev_scope = scope->sub_scope;
-        scope->sub_scope = function_scope;
-        
-        var args = f->args;
-        var args2 = things;
-
-        while(!is_nil(args)){
-          var arg = car(args);
-          if(!is_symbol(arg)){
-            println(f->args);
-            raise_string("(3) arg name must be a symbol");
-            scope->sub_scope = prev_scope;
-            return nil;
-          }
-          if(lisp_value_eq(arg, rest_sym)){
-            args = cdr(args);
-            arg = car(args);
-            if(!is_symbol(arg)){
-              // error
-              println(arg);
-              raise_string("(4) arg name must be a symbol");
-              scope->sub_scope = prev_scope;
-              return nil;
-            }
-            
-            lisp_scope_create_value(function_scope, arg, copy_cons(args2));
-            break;
-          }
-          var argv = car(args2);
-            
-          lisp_scope_create_value(function_scope, arg, argv);
-			 
-          args = cdr(args);
-          args2 = cdr(args2);
-        }
-
-        var it = f->code;
-        lisp_value ret = nil;
-        while(!is_nil(it)){
-          ret = lisp_eval(function_scope, car(it));
-          it = cdr(it);
-        }
-        scope->sub_scope = prev_scope;
-        return ret;
-      }else{
-        println(value);
-        raise_string("not a function");
+      switch(lisp_value_type(first_value)){
+      case LISP_FUNCTION:
+        return lisp_eval_function(scope, lisp_value_function(first_value), argcnt, cdr(value));
+      case LISP_FUNCTION_NATIVE:
+        return lisp_eval_native_functions(scope, lisp_value_native_function(first_value), argcnt, cdr(value));
+      default:
+        lisp_error(new_cons(value, string_lisp_value("is not a function")));
         return nil;
-      }
+      }     
     }
     break;
   case LISP_SYMBOL:
-    {
-      if(is_keyword(value))
-        return value;
-      lisp_value r;
-      if(lisp_scope_try_get_value(scope, value, &r))
-        return r;
-      else{
-        lisp_error(new_cons(string_lisp_value("Symbol not found"), value));
-          //        print(value);
-        //raise_string(" symbol not found.");
-        int j = 0;
-        var scope2 = scope;
-        println(scope_lisp_value(scope2));
-        while(scope2 != NULL){
-          printf("scope%i\n", j);
-          for(size_t i = 0; i < scope2->argcnt; i++){
-            var c = scope2->lookup[i];
-            println(cons_lisp_value(&c));
-          }
-          j++;
-          scope2 = scope2->super;
-        }
-      }
-    }
-          
+    return lisp_eval_symbol(scope, value);
   case LISP_GLOBAL_INDEX:
     return current_context->globals->values[value.integer];
   case LISP_LOCAL_INDEX:
@@ -1252,10 +1247,9 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
     if(value.local_index.scope_type == 0){
       cons v = scope->lookup[value.local_index.scope_index];
       return v.cdr;
-    }else{
+    }else
       return scope->values[value.local_index.scope_index];
-    }
-        
+      
   default:
     return value;
   }
@@ -2239,7 +2233,6 @@ lisp_value lisp_is_rational(lisp_value v){
     return t;
   return nil;
 }
-
 
 lisp_value lisp_is_number(lisp_value v){
   if(is_float(v) || is_integer(v))
