@@ -732,6 +732,87 @@ lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
   return nil;
 }
 
+lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body){
+  lisp_value result = nil;
+  while(!is_nil(body)){
+    result = lisp_eval2(scope, car(body));
+    if(lisp_is_in_error()) break;
+    body = cdr(body);
+  }
+  return result;
+}
+
+lisp_value lisp_eval_let(lisp_scope * scope, lisp_value argform, lisp_value body){
+
+  var argcnt = list_length(argform);
+  cons argsbuf[argcnt];
+  memset(argsbuf, 0, sizeof(argsbuf[0]) * argcnt);
+  lisp_scope scope1[1] = {0};
+  lisp_scope_stack(scope1, scope, argsbuf, argcnt);
+  scope->sub_scope = scope1;
+  var scope_old = scope;
+  
+  scope = scope1;
+  while(!is_nil(argform)){
+    
+    var arg = car(argform);
+    var sym = car(arg);
+    var value = lisp_eval(scope, cadr(arg));
+    if(lisp_is_in_error()){
+      scope_old->sub_scope = NULL;
+      return nil;
+    }
+    lisp_scope_create_value(scope, sym, value);
+    argform = cdr(argform);
+  }
+  lisp_value result = lisp_eval_progn(scope, body);
+  scope_old->sub_scope = NULL;
+  return result;
+}
+
+lisp_value lisp_eval_loop(lisp_scope * scope, lisp_value condition, lisp_value body){
+  lisp_value result = nil;
+  while(!is_nil(lisp_eval2(scope, condition))){
+    result = lisp_eval_progn(scope, body);
+    if(lisp_is_in_error()) break;
+  }
+  return result;
+}
+
+lisp_value lisp_eval_symbol_value(lisp_scope * scope, lisp_value sym_expr, lisp_value root_scope_only){
+  var sym = lisp_eval2(scope, sym_expr);
+  lisp_value result = nil;
+  if(!is_symbol(sym)){
+    println(sym);
+    printf("Not a symbol\n");
+    return nil;
+  }
+  
+  //if looking for a symbol at root scope, iterate through the scopes. 
+  if(!is_nil(root_scope_only))
+    while(scope->super != NULL)
+      scope = scope->super;
+
+  if(lisp_scope_try_get_value(scope, sym, &result))
+    return result;
+  return nil;
+}
+
+lisp_value lisp_eval_boundp(lisp_scope * scope, lisp_value sym_expr, lisp_value root_scope_only_expr){
+  var target_scope = scope;
+  if(!is_nil(root_scope_only_expr) && !is_nil(lisp_eval(scope, root_scope_only_expr)))
+    target_scope = current_context->globals;
+  
+  var sym = lisp_eval(scope, sym_expr);
+  if(!is_symbol(sym))
+    return nil;
+  lisp_value result = nil;
+  if(lisp_scope_try_get_value(target_scope, sym, &result))
+    return t;
+  return nil;
+}
+
+
 sigjmp_buf error_resume_jmp;
 lisp_value lisp_stack;
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
@@ -742,6 +823,8 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   lisp_stack = cdr(lisp_stack);
   return r;
 }
+
+
 
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
   tail_call:;
@@ -803,70 +886,12 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
 		  case LISP_UNQUOTE:
 			 raise_string("Unexpected unquote!\n");
 			 break;
-         
 		  case LISP_LET:
-			 {
-
-				var argform = cadr(value);
-            var argcnt = list_length(argform);
-            cons argsbuf[argcnt];
-            memset(argsbuf, 0, sizeof(argsbuf[0]) * argcnt);
-            lisp_scope scope1[1] = {0};
-            lisp_scope_stack(scope1, scope, argsbuf, argcnt);
-            scope->sub_scope = scope1;
-            var scope_old = scope;
-            
-            scope = scope1;
-            while(!is_nil(argform)){
-
-              var arg = car(argform);
-				  var sym = car(arg);
-				  var value = lisp_eval(scope, cadr(arg));
-				  if(lisp_is_in_error()){
-                scope_old->sub_scope = NULL;
-                return nil;
-              }
-              lisp_scope_create_value(scope, sym, value);
-              argform = cdr(argform);
-				}
-				value = cdr(value);
-            var body = cdr(value);
-				lisp_value result = nil;
-            while(!is_nil(body)){
-				  result = lisp_eval(scope, car(body));
-				  if(lisp_is_in_error()) break;
-				  body = cdr(body);
-				}
-            scope_old->sub_scope = NULL;
-				return result;
-			 }
+			 return lisp_eval_let(scope, cadr(value), cddr(value));
 		  case LISP_PROGN:
-			 {
-				var body = cdr(value);
-				lisp_value result = nil;
-				while(!is_nil(body)){
-				  result = lisp_eval2(scope, car(body));
-              if(lisp_is_in_error()) break;
-				  body = cdr(body);
-				}
-				return result;
-			 }
+          return lisp_eval_progn(scope, cdr(value));
 		  case LISP_LOOP:
-			 {
-				var cond = cadr(value);
-				var _body = cddr(value);
-            
-				lisp_value result = nil;
-				while(!is_nil(lisp_eval2(scope, cond))){
-				  var body = _body;;
-				  while(!is_nil(body)){
-					 result = lisp_eval2(scope, car(body));
-                if(lisp_is_in_error()) return result;
-                body = cdr(body);
-				  }
-				}
-				return result;
-			 }
+          return lisp_eval_loop(scope, cadr(value), cddr(value));
 		  case LISP_LAMBDA:
 		  case LISP_MACRO:
 			 {
@@ -932,36 +957,9 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
 			 }
 		  
         case LISP_SYMBOL_VALUE:
-          {
-            var sym = lisp_eval2(scope, cadr(value));
-            
-            if(!is_symbol(sym)){
-              println(sym);
-              printf("Not a symbol\n");
-              return nil;
-            }
-            if(!is_nil(caddr(value)))
-              while(scope->super != NULL)
-                scope = scope->super;
-            if(lisp_scope_try_get_value(scope, sym, &value))
-              return value;
-            return nil;
-          }
+          return lisp_eval_symbol_value(scope, cadr(value), caddr(value));
         case LISP_BOUND:
-          {
-            var the_scope = scope;
-            if(!is_nil(cddr(value)) && !is_nil(lisp_eval(scope, caddr(value)))){
-              the_scope = current_context->globals;
-            }
-              
-            var sym = lisp_eval(scope, cadr(value));
-            if(!is_symbol(sym))
-              return nil;
-            
-            if(lisp_scope_try_get_value(the_scope, sym, &value))
-              return t;
-            return nil;
-          }
+          return lisp_eval_boundp(scope, cadr(value), caddr(value));          
         case LISP_WITH_EXCEPTION_HANDLER:
           {
             var stk0 = lisp_stack;
