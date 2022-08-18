@@ -41,14 +41,12 @@
                   (lisp:debug (swap foxday-debug-state (not foxday-debug-state))))
                 (when (eq (cadr evt) 'q)
                   (set! should-exit t))
-
-
                 )
               ;(println evt)
               )
     (game-update events))
   (let ((first (lisp:count-allocated)))
-    ;(println first)
+                                        ;(println first)
     (foxgl:render-model model)
 
     )

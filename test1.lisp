@@ -112,11 +112,12 @@
   )
 
 (let ((l '(3 4 5)))
-  (assert (eq (pop! l) 3))
-  (assert (eq (pop! l) 4))
+  
+  (assert (eq (println (pop! l)) 3))
+  (assert (eq (println (pop! l)) 4))
   (push! l 6)
   (push! l 7)
-  (assert (eq (pop! l) 7))
+  (assert (eq (println (pop! l)) 7))
   (assert (eq (pop! l) 6))
   
   )

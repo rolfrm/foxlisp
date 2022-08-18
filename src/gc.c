@@ -85,12 +85,8 @@ inline bool * cons_marker_pointer(gc_context * gc, cons * c){
   return NULL;
 }
 
-static bool mark_cons(gc_context * gc, cons * c){
+static inline bool mark_cons(gc_context * gc, cons * c){
   bool * marker = cons_marker_pointer(gc, c);
-  if(marker == NULL){
-    ASSERT(false);
-    return false;
-  }
   if(*marker)
     return false;
   *marker = true;

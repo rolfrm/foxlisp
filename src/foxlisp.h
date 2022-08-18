@@ -55,6 +55,15 @@ typedef enum {
               LISP_OR,
               LISP_GET_SCOPE,
               LISP_GET_SCOPE_UNSAFE,
+
+              // added for optimization
+              LISP_CAR,
+              LISP_CDR,
+              LISP_EQN,
+              LISP_CDDR,
+              LISP_IS_SYMBOL,
+              LISP_IS_LIST,
+              
 }lisp_builtin;
 
 // structs
@@ -346,6 +355,8 @@ lisp_value lisp_float32(lisp_value value);
 size_t lisp_type_size(lisp_type type);
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
+lisp_value lisp_is_symbol(lisp_value a);
+lisp_value lisp_is_list(lisp_value a);
 lisp_value lisp_error(lisp_value v);
 void raise_string(const char * str);
 bool type_assert(lisp_value val, lisp_type type);

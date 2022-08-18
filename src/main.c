@@ -303,11 +303,11 @@ inline lisp_value cdr(lisp_value v){
   return nil;
 }
 
-lisp_value cddr(lisp_value v){
+inline lisp_value cddr(lisp_value v){
   return cdr(cdr(v));
 }
 
-lisp_value cadr(lisp_value v){
+inline lisp_value cadr(lisp_value v){
   return car(cdr(v));
 }
 
@@ -985,6 +985,7 @@ lisp_value lisp_eval_native_functions(lisp_scope * scope, native_function * n, s
     raise_string("function is null");
     return nil;
   }
+
   lisp_value args[n->nargs == -1 ? argcnt : MAX(argcnt, n->nargs)];
   lisp_value arglist = arg_form;
   for(size_t i = 0; i < argcnt; i++){
@@ -1121,6 +1122,20 @@ lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * f, size_t argc
 
 }
 
+lisp_value lisp_value_eqn3(lisp_scope * scope, lisp_value values){
+  lisp_value a = lisp_eval(scope, car(values));
+  values = cdr(values);
+  while(!is_nil(values)){
+    
+    lisp_value b = lisp_eval(scope, car(values));
+    values = cdr(values);
+    if(!lisp_value_eq(a, b))
+      return nil;
+  }
+  return t;
+}
+
+
 lisp_value lisp_stack;
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
@@ -1216,6 +1231,18 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
           return lisp_eval_get_scope(scope);
         case LISP_GET_SCOPE_UNSAFE:
           return lisp_eval_get_scope_unsafe(scope);
+        case LISP_CAR:
+          return car(lisp_eval2(scope, cadr(value)));
+        case LISP_CDR:
+          return cdr(lisp_eval2(scope, cadr(value)));
+        case LISP_CDDR:
+          return cddr(lisp_eval2(scope, cadr(value)));
+        case LISP_EQN:
+          return lisp_value_eqn3(scope, cdr(value));
+        case LISP_IS_SYMBOL:
+          return lisp_is_symbol(lisp_eval(scope, cadr(value)));
+        case LISP_IS_LIST:
+          return lisp_is_list(lisp_eval(scope, cadr(value)));
         }
       }
       size_t argcnt = lisp_optimize_statement(scope, value) - 1;
@@ -2333,7 +2360,11 @@ int main(int argc, char ** argv){
 #endif
   if(lisp_is_in_error()){
     printf("Exiting due to unhandled exception\n");
-    println(current_error_stack);
+    var stk = current_error_stack;
+    while(!is_nil(stk)){
+      println(car(stk));
+      stk = cdr(stk);
+    }
     println(current_error);
     
   }
@@ -2404,8 +2435,6 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
   lisp_register_native("lisp:trace", 1, lisp_trace);
-  lisp_register_native("symbol?", 1, lisp_is_symbol);
-  lisp_register_native("list?", 1, lisp_is_list);
   lisp_register_native("integer?", 1, lisp_is_integer);
   lisp_register_native("number?", 1, lisp_is_number);
   lisp_register_native("rational?", 1, lisp_is_rational);
@@ -2424,9 +2453,9 @@ lisp_context * lisp_context_new(){
   lisp_register_native("print", 1, print);
   lisp_register_native("println", 1, println);
   lisp_register_native("value->string", 1, value_to_string);
-  lisp_register_native("car", 1, car);
-  lisp_register_native("cdr", 1, cdr);
-  lisp_register_native("cddr", 1, cddr);
+  //lisp_register_native("car", 1, car);
+  //lisp_register_native("cdr", 1, cdr);
+  //lisp_register_native("cddr", 1, cddr); // macro
   lisp_register_native("cadr", 1, cadr);
   lisp_register_native("set-car!", 2, set_car);
   lisp_register_native("set-cdr!", 2, set_cdr);
@@ -2440,7 +2469,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("copy-list-deep", 1, copy_cons_deep);
   lisp_register_native("plookup", 2, lisp_plookup);
 
-  lisp_register_native("=", -1, lisp_value_eqn);
+  //lisp_register_native("=", -1, lisp_value_eqn);
   lisp_register_native("/=", -1, lisp_neqn);
   lisp_register_native("string=", 2, string_eq);
   lisp_register_native("panic", 1, lisp_error);
@@ -2515,6 +2544,14 @@ lisp_context * lisp_context_new(){
   lisp_register_macro("lisp:get-current-scope", LISP_GET_SCOPE);
   lisp_register_macro("lisp:get-current-scope!!", LISP_GET_SCOPE_UNSAFE);
 
+  lisp_register_macro("car", LISP_CAR);
+  lisp_register_macro("cdr", LISP_CDR);
+  lisp_register_macro("cddr", LISP_CDDR);
+  lisp_register_macro("=", LISP_EQN);
+  lisp_register_macro("symbol?", LISP_IS_SYMBOL);
+  lisp_register_macro("list?", LISP_IS_LIST);
+  
+  
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 #ifndef WASM
   lisp_register_value("lisp:*web-environment*", nil);
