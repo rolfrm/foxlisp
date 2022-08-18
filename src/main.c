@@ -812,6 +812,121 @@ lisp_value lisp_eval_boundp(lisp_scope * scope, lisp_value sym_expr, lisp_value 
   return nil;
 }
 
+lisp_value lisp_eval_with_exception_handler(lisp_scope * scope, lisp_value body, lisp_value handler){
+  var stk0 = lisp_stack;
+  lisp_stack = nil;
+  var result = lisp_eval(scope, body);
+  if(lisp_is_in_error()){
+    var error = current_error;
+    current_error = nil;
+    var error_handler = lisp_eval(scope, handler);
+    lisp_scope_create_value(current_context->globals, current_error_sym, error);
+    var result2 = lisp_eval(scope, new_cons(error_handler, new_cons(current_error_sym, nil)));
+    current_error_stack = nil;
+    
+    result = result2;
+  }
+  lisp_stack = stk0;
+  return result;
+}
+
+lisp_value lisp_eval_case(lisp_scope * scope, lisp_value condition, lisp_value cases){
+  var result = lisp_eval2(scope, condition);
+  while(is_nil(cases) == false){
+    var c = car(cases);
+    var test = car(c);
+    bool passed = false;
+    if(is_cons(test)){
+      while(is_cons(test)){
+        if(lisp_value_eq(result, car(test))){
+          passed = true;
+          break;
+        }
+        test = cdr(test);
+      }
+    }else if (lisp_value_eq(result, test)){
+      passed = true;
+    }else if(lisp_value_eq(test, otherwise_sym) && is_symbol(test)){
+      passed = true;
+    }
+    
+    if(passed)
+      return lisp_eval_progn(scope, cdr(c));
+    
+    cases = cdr(cases);
+  }
+  return nil;
+}
+
+lisp_value lisp_eval_cond(lisp_scope * scope, lisp_value cases){
+  while(is_nil(cases) == false){
+    var c = car(cases);
+    var test = car(c);
+    
+    if(lisp_value_eq(test, else_sym) || !is_nil(lisp_eval(scope, test)))
+      return lisp_eval_progn(scope, cdr(c));
+    
+    cases = cdr(cases);
+  }
+  return nil;
+}
+
+lisp_value lisp_eval_and(lisp_scope * scope, lisp_value cases){
+  lisp_value result = t;
+  while(is_nil(cases) == false){
+    var c = car(cases);
+    result = lisp_eval2(scope, c);
+    if(is_nil(result)) return nil;
+    cases = cdr(cases);
+  }
+  return result;
+}
+
+lisp_value lisp_eval_or(lisp_scope * scope, lisp_value cases){
+  while(is_nil(cases) == false){
+    var c = car(cases);
+    var result = lisp_eval2(scope, c);
+    if(is_nil(result) == false) return result;
+    cases = cdr(cases);
+  }
+  return nil;
+}
+
+lisp_value lisp_eval_get_scope(lisp_scope * scope){
+ return (lisp_value){.scope = lisp_scope_unstack(scope), .type = LISP_SCOPE}; 
+}
+
+lisp_value lisp_eval_get_scope_unsafe(lisp_scope * scope){
+  return (lisp_value){.scope = scope, .type = LISP_SCOPE};
+}
+
+lisp_value lisp_eval_lambda(lisp_scope * scope, lisp_value args, lisp_value body){
+  lisp_function * f = lisp_malloc(sizeof(*f));
+  f->code = body;
+  f->args = args;
+  scope = lisp_scope_unstack(scope);
+  f->closure = scope;
+  return (lisp_value){.type = LISP_FUNCTION, .function = f};
+}
+
+lisp_value lisp_eval_macro(lisp_scope * scope, lisp_value args, lisp_value body){
+  var val = lisp_eval_lambda(scope, args, body);
+  val.type = LISP_FUNCTION_MACRO;
+  return val;
+}
+
+lisp_value lisp_eval_define(lisp_scope * scope, lisp_value sym, lisp_value value){
+  TYPE_ASSERT(sym, LISP_SYMBOL);
+    
+  if(!is_symbol(sym))
+    return nil; // error
+  
+  var value2 = lisp_eval(scope, value);
+  if(lisp_is_in_error())
+    return nil;
+  lisp_scope_create_value(scope, sym, value2);
+  return value2;
+}
 
 sigjmp_buf error_resume_jmp;
 lisp_value lisp_stack;
@@ -893,22 +1008,10 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
 		  case LISP_LOOP:
           return lisp_eval_loop(scope, cadr(value), cddr(value));
 		  case LISP_LAMBDA:
+          return lisp_eval_lambda(scope, cadr(value), cddr(value));
 		  case LISP_MACRO:
-			 {
-            var args = cadr(value);
-				var body = cddr(value);
-				lisp_function * f = lisp_malloc(sizeof(*f));
-				f->code = body;
-				f->args = args;
-            scope = lisp_scope_unstack(scope);
-				f->closure = scope;
-
-				if(first_value.builtin == LISP_LAMBDA)
-				  return (lisp_value){.type = LISP_FUNCTION, .function = f};
-				else
-				  return (lisp_value){.type = LISP_FUNCTION_MACRO, .function = f};
-			 }
-		  case LISP_SET:
+          return lisp_eval_macro(scope, cadr(value), cddr(value));
+        case LISP_SET:
 			 {
             var ovalue = value;
             value = cdr(value);
@@ -946,132 +1049,25 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
 				return value2;
 			 }
 		  case LISP_DEFINE:
-			 {
-				var sym = cadr(value);
-				if(!is_symbol(sym))
-				  return nil; // error
-				
-				var value2 = lisp_eval(scope, caddr(value));
-				lisp_scope_create_value(scope, sym, value2);
-				return value2;
-			 }
-		  
+          return lisp_eval_define(scope, cadr(value), caddr(value));
         case LISP_SYMBOL_VALUE:
           return lisp_eval_symbol_value(scope, cadr(value), caddr(value));
         case LISP_BOUND:
           return lisp_eval_boundp(scope, cadr(value), caddr(value));          
         case LISP_WITH_EXCEPTION_HANDLER:
-          {
-            var stk0 = lisp_stack;
-            lisp_stack = nil;
-            var result = lisp_eval(scope, cadr(value));
-            if(lisp_is_in_error()){
-              var error = current_error;
-              current_error = nil;
-              var error_handler = lisp_eval(scope, caddr(value));
-              lisp_scope_create_value(current_context->globals, current_error_sym, error);
-              var result2 = lisp_eval(scope, new_cons(error_handler, new_cons(current_error_sym, nil)));
-              current_error_stack = nil;
-              
-              result = result2;
-            }
-            lisp_stack = stk0;
-            return result;
-            
-            break;
-          }
+          return lisp_eval_with_exception_handler(scope, cadr(value), caddr(value));
         case LISP_CASE:
-          {
-            var result = lisp_eval2(scope, cadr(value));
-            var cases = cddr(value);
-            while(is_nil(cases) == false){
-              var c = car(cases);
-              var test = car(c);
-              bool passed = false;
-              if(is_cons(test)){
-                while(is_cons(test)){
-                  if(lisp_value_eq(result, car(test))){
-                    passed = true;
-                    break;
-                  }
-                  test = cdr(test);
-                }
-              }else if (lisp_value_eq(result, test)){
-                passed = true;
-              }else if(lisp_value_eq(test, otherwise_sym) && is_symbol(test)){
-                passed = true;
-              }
-              
-              if(passed){
-                var form = cdr(c);
-                lisp_value ret = nil;
-                while(!is_nil(form)){
-                  ret = lisp_eval(scope, car(form));
-                  if(lisp_is_in_error()) return nil;
-                
-                  form = cdr(form);
-                }
-                return ret;
-              }
-              cases = cdr(cases);
-            }
-          }
-          return nil;
+          return lisp_eval_case(scope, cadr(value), cddr(value));
         case LISP_COND:
-          {
-            var cases = cdr(value);
-            while(is_nil(cases) == false){
-              var c = car(cases);
-              var test = car(c);
-
-              if(lisp_value_eq(test, else_sym) || !is_nil(lisp_eval(scope, test))){
-                lisp_value ret = nil;
-                var form = cdr(c);
-                while(!is_nil(form)){
-                  ret = lisp_eval(scope, car(form));
-                  if(lisp_is_in_error()) return nil;
-                  form = cdr(form);
-                }
-                return ret;
-                
-              }
-              cases = cdr(cases);
-            }
-          }
-          return nil;
-
+          return lisp_eval_cond(scope, cdr(value));
         case LISP_AND:
-          {
-            var cases = cdr(value);
-            lisp_value result = t;
-            while(is_nil(cases) == false){
-              var c = car(cases);
-              result = lisp_eval2(scope, c);
-              if(is_nil(result)) return nil;
-              cases = cdr(cases);
-            }
-            return result;
-          }
+          return lisp_eval_and(scope, cdr(value));
         case LISP_OR:
-          {
-            var cases = cdr(value);
-            lisp_value result = nil;
-            while(is_nil(cases) == false){
-              var c = car(cases);
-              result = lisp_eval2(scope, c);
-              if(is_nil(result) == false) return result;
-              cases = cdr(cases);
-            }
-            return nil;
-          }
+          return lisp_eval_or(scope, cdr(value));
         case LISP_GET_SCOPE:
-          {
-				return (lisp_value){.scope = lisp_scope_unstack(scope), .type = LISP_SCOPE}; 
-          }
+          return lisp_eval_get_scope(scope);
         case LISP_GET_SCOPE_UNSAFE:
-          {
-				return (lisp_value){.scope = scope, .type = LISP_SCOPE}; 
-          }
+          return lisp_eval_get_scope_unsafe(scope);
         }
       }
       size_t argcnt = lisp_optimize_statement(scope, cdr(value));

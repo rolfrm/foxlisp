@@ -252,7 +252,7 @@
       )
   (lambda (ex)
     (set! exception-handled 1)
-    (println "its ok)")))
+    (println "its ok")))
 (assert exception-handled)
 (assert-not normal-form-completed)
 
