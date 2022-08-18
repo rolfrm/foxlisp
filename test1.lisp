@@ -438,11 +438,14 @@
 ;;; blank line!!
 (defun test-func-2 () (+ 1 2))
 
-(assert (eq (cadr (lisp:function-location test-func-1))
-            (- (cadr (lisp:function-location test-func-2)) 2)))
+(println (car (function->code test-func-1)))
+;(println (hashtable-keys lisp:++cons-file-offset++))
+(assert (eq (cadr (println (lisp:function-location test-func-1)))
+            (- (cadr (println (lisp:function-location test-func-2))) 2)))
 
 (println (lisp:code-location (function->code test-func-1)))
                                         ;(println (hashtable-values lisp:++cons-file++))
+(println (length (hashtable-keys lisp:++cons-file-offset++)))
 
 (println "Tests Passed")
 

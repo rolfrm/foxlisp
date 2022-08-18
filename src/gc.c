@@ -42,7 +42,7 @@ struct _cons_buffer {
   cons_buffer * next;
   cons * free_cons;
   cons * buffer;
-  bool * gc_mark;
+  u8 * gc_mark;
   size_t size;
 };
 
@@ -62,11 +62,17 @@ struct __array_pool{
   array_header * free_arrays;
   array_header * occupied_arrays; 
 };
-
+typedef enum{
+  CLEAR = 0,
+  MARK = 1,
+  CLEAR_WEAK = 2,
+  
+}gc_stage;
 
 struct __gc_context{
   cons_buffer * cons_pool;
   array_pool array_pool[3 * 1024 + 1];
+  gc_stage stage;
 };
 
 gc_context * gc_context_new(){
@@ -74,7 +80,7 @@ gc_context * gc_context_new(){
   return ctx;
 }
 
-inline bool * cons_marker_pointer(gc_context * gc, cons * c){
+inline u8 * cons_marker_pointer(gc_context * gc, cons * c){
   cons_buffer * pool = gc->cons_pool;
   while(pool){
     size_t offset = c - pool->buffer;
@@ -86,10 +92,10 @@ inline bool * cons_marker_pointer(gc_context * gc, cons * c){
 }
 
 static inline bool mark_cons(gc_context * gc, cons * c){
-  bool * marker = cons_marker_pointer(gc, c);
-  if(*marker)
+  u8 * marker = cons_marker_pointer(gc, c);
+  if(*marker == gc->stage)
     return false;
-  *marker = true;
+  *marker = gc->stage;
   return true;
 }
 static inline bool visit_cons(gc_context * gc, cons * c);
@@ -98,27 +104,26 @@ bool gc_mark_cons(gc_context * gc, cons * c){
 }
 
 bool cons_is_marked(gc_context * gc, cons * c){
-  bool * marker = cons_marker_pointer(gc, c);
+  u8 * marker = cons_marker_pointer(gc, c);
   if(marker == NULL)
     return false;
-  return *marker;
+  return *marker > 0;
 }
 
 static inline bool mark_vector(gc_context * gc, void * vector){
   if(vector == NULL) return false;
   array_header * mark = vector - sizeof(array_header);
   ASSERT(mark->check == 0x123);
-  ASSERT(mark->mark <= 1);
-  if(mark->mark)
+  if(mark->mark == gc->stage)
     return false; // already marked.
-  mark->mark = 1;
+  mark->mark = gc->stage;
   return true;
 }
 
 
 bool vector_is_marked(gc_context * gc, void * vector){
   array_header * mark = vector - sizeof(array_header);
-  ASSERT(mark->mark <= 1);
+  ASSERT(mark->mark <= 2);
   if(mark->mark)
     return true;
   return false;
@@ -127,7 +132,39 @@ bool vector_is_marked(gc_context * gc, void * vector){
 
 static inline void visit_value(gc_context * gc, lisp_value val);
 void iterate_value(void * key, void * value, void * data);
+void iterate_keys_only(void * key, void * value, void * data);
+void iterate_values_only(void * key, void * value, void * data);
 void iterate_scope(gc_context * ctx, lisp_scope * scope);
+
+static ht_op iterate_keys_remove_unmarked(void * key, void * value, void * data){
+  lisp_value * ke = key;
+  gc_context * gc = data;
+  switch(ke->type){
+  case LISP_CONS:
+    if(!cons_is_marked(gc, ke->cons))
+      return HT_REMOVE;
+    break;
+  default:
+    break;
+  }
+   return HT_NOP;
+}
+
+static ht_op iterate_values_remove_unmarked(void * key, void * value, void * data){
+  lisp_value * val = value;
+  gc_context * gc = data;
+  switch(val->type){
+  case LISP_CONS:
+    if(!cons_is_marked(gc, val->cons))
+      return HT_REMOVE;
+    break;
+  default:
+    break;
+  }
+   return HT_NOP;
+}
+
+
 void mark_scope(gc_context * gc, lisp_scope * scope){
   if(scope == NULL)
     return;
@@ -165,7 +202,25 @@ static inline void visit_value(gc_context * gc, lisp_value val){
     {
       hash_table * table = val.native_pointer;
       if(!mark_vector(gc, table) && !mark_vector(gc, table->keys)) return;
-      ht_iterate(table, iterate_value, gc);
+      if(table->userdata != NULL){
+        size_t mask = (size_t) table->userdata;
+        if(mask & LISP_HASHTABLE_WEAK_KEYS){
+          ht_iterate(table, iterate_values_only, gc);
+          if(gc->stage == CLEAR_WEAK){
+            // removed non-gc-marked entries
+            ht_iterate2(table, iterate_keys_remove_unmarked, gc);
+          }
+        }else if(mask & LISP_HASHTABLE_WEAK_VALUES){
+          // note unmarked.
+          ht_iterate(table, iterate_values_only, gc);
+          if(gc->stage == CLEAR_WEAK){
+            // removed non-gc-marked entries
+            ht_iterate2(table, iterate_values_remove_unmarked, gc);
+          }
+        }
+      }else{
+        ht_iterate(table, iterate_value, gc);
+      }
       mark_vector(gc, table->elems);
       mark_vector(gc, table->occupied);
     }
@@ -242,13 +297,27 @@ static inline void visit_value(gc_context * gc, lisp_value val){
   }
 }
 
-void iterate_value(void * key, void * value, void * data){
+ void iterate_value(void * key, void * value, void * data){
   lisp_value * val = value;
   lisp_value * ke = key;
   gc_context * gc = data;
   visit_value(gc, *val);
   visit_value(gc, *ke);
 }
+
+
+ void iterate_values_only(void * key, void * value, void * data){
+  lisp_value * val = value;
+  gc_context * gc = data;
+  visit_value(gc, *val);
+}
+
+ void iterate_keys_only(void * key, void * value, void * data){
+  lisp_value * ke = key;
+  gc_context * gc = data;
+  visit_value(gc, *ke);
+}
+
 
 void gc_clear(gc_context * gc){
   var buf = gc->cons_pool;
@@ -308,7 +377,7 @@ void gc_recover_unmarked(gc_context * gc){
         pool->free_arrays = obj;
         *place = next;
 
-      }else if(obj->mark == 1){
+      }else if(obj->mark <= 2){
         place = &obj->next;
       }else{
         ASSERT(false);
@@ -367,6 +436,14 @@ int gc_unsorted_cons(gc_context * gc){
 size_t ht_count(hash_table * ht);
 
 void gc_mark(lisp_context * lisp){
+  lisp->gc->stage = MARK;
+  iterate_scope(lisp->gc, lisp->globals);
+}
+
+//todo: check if there is a performance benefit to adding gc weak objects.
+
+void gc_clear_weak(lisp_context * lisp){
+  lisp->gc->stage = CLEAR_WEAK;
   iterate_scope(lisp->gc, lisp->globals);
 }
 
@@ -374,6 +451,14 @@ void gc_collect_garbage(lisp_context * lisp){
   var gc = lisp->gc;
   gc_clear(gc);
   gc_mark(lisp);
+  // to support weak references I had to add a stage to the garbage collection.
+  // A second sweep is done and every weak reference is cleared
+  // if the object being pointed to is unmarked at this stage.
+  // Currently only a limited set of objects can be weak.
+  // - add support for an object where a callback is done when the target
+  // object is removed. This could be useful for resources that needs to be managed.
+  
+  gc_clear_weak(lisp);
   gc_recover_unmarked(gc);
 }
 

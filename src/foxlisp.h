@@ -83,6 +83,7 @@ typedef struct __attribute__((__packed__))
   int16_t scope_level;
   int scope_index : 24;
 }lisp_local_index;
+
 typedef enum{
   LISP_SPECIAL = 0,
   LISP_RATIONAL2 = 1,
@@ -101,6 +102,12 @@ typedef enum{
   LISP_GLOBAL_INDEX2 = 7,
   LISP_LOCAL_INDEX2 = 8
 }lisp_value_tag2;
+
+typedef enum{
+  LISP_HASHTABLE_WEAK_KEYS = 1,
+  LISP_HASHTABLE_WEAK_VALUES = 2
+  
+}lisp_hashtable_flags;
 
 typedef struct __attribute__((__packed__)){
   lisp_value_tag1 tag: 2;

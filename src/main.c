@@ -2162,6 +2162,15 @@ lisp_value lisp_make_hashtable(){
   return hashtable_lisp_value(ht);
 }
 
+lisp_value lisp_make_hashtable_weak_keys(){
+  hash_table * ht = lisp_malloc(sizeof(*ht));
+  ht_create3(ht, 1, sizeof(lisp_value), sizeof(lisp_value));
+  ht_set_alloc(ht, lisp_malloc, lisp_free);
+  ((size_t*)&ht->userdata)[0] = LISP_HASHTABLE_WEAK_KEYS;
+  return hashtable_lisp_value(ht);
+}
+
+
 lisp_value lisp_hashtable_set(lisp_value _ht, lisp_value key, lisp_value value){
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
   hash_table * ht = lisp_value_hashtable(_ht);
@@ -2561,8 +2570,8 @@ lisp_context * lisp_context_new(){
 #endif
 
   // keeping track of debug information
-  read_cons_offset = lisp_make_hashtable();
-  read_cons_file = lisp_make_hashtable();
+  read_cons_offset = lisp_make_hashtable_weak_keys();
+  read_cons_file = lisp_make_hashtable_weak_keys();
   lisp_register_value("lisp:++cons-file-offset++", read_cons_offset);
   lisp_register_value("lisp:++cons-file++", read_cons_file);
 
