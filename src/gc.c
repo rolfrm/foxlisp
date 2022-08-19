@@ -32,7 +32,7 @@ static void * _alloc0(size_t v){
 }
 
 
-bool is_heap_ptr(void * ptr){
+static inline bool is_heap_ptr(void * ptr){
   return ptr >= heap_start && ptr <= heap_end;
 }
 
@@ -103,7 +103,7 @@ bool gc_mark_cons(gc_context * gc, cons * c){
   return visit_cons(gc, c);
 }
 
-bool cons_is_marked(gc_context * gc, cons * c){
+inline bool cons_is_marked(gc_context * gc, cons * c){
   u8 * marker = cons_marker_pointer(gc, c);
   if(marker == NULL)
     return false;
@@ -138,6 +138,7 @@ void iterate_scope(gc_context * ctx, lisp_scope * scope);
 
 static ht_op iterate_keys_remove_unmarked(void * key, void * value, void * data){
   lisp_value * ke = key;
+  lisp_value * val = value;
   gc_context * gc = data;
   switch(ke->type){
   case LISP_CONS:
@@ -147,6 +148,8 @@ static ht_op iterate_keys_remove_unmarked(void * key, void * value, void * data)
   default:
     break;
   }
+  visit_value(gc, *val);
+    
    return HT_NOP;
 }
 
@@ -180,6 +183,37 @@ static inline bool visit_cons(gc_context * gc, cons * c){
   visit_value(gc, c->cdr);
   return true;
 }
+
+static inline void visit_hashtable(gc_context * gc, hash_table * table){
+  if(!mark_vector(gc, table) && !mark_vector(gc, table->keys))
+    return;
+
+  // weak key / value table support
+  if(table->userdata != NULL){
+    size_t mask = (size_t) table->userdata;
+    if(mask & LISP_HASHTABLE_WEAK_KEYS){
+      if(gc->stage == CLEAR_WEAK){
+        // removed non-gc-marked entries
+        ht_iterate2(table, iterate_keys_remove_unmarked, gc);
+      }else{
+        ht_iterate(table, iterate_values_only, gc);
+      
+      }
+    }else if(mask & LISP_HASHTABLE_WEAK_VALUES){
+      // note unmarked.
+      ht_iterate(table, iterate_values_only, gc);
+      if(gc->stage == CLEAR_WEAK){
+        // removed non-gc-marked entries
+        ht_iterate2(table, iterate_values_remove_unmarked, gc);
+      }
+    }
+  }else{
+    ht_iterate(table, iterate_value, gc);
+  }
+  mark_vector(gc, table->elems);
+  mark_vector(gc, table->occupied);
+}
+
 static inline void visit_value(gc_context * gc, lisp_value val){
   
   switch(val.type){
@@ -199,32 +233,8 @@ static inline void visit_value(gc_context * gc, lisp_value val){
       return;
     return;
   case LISP_HASHTABLE:
-    {
-      hash_table * table = val.native_pointer;
-      if(!mark_vector(gc, table) && !mark_vector(gc, table->keys)) return;
-      if(table->userdata != NULL){
-        size_t mask = (size_t) table->userdata;
-        if(mask & LISP_HASHTABLE_WEAK_KEYS){
-          ht_iterate(table, iterate_values_only, gc);
-          if(gc->stage == CLEAR_WEAK){
-            // removed non-gc-marked entries
-            ht_iterate2(table, iterate_keys_remove_unmarked, gc);
-          }
-        }else if(mask & LISP_HASHTABLE_WEAK_VALUES){
-          // note unmarked.
-          ht_iterate(table, iterate_values_only, gc);
-          if(gc->stage == CLEAR_WEAK){
-            // removed non-gc-marked entries
-            ht_iterate2(table, iterate_values_remove_unmarked, gc);
-          }
-        }
-      }else{
-        ht_iterate(table, iterate_value, gc);
-      }
-      mark_vector(gc, table->elems);
-      mark_vector(gc, table->occupied);
-    }
-    return;
+    visit_hashtable(gc, val.native_pointer);
+    break;
   case LISP_ALLOCATED_POINTER:
     if(!mark_vector(gc, val.native_pointer))
       return;
@@ -339,6 +349,36 @@ void gc_clear(gc_context * gc){
   }
 }
 
+static inline void recover_cons(cons_buffer * buf, ssize_t i){
+  if(buf->gc_mark[i] == false){
+    buf->buffer[i].cdr.cons = buf->free_cons;
+    buf->buffer[i].car = nil;
+    //ASSERT(is_heap_ptr(buf->buffer + i));
+    buf->free_cons = buf->buffer + i;
+  }  
+}
+
+static void recover_pool(cons_buffer * buf){
+  // free them in inverse order
+  // this means
+  // always a multiple of 8 bytes.
+  u64 * marks = (u64 *) buf->gc_mark;
+  size_t mark_count = buf->size / 8;
+  for(ssize_t j = mark_count; j > 0; j--){
+    // 02020202... - the GC mark when a full block is all marked
+    // 2 is the stage 2 GC mark.
+    if(marks[j - 1] == 0x0202020202020202L){
+      
+      continue;
+    }
+
+    ssize_t i2 = j * 8;
+    for(ssize_t i = 0; i < 8; i += 1){
+      recover_cons(buf, i2 - i - 1);
+    }
+  }
+}
+
 void gc_recover_unmarked(gc_context * gc){
   var buf = gc->cons_pool;
   
@@ -349,17 +389,7 @@ void gc_recover_unmarked(gc_context * gc){
       mark_cons(gc, c);
       c = c->cdr.cons;
     }
-    // free them in inverse order
-    // this means
-    for(size_t i = buf->size - 1; i >= 0; i--){
-      if(buf->gc_mark[i] == false){
-        buf->buffer[i].cdr.cons = buf->free_cons;
-        buf->buffer[i].car = nil;
-        //ASSERT(is_heap_ptr(buf->buffer + i));
-        buf->free_cons = buf->buffer + i;
-      }
-      if(i == 0)break;
-    }
+    recover_pool(buf);
     buf = buf->next;
   }
   //return;
@@ -528,7 +558,8 @@ lisp_value lisp_trace_allocations(lisp_value c){
   trace_allocations = !is_nil(c);
   return nil;
 }
-void * lisp_malloc(size_t v){
+
+inline void * lisp_malloc(size_t v){
 
   // cannot default to a normal allocator because that has the potential of messing
   // with the garbage collector later on.
@@ -605,6 +636,7 @@ lisp_value lisp_count_allocated(){
     }
     buf = buf->next;
   }
+
   array_pool * array_pools = gc->array_pool;
   for(size_t i = 0; i < 3 * 1024 + 1; i++){
     var ptr = array_pools[i].occupied_arrays;

@@ -428,10 +428,13 @@ lisp_value lisp_macro_expand(lisp_scope * scope, lisp_value value);
 // this makes sure that the code location is maintained.
 lisp_value new_cons_m(lisp_value a, lisp_value b, lisp_value cons){
   
+  if(is_nil(read_cons_offset))
+    return new_cons(a, b);
+
   var offset = lisp_hashtable_get(read_cons_offset, cons);
   var file = lisp_hashtable_get(read_cons_file, cons);
-  
   cons = new_cons(a, b);
+  
   if(is_nil(offset) || is_nil(file))
      return cons;
   lisp_hashtable_set(read_cons_offset, cons, offset);
@@ -1096,7 +1099,7 @@ lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * f, size_t argc
 
 }
 
-lisp_value lisp_value_eqn3(lisp_scope * scope, lisp_value values){
+lisp_value lisp_eval_eqn(lisp_scope * scope, lisp_value values){
   lisp_value a = lisp_eval(scope, car(values));
   values = cdr(values);
   while(!is_nil(values)){
@@ -1107,6 +1110,22 @@ lisp_value lisp_value_eqn3(lisp_scope * scope, lisp_value values){
       return nil;
   }
   return t;
+}
+
+
+lisp_value lisp_eval_plookup(lisp_scope * scope, lisp_value lst, lisp_value sym){
+  lst = lisp_eval(scope, lst);
+  sym = lisp_eval(scope, sym);
+  while(is_cons(lst)){
+    if(is_symbol(car(lst))){
+      if(lisp_value_eq(sym, car(lst)))
+        return cadr(lst);
+      lst = cddr(lst);
+    }else{
+      lst = cdr(lst);
+    }
+  }
+  return nil;
 }
 
 
@@ -1211,12 +1230,18 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
           return cdr(lisp_eval(scope, cadr(value)));
         case LISP_CDDR:
           return cddr(lisp_eval(scope, cadr(value)));
+        case LISP_CADR:
+          return cadr(lisp_eval(scope, cadr(value)));
         case LISP_EQN:
-          return lisp_value_eqn3(scope, cdr(value));
+          return lisp_eval_eqn(scope, cdr(value));
         case LISP_IS_SYMBOL:
           return lisp_is_symbol(lisp_eval(scope, cadr(value)));
         case LISP_IS_LIST:
           return lisp_is_list(lisp_eval(scope, cadr(value)));
+        case LISP_PLOOKUP:
+          return lisp_eval_plookup(scope, cadr(value), caddr(value));
+        case LISP_NEW_CONS:
+          return new_cons(lisp_eval(scope, cadr(value)), lisp_eval(scope, caddr(value)));
         }
       }
       size_t argcnt = lisp_optimize_statement(scope, value) - 1;
@@ -1319,6 +1344,9 @@ lisp_value lisp_code_location(lisp_value cons){
 }
 
 lisp_value lisp_print_code_location(lisp_value cons){
+  
+  if(is_nil(read_cons_offset))
+    return nil;
   var offset = lisp_hashtable_get(read_cons_offset, cons);
   var file = lisp_hashtable_get(read_cons_file, cons);
   if(lisp_value_type(offset) != LISP_INTEGER)
@@ -2226,6 +2254,14 @@ lisp_value lisp_hashtable_values(lisp_value _ht){
   return keys;
 }
 
+lisp_value lisp_hashtable_clear(lisp_value _ht){
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
+  hash_table * ht = lisp_value_hashtable(_ht);
+  ht_clear(ht);
+  return nil;
+}
+
+
 lisp_value lisp_is_symbol(lisp_value v){
   if(is_symbol(v))
     return t;
@@ -2442,7 +2478,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("cadr", 1, cadr);
   lisp_register_native("set-car!", 2, set_car);
   lisp_register_native("set-cdr!", 2, set_cdr);
-  lisp_register_native("cons", 2, new_cons);
+  //lisp_register_native("cons", 2, new_cons);
   lisp_register_native("length", 1, lisp_length);
   lisp_register_native("lisp:collect-garbage", 0, lisp_collect_garbage);
   lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);
@@ -2450,7 +2486,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:debug", 1, lisp_debug);
   lisp_register_native("copy-list", 1, copy_cons);
   lisp_register_native("copy-list-deep", 1, copy_cons_deep);
-  lisp_register_native("plookup", 2, lisp_plookup);
+  //lisp_register_native("plookup", 2, lisp_plookup);
 
   //lisp_register_native("=", -1, lisp_value_eqn);
   lisp_register_native("/=", -1, lisp_neqn);
@@ -2493,6 +2529,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
   lisp_register_native("hashtable-keys", 1, lisp_hashtable_keys);
   lisp_register_native("hashtable-values", 1, lisp_hashtable_values);
+  lisp_register_native("hashtable-clear", 1, lisp_hashtable_clear);
   lisp_register_native("function-signature", 1, lisp_signature);
 
   lisp_register_native("optimize-statement", 2, _lisp_optimize_statement);
@@ -2530,9 +2567,12 @@ lisp_context * lisp_context_new(){
   lisp_register_macro("car", LISP_CAR);
   lisp_register_macro("cdr", LISP_CDR);
   lisp_register_macro("cddr", LISP_CDDR);
+  lisp_register_macro("cadr", LISP_CADR);
   lisp_register_macro("=", LISP_EQN);
   lisp_register_macro("symbol?", LISP_IS_SYMBOL);
   lisp_register_macro("list?", LISP_IS_LIST);
+  lisp_register_macro("plookup", LISP_PLOOKUP);
+  lisp_register_macro("cons", LISP_NEW_CONS);
   
   
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});

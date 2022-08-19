@@ -1,3 +1,4 @@
+
 (println "starting ld50 game")
 (load "lisp1.lisp")
 (lisp:collect-garbage)

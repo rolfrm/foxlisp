@@ -61,8 +61,11 @@ typedef enum {
               LISP_CDR,
               LISP_EQN,
               LISP_CDDR,
+              LISP_CADR,
               LISP_IS_SYMBOL,
               LISP_IS_LIST,
+              LISP_PLOOKUP,
+              LISP_NEW_CONS
               
 }lisp_builtin;
 
