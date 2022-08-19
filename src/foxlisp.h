@@ -296,6 +296,10 @@ void * nogc_clone(const void * mem, size_t s);
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 
+lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body);
+
+
+
 
 int64_t get_symbol_id(const char * s);
 lisp_value print(lisp_value v);

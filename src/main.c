@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <iron/full.h>
 #include <setjmp.h>
-
 #ifdef EMSCRIPTEN
 #include "emscripten.h"
 #endif
@@ -42,7 +41,6 @@ lisp_value read_cons_file = {0};
 
 #undef ASSERT
 void print_call_stack();
-#define lisp_eval2 lisp_eval
 static lisp_value current_error = {0};
 static lisp_value current_error_stack = {0};
 static bool is_in_lisp;
@@ -635,16 +633,7 @@ lisp_value lisp_with_sub_scope(lisp_value scope, lisp_value sym, lisp_value valu
   lisp_scope * super_scope = lisp_value_scope(scope);
   cons con = {.car = sym, .cdr = value};
   lisp_scope_stack(&s, super_scope, &con, 1);
-
-  lisp_value ret = nil;
-  while(is_cons(body)){
-    ret = lisp_eval(&s, car(body));
-    if(lisp_is_in_error()) return nil;
-    
-    body = cdr(body);
-  }
-  return ret;
-  
+  return lisp_eval_progn(&s, body);
 }
 
 
@@ -683,14 +672,7 @@ lisp_value lisp_with_scope_binding(lisp_value scope, lisp_value scope2, lisp_val
     }
     
   }
-  lisp_value ret = nil;
-  while(is_cons(body)){
-    ret = lisp_eval(&s, car(body));
-    if(lisp_is_in_error()) return nil;
-    //println(body);
-    body = cdr(body);
-  }
-  return ret;
+  return lisp_eval_progn(&s, body);
 }
 
 lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2, lisp_value syms, lisp_value variable, lisp_value body){
@@ -710,16 +692,8 @@ lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2, lisp_value 
   con[len2].cdr = nil;
   
   lisp_scope_stack(&s, super_scope, con, len2 + 1);
-  
-  lisp_value ret = nil;
-    while(is_cons(body)){
-    ret = lisp_eval(&s, car(body));
-    if(lisp_is_in_error()) return nil;
-    
-    body = cdr(body);
-  }
-  return ret;
-  
+
+  return lisp_eval_progn(&s, body);
 }
 
 lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
@@ -731,7 +705,7 @@ lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
 lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body){
   lisp_value result = nil;
   while(!is_nil(body)){
-    result = lisp_eval2(scope, car(body));
+    result = lisp_eval(scope, car(body));
     if(lisp_is_in_error()) break;
     body = cdr(body);
   }
@@ -739,7 +713,7 @@ lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body){
 }
 
 lisp_value lisp_eval_if(lisp_scope * scope, lisp_value cond, lisp_value true_form, lisp_value false_form){
-  var condr = lisp_eval2(scope, cond);
+  var condr = lisp_eval(scope, cond);
   if(lisp_is_in_error()) return nil;
     
   if(is_nil(condr))
@@ -790,7 +764,7 @@ lisp_value lisp_eval_let(lisp_scope * scope, lisp_value argform, lisp_value body
 
 lisp_value lisp_eval_loop(lisp_scope * scope, lisp_value condition, lisp_value body){
   lisp_value result = nil;
-  while(!is_nil(lisp_eval2(scope, condition))){
+  while(!is_nil(lisp_eval(scope, condition))){
     result = lisp_eval_progn(scope, body);
     if(lisp_is_in_error()) break;
   }
@@ -798,7 +772,7 @@ lisp_value lisp_eval_loop(lisp_scope * scope, lisp_value condition, lisp_value b
 }
 
 lisp_value lisp_eval_symbol_value(lisp_scope * scope, lisp_value sym_expr, lisp_value root_scope_only){
-  var sym = lisp_eval2(scope, sym_expr);
+  var sym = lisp_eval(scope, sym_expr);
   lisp_value result = nil;
   if(!is_symbol(sym)){
     println(sym);
@@ -849,7 +823,7 @@ lisp_value lisp_eval_with_exception_handler(lisp_scope * scope, lisp_value body,
 }
 
 lisp_value lisp_eval_case(lisp_scope * scope, lisp_value condition, lisp_value cases){
-  var result = lisp_eval2(scope, condition);
+  var result = lisp_eval(scope, condition);
   while(is_nil(cases) == false){
     var c = car(cases);
     var test = car(c);
@@ -893,7 +867,7 @@ lisp_value lisp_eval_and(lisp_scope * scope, lisp_value cases){
   lisp_value result = t;
   while(is_nil(cases) == false){
     var c = car(cases);
-    result = lisp_eval2(scope, c);
+    result = lisp_eval(scope, c);
     if(is_nil(result)) return nil;
     cases = cdr(cases);
   }
@@ -903,7 +877,7 @@ lisp_value lisp_eval_and(lisp_scope * scope, lisp_value cases){
 lisp_value lisp_eval_or(lisp_scope * scope, lisp_value cases){
   while(is_nil(cases) == false){
     var c = car(cases);
-    var result = lisp_eval2(scope, c);
+    var result = lisp_eval(scope, c);
     if(is_nil(result) == false) return result;
     cases = cdr(cases);
   }
@@ -935,7 +909,7 @@ lisp_value lisp_eval_macro(lisp_scope * scope, lisp_value args, lisp_value body)
 
 lisp_value lisp_eval_set(lisp_scope * scope, lisp_value symform){
   var sym = car(symform);
-  var value2 = lisp_eval2(scope, cadr(symform));
+  var value2 = lisp_eval(scope, cadr(symform));
   switch(lisp_value_type(sym)){
   case LISP_SYMBOL:
     lisp_optimize_statement(scope, symform);
@@ -989,7 +963,7 @@ lisp_value lisp_eval_native_functions(lisp_scope * scope, native_function * n, s
   lisp_value args[n->nargs == -1 ? argcnt : MAX(argcnt, n->nargs)];
   lisp_value arglist = arg_form;
   for(size_t i = 0; i < argcnt; i++){
-    args[i] = lisp_eval2(scope, car(arglist));
+    args[i] = lisp_eval(scope, car(arglist));
     arglist = cdr(arglist);
     if(lisp_is_in_error())
       return nil;
@@ -1056,7 +1030,7 @@ lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * f, size_t argc
 
     // evaluate the arguments
     for(size_t i = 0; i < argcnt; i++){
-      args0[i].car = lisp_eval2(scope, car(arg0));
+      args0[i].car = lisp_eval(scope, car(arg0));
       arg0 = cdr(arg0);
     }
           
@@ -1177,13 +1151,13 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
             lisp_value new = global_index_lisp_value(i1);
             set_car(value, new);
             
-            var first_value2 = lisp_eval2(scope, new);
+            var first_value2 = lisp_eval(scope, new);
             ASSERT(lisp_value_eq(first_value, first_value2));
             first_value = first_value2;
           }
           // this is a performance optimization for the normal case - calling a function by name
         }else{
-        first_value = lisp_eval2(scope, first);
+        first_value = lisp_eval(scope, first);
       }
 
 		if(is_macro_builtin(first_value)){
@@ -1232,11 +1206,11 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
         case LISP_GET_SCOPE_UNSAFE:
           return lisp_eval_get_scope_unsafe(scope);
         case LISP_CAR:
-          return car(lisp_eval2(scope, cadr(value)));
+          return car(lisp_eval(scope, cadr(value)));
         case LISP_CDR:
-          return cdr(lisp_eval2(scope, cadr(value)));
+          return cdr(lisp_eval(scope, cadr(value)));
         case LISP_CDDR:
-          return cddr(lisp_eval2(scope, cadr(value)));
+          return cddr(lisp_eval(scope, cadr(value)));
         case LISP_EQN:
           return lisp_value_eqn3(scope, cdr(value));
         case LISP_IS_SYMBOL:
