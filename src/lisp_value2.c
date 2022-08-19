@@ -11,7 +11,7 @@ static inline bool is_integer_type(lisp_type t){
   return false;  
 }
 
-static inline bool is_float_type(lisp_type t){
+inline bool is_float_type(lisp_type t){
   switch(t){
   case LISP_RATIONAL:
   case LISP_FLOAT32:

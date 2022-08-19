@@ -65,7 +65,14 @@ typedef enum {
               LISP_IS_SYMBOL,
               LISP_IS_LIST,
               LISP_PLOOKUP,
-              LISP_NEW_CONS
+              LISP_NEW_CONS,
+              LISP_ADD,
+              LISP_SUB,
+              LISP_MUL,
+              LISP_CONV_FLOAT32,
+              LISP_VECTOR_LENGTH,
+              LISP_VECTOR_REF,
+              LISP_VECTOR_SET
               
 }lisp_builtin;
 
@@ -242,6 +249,7 @@ bool is_function(lisp_value a);
 bool is_function_macro(lisp_value a);
 bool is_function_native(lisp_value a);
 bool is_macro_builtin(lisp_value a);
+bool is_float_type(lisp_type t);
 f64 lisp_value_rational(lisp_value v);
 lisp_value rational_lisp_value(double o);
 int64_t lisp_value_as_integer(lisp_value v);

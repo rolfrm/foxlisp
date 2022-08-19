@@ -705,7 +705,7 @@ lisp_value lisp_scope_set(lisp_value scope, lisp_value sym, lisp_value value){
   return nil;
 }
 
-lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body){
+inline lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body){
   lisp_value result = nil;
   while(!is_nil(body)){
     result = lisp_eval(scope, car(body));
@@ -737,7 +737,7 @@ lisp_value lisp_eval_symbol(lisp_scope * scope, lisp_value sym){
 }
 
 
-lisp_value lisp_eval_let(lisp_scope * scope, lisp_value argform, lisp_value body){
+static inline lisp_value lisp_eval_let(lisp_scope * scope, lisp_value argform, lisp_value body){
 
   var argcnt = list_length(argform);
   cons argsbuf[argcnt];
@@ -1024,7 +1024,7 @@ lisp_value lisp_eval_native_functions(lisp_scope * scope, native_function * n, s
   return nil;
 }
 
-lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * f, size_t argcnt, lisp_value args_form){
+static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * f, size_t argcnt, lisp_value args_form){
   cons args0[argcnt];
   
   lisp_value things;
@@ -1128,10 +1128,133 @@ lisp_value lisp_eval_plookup(lisp_scope * scope, lisp_value lst, lisp_value sym)
   return nil;
 }
 
+lisp_value lisp_eval_add(lisp_scope * scope, lisp_value number_forms){
+  lisp_value val1 = lisp_eval(scope, car(number_forms));
+  lisp_type val1_type = lisp_value_type(val1);
+  bool integer_mode = !is_float_type(val1_type);
+  
+  while(!is_nil(number_forms = cdr(number_forms))){
+    lisp_value val2 = lisp_eval(scope, car(number_forms));
+    lisp_type val2_type = lisp_value_type(val2);
+    if(integer_mode){
+      if(is_float(val2)){
+        integer_mode = false;
+        val1 = rational(val1.integer);
+        val1_type = val2_type;
+        goto float_mode;
+      }else{
+        val1.integer += val2.integer;
+        if(val2_type != val1_type){
+          if(val1_type == LISP_INTEGER)
+            val1_type = LISP_INTEGER;
+          else if(val2_type == LISP_INTEGER32 && val1_type == LISP_BYTE)
+            val1_type = LISP_INTEGER;
+        }
+      }
+    }else{
+    float_mode:
+      if(!is_float(val2)){
+        val2.rational = val2.integer;
+      }
+      val1.rational += val2.rational;
+      if(val2_type != val1_type && val2_type == LISP_RATIONAL){
+        val1_type = LISP_RATIONAL;
+      }
+    }
+  }
+  val1.type = val1_type;
+  return val1;
+}
+lisp_value lisp_eval_sub(lisp_scope * scope, lisp_value number_forms){
+  lisp_value val1 = lisp_eval(scope, car(number_forms));
+  lisp_type val1_type = lisp_value_type(val1);
+  bool integer_mode = !is_float_type(val1_type);
+  
+  while(!is_nil(number_forms = cdr(number_forms))){
+    lisp_value val2 = lisp_eval(scope, car(number_forms));
+    lisp_type val2_type = lisp_value_type(val2);
+    if(integer_mode){
+      if(is_float(val2)){
+        integer_mode = false;
+        val1 = rational(val1.integer);
+        val1_type = val2_type;
+        goto float_mode;
+      }else{
+        val1.integer -= val2.integer;
+        if(val2_type != val1_type){
+          if(val1_type == LISP_INTEGER)
+            val1_type = LISP_INTEGER;
+          else if(val2_type == LISP_INTEGER32 && val1_type == LISP_BYTE)
+            val1_type = LISP_INTEGER;
+        }
+      }
+    }else{
+    float_mode:
+      if(!is_float(val2)){
+        val2.rational = val2.integer;
+      }
+      val1.rational -= val2.rational;
+      if(val2_type != val1_type && val2_type == LISP_RATIONAL){
+        val1_type = LISP_RATIONAL;
+      }
+    }
+  }
+  val1.type = val1_type;
+  return val1;
+}
+lisp_value lisp_eval_mul(lisp_scope * scope, lisp_value number_forms){
+  lisp_value val1 = lisp_eval(scope, car(number_forms));
+  lisp_type val1_type = lisp_value_type(val1);
+  bool integer_mode = !is_float_type(val1_type);
+  
+  while(!is_nil(number_forms = cdr(number_forms))){
+    lisp_value val2 = lisp_eval(scope, car(number_forms));
+    lisp_type val2_type = lisp_value_type(val2);
+    if(integer_mode){
+      if(is_float(val2)){
+        integer_mode = false;
+        val1 = rational(val1.integer);
+        val1_type = val2_type;
+        goto float_mode;
+      }else{
+        val1.integer *= val2.integer;
+        if(val2_type != val1_type){
+          if(val1_type == LISP_INTEGER)
+            val1_type = LISP_INTEGER;
+          else if(val2_type == LISP_INTEGER32 && val1_type == LISP_BYTE)
+            val1_type = LISP_INTEGER;
+        }
+      }
+    }else{
+    float_mode:
+      if(!is_float(val2)){
+        val2.rational = val2.integer;
+      }
+      val1.rational *= val2.rational;
+      if(val2_type != val1_type && val2_type == LISP_RATIONAL){
+        val1_type = LISP_RATIONAL;
+      }
+    }
+  }
+  val1.type = val1_type;
+  return val1;
+}
+
+lisp_value lisp_eval_vector_length(lisp_scope * scope, lisp_value vec_form){
+  return vector_length(lisp_eval(scope, vec_form));
+}
+
+lisp_value lisp_eval_vector_ref(lisp_scope * scope, lisp_value vec_form, lisp_value index_form){
+  return vector_ref(lisp_eval(scope, vec_form), lisp_eval(scope, index_form));
+}
+
+lisp_value lisp_eval_vector_set(lisp_scope * scope, lisp_value vec_form, lisp_value index_form, lisp_value value_form){
+  return vector_set(lisp_eval(scope, vec_form),lisp_eval(scope, index_form),lisp_eval(scope, value_form));
+}
 
 lisp_value lisp_stack;
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
-lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
   cons stk = {.car = value, .cdr = lisp_stack};
   lisp_stack = cons_lisp_value(&stk);
   var r = lisp_eval_inner(scope, value);
@@ -1139,46 +1262,75 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   return r;
 }
 
+static inline lisp_value lookup_local_index(lisp_scope * scope, lisp_local_index index){
+  while(index.scope_level > 0){
+    scope = scope->super;
+    ASSERT(scope != NULL);
+    index.scope_level -= 1;
+  }
+  if(index.scope_type == 0){
+    cons v = scope->lookup[index.scope_index];
+    return v.cdr;
+  }
+  return scope->values[index.scope_index];  
+}
 
 
-lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
+lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   switch(lisp_value_type(value)){
   case LISP_CONS:
 	 {
       var first = car(value);
 
-      if(debug_enabled){
+      /*if(debug_enabled){
         if(!is_nil(lisp_print_code_location(value)))
           {
             printf(" ");
             println(first);
           }
-      }
-      lisp_value first_value;
+          }*/
+      lisp_value first_value = first;
 
       lisp_scope * s1;
       int i1, i2;
-      if(is_symbol(first) && lisp_scope_try_get_value2(scope, first.integer, &s1, &i1, &i2))
+      switch(lisp_value_type(first)){
+      case LISP_SYMBOL:
         {
-          if(i2 == -1){
-            first_value = s1->values[i1];
-          }else{
-            first_value = s1->lookup[i2].cdr;
-          }
-          if(s1 == current_context->globals){
-            
-            lisp_value new = global_index_lisp_value(i1);
-            set_car(value, new);
-            
-            var first_value2 = lisp_eval(scope, new);
-            ASSERT(lisp_value_eq(first_value, first_value2));
-            first_value = first_value2;
-          }
-          // this is a performance optimization for the normal case - calling a function by name
-        }else{
+          if(lisp_scope_try_get_value2(scope, first.integer, &s1, &i1, &i2))
+            {
+              if(i2 == -1){
+                first_value = s1->values[i1];
+              }else{
+                first_value = s1->lookup[i2].cdr;
+              }
+              if(s1 == current_context->globals){
+                
+                lisp_value new = global_index_lisp_value(i1);
+                set_car(value, new);
+                
+                var first_value2 = lisp_eval(scope, new);
+                ASSERT(lisp_value_eq(first_value, first_value2));
+                first_value = first_value2;
+              }
+              // this is a performance optimization for the normal case - calling a function by name
+            }
+        }
+        break;
+      case LISP_FUNCTION:
+        break;
+      case LISP_FUNCTION_NATIVE:
+        break;
+      case LISP_GLOBAL_INDEX:
+        first_value = current_context->globals->values[first.integer];
+        break;
+      case LISP_LOCAL_INDEX:
+        first_value = lookup_local_index(scope, first_value.local_index);
+        break;
+      default:
         first_value = lisp_eval(scope, first);
+        break;
       }
-
+      
 		if(is_macro_builtin(first_value)){
 		  switch(first_value.builtin){
 		  case LISP_IF:
@@ -1242,6 +1394,20 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
           return lisp_eval_plookup(scope, cadr(value), caddr(value));
         case LISP_NEW_CONS:
           return new_cons(lisp_eval(scope, cadr(value)), lisp_eval(scope, caddr(value)));
+        case LISP_ADD:
+          return lisp_eval_add(scope, cdr(value));
+        case LISP_SUB:
+          return lisp_eval_sub(scope, cdr(value));
+        case LISP_MUL:
+          return lisp_eval_mul(scope, cdr(value));
+        case LISP_VECTOR_LENGTH:
+          return lisp_eval_vector_length(scope, cadr(value));
+        case LISP_VECTOR_REF:
+          return lisp_eval_vector_ref(scope, cadr(value), caddr(value));
+        case LISP_VECTOR_SET:
+          return lisp_eval_vector_set(scope, cadr(value), caddr(value), cadddr(value));
+        case LISP_CONV_FLOAT32:
+          return lisp_float32(lisp_eval(scope, cadr(value)));
         }
       }
       size_t argcnt = lisp_optimize_statement(scope, value) - 1;
@@ -1265,17 +1431,7 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
   case LISP_GLOBAL_INDEX:
     return current_context->globals->values[value.integer];
   case LISP_LOCAL_INDEX:
-    while(value.local_index.scope_level > 0){
-      scope = scope->super;
-      ASSERT(scope != NULL);
-      value.local_index.scope_level -= 1;
-    }
-    if(value.local_index.scope_type == 0){
-      cons v = scope->lookup[value.local_index.scope_index];
-      return v.cdr;
-    }else
-      return scope->values[value.local_index.scope_index];
-      
+    return lookup_local_index(scope, value.local_index);
   default:
     return value;
   }
@@ -2458,9 +2614,9 @@ lisp_context * lisp_context_new(){
   lisp_register_native("number?", 1, lisp_is_number);
   lisp_register_native("rational?", 1, lisp_is_rational);
   lisp_register_native("cons?", 1, lisp_is_cons);
-  lisp_register_native("+", -1, lisp_addn);
-  lisp_register_native("-", -1, lisp_subn);
-  lisp_register_native("*", -1, lisp_muln);
+  //lisp_register_native("+", -1, lisp_addn);
+  //lisp_register_native("-", -1, lisp_subn);
+  //lisp_register_native("*", -1, lisp_muln);
   lisp_register_native("/",-1, lisp_divn);
   lisp_register_native("<", -1, lisp_lessn);
   lisp_register_native(">", -1, lisp_greatern);
@@ -2494,7 +2650,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
   lisp_register_native("rational", 1, lisp_rational);
-  lisp_register_native("float32", 1, lisp_float32);
+  //lisp_register_native("float32", 1, lisp_float32);
   lisp_register_native("byte", 1, lisp_byte);
   lisp_register_native("sin", 1, lisp_sin);
   lisp_register_native("cos", 1, lisp_cos);
@@ -2506,10 +2662,10 @@ lisp_context * lisp_context_new(){
   lisp_register_native("load", 1, lisp_load);
   
   lisp_register_native("make-vector", 2, make_vector);
-  lisp_register_native("vector-ref", 2, vector_ref);
-  lisp_register_native("vector-set!", 3, vector_set);
+  //lisp_register_native("vector-ref", 2, vector_ref);
+  //lisp_register_native("vector-set!", 3, vector_set);
   lisp_register_native("vector-element-type", 1, vector_elem_type);
-  lisp_register_native("vector-length", 1, vector_length);
+  //lisp_register_native("vector-length", 1, vector_length);
   lisp_register_native("vector-native-element-pointer", 2, vector_native_element_pointer);
   lisp_register_native("vector-resize", 2, vector_resize);
   lisp_register_native("vector->string", 1, vector_to_string);
@@ -2573,6 +2729,13 @@ lisp_context * lisp_context_new(){
   lisp_register_macro("list?", LISP_IS_LIST);
   lisp_register_macro("plookup", LISP_PLOOKUP);
   lisp_register_macro("cons", LISP_NEW_CONS);
+  lisp_register_macro("+", LISP_ADD);
+  lisp_register_macro("-", LISP_SUB);
+  lisp_register_macro("*", LISP_MUL);
+  lisp_register_macro("vector-length", LISP_VECTOR_LENGTH);
+  lisp_register_macro("vector-ref", LISP_VECTOR_REF);
+  lisp_register_macro("vector-set!", LISP_VECTOR_SET);
+  lisp_register_macro("float32", LISP_CONV_FLOAT32);
   
   
   lisp_register_value("native-null-pointer", (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});

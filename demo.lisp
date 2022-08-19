@@ -39,8 +39,8 @@
       ))))
 
 (defvar dots nil)
-(dotimes! i 100
-          (push! dots (* (- i 50) 0.3)))
+(dotimes! i 10000
+          (push! dots (* (- i 5000) 0.003)))
 
 (define start-time (foxgl:timestamp))
 
