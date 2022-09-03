@@ -547,11 +547,16 @@
           (incf i 1))
     ))
 
+
 (define foxgl:key-up 264)
 (define foxgl:key-w 87)
 (define foxgl:key-a 65)
 (define foxgl:key-s 83)
 (define foxgl:key-d 68)
+
+(define foxgl:mappings '((up 264)
+                         (down 265)))
+                         
 
 (define window-title "window")
 

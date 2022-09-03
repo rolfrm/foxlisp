@@ -79,7 +79,7 @@ void test_gc(){
      // test hashtable related GCing
     var s2 = get_symbol("c");
 
-    var ht = lisp_make_hashtable(nil, nil);
+    var ht = lisp_make_hashtable();
     var c2 = new_cons(nil, nil);
     var c1 = new_cons(c2, nil);
     var c5 = new_cons(nil, nil);

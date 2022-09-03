@@ -64,7 +64,7 @@
   (foxgl:set-title win window-title)
   )
 ;(unless! lisp:*web-environment*
-;(load "swank.lisp")
+(load "swank.lisp")
 
 (defun lisp:print-stack-trace()
   (for-each y (deref-pointer lisp:++current-error-stack++)
@@ -80,7 +80,7 @@
             ))
             
 (unless lisp:*web-environment*
-  ;(set! swnk (swank-server-new 8810))
+  (set! swnk (swank-server-new 8810))
 
   (ld50:initialize)
   (foxgl:make-current win)

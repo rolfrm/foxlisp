@@ -131,7 +131,7 @@
 
 
 (defun swank-handle-command (slime cmd)
-  ;(println (cons 'swank: cmd))
+  (println (cons 'swank: cmd))
   (when (eq (car cmd) ':emacs-rex)
     
     (let ((str (value->string `(:return ,(eval (cadr cmd)) ,(last cmd)))))
@@ -164,7 +164,6 @@
                   (let ((buf2 (make-vector len (byte 0))))
                     (read slime buf2)
                     (let ((cmd (read-string (vector->string buf2))))
-                                        ;(println (list 'cmd: cmd))
                       (with-exception-handler
                           (swank-handle-command slime cmd)
                         (lambda (ex)
@@ -215,6 +214,7 @@
                  (set! next nil))
                (when (< 0 read-len)
                  (let ((len (parse-hex (vector->string len-buf))))
+                   (println (list 'read-len len))
                    (let ((buf2 (make-vector len (byte 0))))
                      (fd:read slime buf2)
                      (let ((cmd (read-string (vector->string buf2))))

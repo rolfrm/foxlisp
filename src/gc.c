@@ -240,9 +240,11 @@ static inline void visit_value(gc_context * gc, lisp_value val){
       return;
   case LISP_NATIVE_POINTER_TO_VALUE:
     // assuming a non-gc'd pointer
-    lisp_value * ptr_to_value = val.native_pointer;
-    if(ptr_to_value != NULL)
-      visit_value(gc, *ptr_to_value);
+    {
+      lisp_value * ptr_to_value = val.native_pointer;
+      if(ptr_to_value != NULL)
+        visit_value(gc, *ptr_to_value);
+    }
     break;
   case LISP_SCOPE:
     mark_scope(gc, val.scope);
@@ -566,19 +568,25 @@ inline void * lisp_malloc(size_t v){
   //if(current_context == NULL)return _alloc(v);
   ASSERT(current_context != NULL);
   var ctx = current_context->gc;
-  
+
+  v = 1 + (v - 1) / 8;
+  v = v * 8;
+
   size_t poolid = 0;
   if(v < 1024){
     // small_pool
     poolid = v;
-    //v += 1;
   }else if(v < 1024 * 1024){
-      poolid = v / 1024 + 1024;
-      //v += 1024;
+    // 1k-1M size pool
+
+    poolid = v / 1024 + 1024;
+      v += 1024;
   }else if(v < 1024 * 1024 * 1024){
+    // <1M sized pools.
     poolid = v / (1024 * 1024) + 1024 + 1024;
-    //v += 1024 * 1024;
+    v += 1024 * 1024;
   }else {
+    // > 1M
     poolid = 1024 + 1024 + 1024;
   }
 

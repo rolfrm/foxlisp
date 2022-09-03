@@ -825,7 +825,7 @@ lisp_value lisp_eval_with_exception_handler(lisp_scope * scope, lisp_value body,
   return result;
 }
 
-lisp_value lisp_eval_case(lisp_scope * scope, lisp_value condition, lisp_value cases){
+static lisp_value lisp_eval_case(lisp_scope * scope, lisp_value condition, lisp_value cases){
   var result = lisp_eval(scope, condition);
   while(is_nil(cases) == false){
     var c = car(cases);
@@ -1254,7 +1254,7 @@ lisp_value lisp_eval_vector_set(lisp_scope * scope, lisp_value vec_form, lisp_va
 
 lisp_value lisp_stack;
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
-lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
+lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   cons stk = {.car = value, .cdr = lisp_stack};
   lisp_stack = cons_lisp_value(&stk);
   var r = lisp_eval_inner(scope, value);
@@ -1276,19 +1276,11 @@ static inline lisp_value lookup_local_index(lisp_scope * scope, lisp_local_index
 }
 
 
-lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
   switch(lisp_value_type(value)){
   case LISP_CONS:
 	 {
       var first = car(value);
-
-      /*if(debug_enabled){
-        if(!is_nil(lisp_print_code_location(value)))
-          {
-            printf(" ");
-            println(first);
-          }
-          }*/
       lisp_value first_value = first;
 
       lisp_scope * s1;
@@ -1724,6 +1716,7 @@ lisp_value print(lisp_value v){
 
 lisp_value value_to_string(lisp_value v){
   int l = print2(NULL,0,  v);
+  l += 100;
   char * str = lisp_malloc(l+ 1);
   print2(str, l + 1, v);
   return string_lisp_value(str);
@@ -2262,7 +2255,7 @@ lisp_value string_to_vector(lisp_value str){
   char * strbuf = lisp_value_string(str);
   size_t l = strlen(strbuf) + 1;
   size_t elem_size = 1;
-
+  
   lisp_vector * vector = lisp_malloc(sizeof(*vector));
   vector->data = strbuf;
   vector->count = l - 1;
