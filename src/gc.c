@@ -9,6 +9,8 @@
 #include <dlfcn.h>
 
 #include "foxlisp.h"
+#include "valgrind/memcheck.h"
+
 
 static void * heap_start = NULL;
 static void * heap_end = NULL;
@@ -49,18 +51,21 @@ struct _cons_buffer {
 typedef struct __array_header array_header; 
 struct __array_header{
   // this check is just for verifying the integrety and should always be assigned
-  // the value 0x123.
+  // the value ARRAY_CHECK.
   // Consider removing it in release builds for more performance.
+  size_t reserved;
   size_t check;
   array_header * next;
   size_t mark;
+  
   
 };
 
 typedef struct __array_pool array_pool;
 struct __array_pool{
   array_header * free_arrays;
-  array_header * occupied_arrays; 
+  array_header * occupied_arrays;
+  size_t pool_size;
 };
 typedef enum{
   CLEAR = 0,
@@ -110,10 +115,12 @@ inline bool cons_is_marked(gc_context * gc, cons * c){
   return *marker > 0;
 }
 
+#define ARRAY_CHECK 0x1122334411223344L
+
 static inline bool mark_vector(gc_context * gc, void * vector){
   if(vector == NULL) return false;
   array_header * mark = vector - sizeof(array_header);
-  ASSERT(mark->check == 0x123);
+  ASSERT(mark->check == ARRAY_CHECK);
   if(mark->mark == gc->stage)
     return false; // already marked.
   mark->mark = gc->stage;
@@ -185,9 +192,13 @@ static inline bool visit_cons(gc_context * gc, cons * c){
 }
 
 static inline void visit_hashtable(gc_context * gc, hash_table * table){
-  if(!mark_vector(gc, table) && !mark_vector(gc, table->keys))
+  if(!mark_vector(gc, table)
+     & !mark_vector(gc, table->keys)
+     & !mark_vector(gc, table->elems)
+     & !mark_vector(gc, table->occupied)
+     )
     return;
-
+  
   // weak key / value table support
   if(table->userdata != NULL){
     size_t mask = (size_t) table->userdata;
@@ -210,8 +221,7 @@ static inline void visit_hashtable(gc_context * gc, hash_table * table){
   }else{
     ht_iterate(table, iterate_value, gc);
   }
-  mark_vector(gc, table->elems);
-  mark_vector(gc, table->occupied);
+  
 }
 
 static inline void visit_value(gc_context * gc, lisp_value val){
@@ -344,7 +354,10 @@ void gc_clear(gc_context * gc){
   for(size_t i = 0; i < 3 * 1024 + 1; i++){
     var ptr = array_pools[i].occupied_arrays;
     while(ptr){
+
       var header = ptr;
+      ASSERT(header->check == ARRAY_CHECK);
+      
       header->mark = 0;
       ptr = header->next;
     }
@@ -369,10 +382,8 @@ static void recover_pool(cons_buffer * buf){
   for(ssize_t j = mark_count; j > 0; j--){
     // 02020202... - the GC mark when a full block is all marked
     // 2 is the stage 2 GC mark.
-    if(marks[j - 1] == 0x0202020202020202L){
-      
+    if(marks[j - 1] == 0x0202020202020202L)
       continue;
-    }
 
     ssize_t i2 = j * 8;
     for(ssize_t i = 0; i < 8; i += 1){
@@ -394,21 +405,32 @@ void gc_recover_unmarked(gc_context * gc){
     recover_pool(buf);
     buf = buf->next;
   }
-  //return;
+
   array_pool * array_pools = gc->array_pool;
   for(size_t i = 0; i < 3 * 1024 + 1; i++){
     var pool = array_pools + i;
-    array_header ** place = &array_pools[i].occupied_arrays;
+    array_header * free = pool->occupied_arrays;
+    while(free){
+      ASSERT(free->check == ARRAY_CHECK);
+      free = free->next;
+    }
+
+    array_header ** place = &pool->occupied_arrays;
+    
     while(*place){
       array_header * obj = *place;
-      
+      ASSERT(obj->check == ARRAY_CHECK);
+
       if(obj->mark == 0){
         //recover it this array by popping it from the list.
         array_header * next = obj->next;
         obj->next = pool->free_arrays;
         pool->free_arrays = obj;
+        ASSERT(pool->pool_size > 0);
+        VALGRIND_MAKE_MEM_NOACCESS((void *) (obj + 1), pool->pool_size);
+  
         *place = next;
-
+  
       }else if(obj->mark <= 2){
         place = &obj->next;
       }else{
@@ -561,55 +583,73 @@ lisp_value lisp_trace_allocations(lisp_value c){
   return nil;
 }
 
-inline void * lisp_malloc(size_t v){
+typedef struct{
+  size_t alloc_size;
+  size_t pool_id;
+}pool_info;
 
-  // cannot default to a normal allocator because that has the potential of messing
-  // with the garbage collector later on.
-  //if(current_context == NULL)return _alloc(v);
-  ASSERT(current_context != NULL);
-  var ctx = current_context->gc;
-
+static inline pool_info get_array_pool(size_t v){
+  // only allocate multiples of 8 byte to promote reuse.
+  v = v + 1;
   v = 1 + (v - 1) / 8;
   v = v * 8;
-
+  
   size_t poolid = 0;
   if(v < 1024){
     // small_pool
     poolid = v;
   }else if(v < 1024 * 1024){
     // 1k-1M size pool
-
     poolid = v / 1024 + 1024;
-      v += 1024;
+    v = (1 + v / 1024) * 1024;
   }else if(v < 1024 * 1024 * 1024){
     // <1M sized pools.
     poolid = v / (1024 * 1024) + 1024 + 1024;
-    v += 1024 * 1024;
+    v = (1 + v / (1024 * 1024)) * 1024 * 1024;
   }else {
     // > 1M
     poolid = 1024 + 1024 + 1024;
   }
+  return (pool_info){.alloc_size = v, .pool_id = poolid};
+}
 
-  if(ctx->array_pool[poolid].free_arrays){
-    array_header *  new_ptr = ctx->array_pool[poolid].free_arrays;
-    
-    ctx->array_pool[poolid].free_arrays = new_ptr->next;
-    new_ptr->next = ctx->array_pool[poolid].occupied_arrays;
-    ctx->array_pool[poolid].occupied_arrays = new_ptr;
+static inline void * pool_alloc_array(gc_context * ctx, pool_info p){
+  array_header * new_ptr = ctx->array_pool[p.pool_id].free_arrays;
+  if(new_ptr){
+    ctx->array_pool[p.pool_id].free_arrays = new_ptr->next;
+    new_ptr->next = ctx->array_pool[p.pool_id].occupied_arrays;
+    ctx->array_pool[p.pool_id].occupied_arrays = new_ptr;
+    ASSERT(new_ptr->check == ARRAY_CHECK);
     void * r = new_ptr + 1; 
-    memset(r, 0, v);
+    ASSERT((r - sizeof(array_header)) == new_ptr);
+    VALGRIND_MAKE_MEM_DEFINED(r, p.alloc_size);
+    memset(r, 0, p.alloc_size);
     return r;
-    
   }
-  array_header * arr = _alloc0(v + sizeof(array_header));
-  arr->check = 0x123;
+  array_header * arr = _alloc0(p.alloc_size + sizeof(array_header) + 8);
+  arr->check = ARRAY_CHECK;
   
-  arr->next = ctx->array_pool[poolid].occupied_arrays;
+  arr->next = ctx->array_pool[p.pool_id].occupied_arrays;
+  VALGRIND_MAKE_MEM_NOACCESS(&arr->reserved, sizeof(arr->reserved));
+  ctx->array_pool[p.pool_id].occupied_arrays = arr;
+  allocated += p.alloc_size;
+  ctx->array_pool[p.pool_id].pool_size = p.alloc_size;
 
-  ctx->array_pool[poolid].occupied_arrays = arr;
-  allocated += v;
-  return arr + 1;
+  void * outptr = arr + 1;
+  VALGRIND_MAKE_MEM_NOACCESS(outptr + p.alloc_size, 8 );
+  
+  return outptr;
+}
 
+
+inline void * lisp_malloc(size_t v){
+  // cannot default to a normal allocator because that has the potential of messing
+  // with the garbage collector later on.
+  ASSERT(current_context != NULL);
+  if(v == 0) return NULL;
+  var pool_info = get_array_pool(v);
+  return pool_alloc_array(current_context->gc, pool_info);
+  
 }
 
 void * lisp_realloc(void * p, size_t v){

@@ -380,7 +380,7 @@
      (foxgl:render-sub-models (cdr model))
      
      (when (> (* foxgl:-points-array-count 2) (vector-length foxgl:-points-array)) 
-       (vector-resize foxgl:-points-array (* (vector-length foxgl:-points-array) 2)))
+       (set! foxgl:-points-array (vector-resize foxgl:-points-array (* (vector-length foxgl:-points-array) 2))))
      (let ((cnt (/ foxgl:-points-array-count 2))
            (array foxgl:-points-array)
            (line-width 0.3))
@@ -435,7 +435,9 @@
      (let ((x (unbind (cadr model)))
            (y (unbind (caddr model))))
        (when (> (+ foxgl:-points-array-count 2) (vector-length foxgl:-points-array)) 
-         (vector-resize foxgl:-points-array (* (vector-length foxgl:-points-array) 2)))
+         (set! foxgl:-points-array (vector-resize foxgl:-points-array (* (vector-length foxgl:-points-array) 2)))
+
+         )
          
 
          (vector-set! foxgl:-points-array foxgl:-points-array-count (float32 x))

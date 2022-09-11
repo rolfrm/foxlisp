@@ -2142,7 +2142,7 @@ lisp_value make_vector(lisp_value len, lisp_value _default){
   vector->default_value = _default;
   lisp_value v = vector_lisp_value(vector);
   for(size_t i = 0; i < l; i++)
-    vector_set(v, integer_lisp_value(i),_default);
+    vector_set(v, integer_lisp_value(i), _default);
     
   return v;
 }
@@ -2203,7 +2203,9 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
   TYPE_ASSERT(k, LISP_INTEGER);
 
   size_t l = (size_t)lisp_value_integer(k);
-  var vec = lisp_value_vector(vector);
+  var vec0 = lisp_value_vector(vector);
+  lisp_vector * vec = lisp_malloc(sizeof(*vec));
+  *vec = *vec0;
   size_t elem_size = lisp_type_size(lisp_value_type(vec->default_value));
   
   void * new_data = lisp_malloc(l * elem_size);
@@ -2211,11 +2213,11 @@ lisp_value vector_resize(lisp_value vector, lisp_value k){
   memcpy(new_data, vec->data, prevCount * elem_size);
   vec->data = new_data;
   vec->count = l;
-  for(size_t i = prevCount; i < l; i++){
-    vector_set(vector, integer_lisp_value(i), vec->default_value);
-  }
+  //for(size_t i = prevCount; i < l; i++){
+  //  vector_set(vector, integer_lisp_value(i), vec->default_value);
+  //}
 
-  return vector;
+  return vector_lisp_value(vec);
 }
 
 lisp_value vector_elem_type(lisp_value vector){
@@ -2315,7 +2317,7 @@ lisp_value lisp_make_hashtable(){
 
 lisp_value lisp_make_hashtable_weak_keys(){
   hash_table * ht = lisp_malloc(sizeof(*ht));
-  ht_create3(ht, 1, sizeof(lisp_value), sizeof(lisp_value));
+  ht_create3(ht, 8, sizeof(lisp_value), sizeof(lisp_value));
   ht_set_alloc(ht, lisp_malloc, lisp_free);
   ((size_t*)&ht->userdata)[0] = LISP_HASHTABLE_WEAK_KEYS;
   return hashtable_lisp_value(ht);
@@ -2743,7 +2745,9 @@ lisp_context * lisp_context_new(){
   read_cons_offset = lisp_make_hashtable_weak_keys();
   read_cons_file = lisp_make_hashtable_weak_keys();
   lisp_register_value("lisp:++cons-file-offset++", read_cons_offset);
+  lisp_register_value("lisp:++cons-file-offset2++", lisp_pointer_to_lisp_value(&read_cons_offset));
   lisp_register_value("lisp:++cons-file++", read_cons_file);
+  lisp_register_value("lisp:++cons-file2++", lisp_pointer_to_lisp_value(&read_cons_file));
 
   lisp_register_value("lisp:++stack++", lisp_pointer_to_lisp_value(&lisp_stack));
   lisp_register_value("lisp:++current-error++", lisp_pointer_to_lisp_value(&current_error));

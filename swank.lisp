@@ -46,16 +46,12 @@
       `(:ok (:compilation-result nil t 0.0 nil nil)))))
 
 (defun swank:completions (prefix _)
-                                        ;(println (list 'completions prefix))
   (let ((matching (take (lambda (x) (string-starts-with (symbol->string x) prefix)) (all-symbols))))
     (println `(:ok (,(map matching symbol->string) ,(if (cdr matching) prefix (when matching (symbol->string (car matching)))))))))
 
 
 (defun swank:autodoc (forms &rest args)
-  ;(println forms)
-                                        ;(println 'AUTODOC)
-                                        ;(println (list forms args))
-  
+
   (defun find-cursor(thing)
     (cond
       ((and (list? thing)
@@ -71,7 +67,6 @@
       (else #f)))
   
   (defun highlight-arg (info args)
-                                        ;(println 'find-cursor)
     
     (cond
       ((null? info) '())
@@ -87,7 +82,6 @@
                   (highlight-arg (cdr info) (cdr args))))))
   
   (defun info (sym)
-                                        ;(println 'info)
     (cond
       ((not (bound? sym t)) #f)
       ((symbol-procedure? sym)
@@ -102,8 +96,7 @@
   ;; and the module name is listed in ##sys#module-table. If there are multiple
   ;; such nodes, choose the first one.
   ;;
-  (defun guess-doc-node(doc-nodes)
-                                        ;(println 'doc-node)  
+  (defun guess-doc-node(doc-nodes)  
     (case (length doc-nodes)
       ((0) #f)
       ;; ((1) (car doc-nodes))
@@ -123,7 +116,6 @@
         (progn
           (let* ((sym (string->symbol (car where)))
                  (i (or (signature-from-doc sym) (info sym))))
-                                        ;(println 'oook)
             (if i
                 `(:ok (,(value->string (highlight-arg i where)) t))
                 `(:ok (:not-available t)))))
@@ -131,11 +123,8 @@
 
 
 (defun swank-handle-command (slime cmd)
-  (println (cons 'swank: cmd))
   (when (eq (car cmd) ':emacs-rex)
-    
     (let ((str (value->string `(:return ,(eval (cadr cmd)) ,(last cmd)))))
-      (println (list 'response str))
       (let ((strbuf (string->vector str)))
         (let ((lenbuf (hex-string (vector-length strbuf) 6)))
           (fd:write slime (string->vector lenbuf))
@@ -161,7 +150,7 @@
             (when (< 0 read-len)
               (progn
                 (let ((len (parse-hex (vector->string len-buf))))
-                  (let ((buf2 (make-vector len (byte 0))))
+                  (let ((buf2 (make-vector (+ len 32) (byte 0))))
                     (read slime buf2)
                     (let ((cmd (read-string (vector->string buf2))))
                       (with-exception-handler
@@ -188,9 +177,6 @@
     (println "listening")
     (fd:set-blocking listener nil)
     (cons listener nil)))
-                                        ;(let ((emacs (tcp:accept listener)))
-                                        ;  (println "ok")
-                                        ;  emacs)))
 (defun swank-server-update(listener)
   (unless (cdr listener)
     (let ((new (tcp:accept (car listener))))
@@ -214,10 +200,12 @@
                  (set! next nil))
                (when (< 0 read-len)
                  (let ((len (parse-hex (vector->string len-buf))))
-                   (println (list 'read-len len))
+                   
+                   (println (cons 'length len))
                    (let ((buf2 (make-vector len (byte 0))))
                      (fd:read slime buf2)
                      (let ((cmd (read-string (vector->string buf2))))
+                       (println (cons 'cmd cmd))
                        (with-exception-handler
                            (swank-handle-command slime cmd)
                          (lambda (ex)

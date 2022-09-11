@@ -60,8 +60,8 @@
   (println (list (vector-element-type vector) ': (vector-ref vector 0) (vector-ref vector 2) (vector-ref vector 1)))
   (println 'hello)
   (println (list 'vector 'pointer ': (vector-native-element-pointer vector 0)))
-  (vector-resize vector 5)
-  (println (list 'resized vector))
+  (set! vector (vector-resize vector 5))
+  (println (list 'resized vector (vector-length vector)))
   (assert (eq (vector-length vector) 5))
   )
 (println (type-of 1))
@@ -446,6 +446,17 @@
 (println (lisp:code-location (function->code test-func-1)))
                                         ;(println (hashtable-values lisp:++cons-file++))
 (println (length (hashtable-keys lisp:++cons-file-offset++)))
+
+(dotimes! i 50
+          (println i)
+    (let ((a 
+            (make-vector (+ 6000 (* i 100)) (byte 0))))
+      
+      ;(print (cons 'ok i))
+      )
+    (lisp:collect-garbage)
+
+    )
 
 (println "Tests Passed")
 
