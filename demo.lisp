@@ -73,15 +73,24 @@
 (define guy-arm
     '(arm
       (scale (1.2 1.2 1.2)
-     (scale (0.6 0.3 0.3)
-      (translate (0.0 -0.0 -0.5)
-       (ref cube-model)))
-     (translate (0.6 0 0)
-      (rotate (0 0 -0.1)
-       (scale (0.4 0.2 0.2)
-        (ref cube-model)))
-
-      ))))
+       (scale (0.6 0.3 0.3)
+        (translate (0.0 -0.0 -0.5)
+         (ref cube-model)))
+       (translate (0.6 0 0)
+        (rotate (0 0 -0.1)
+         (scale (0.4 0.2 0.2)
+          (ref cube-model)))
+        (translate (0.35 -0.05 0)
+         (rotate (0.0 0 -0.2)
+          (scale 0.2
+           (ref cube-model)))
+         )
+        ))))
+(define guy-leg
+    '(leg
+      (translate (0 -1 0)
+       (scale (0.2 1.0 0.2)
+        (ref cube-model)))))
 
 (define guy
     '(body
@@ -112,6 +121,13 @@
        (translate (-0.5 1 0)
         (scale (-1.0 1.0 1.0)
          (ref guy-arm)))
+
+       (translate (0.3 -0.6 0)
+        (rotate (0.9 0.0 0.0)
+         (ref guy-leg)))
+       (translate (-0.3 -0.6 0)
+        (scale (-1.0 1.0 1.0)
+         (ref guy-leg)))
        
        )))
 

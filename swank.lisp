@@ -200,12 +200,9 @@
                  (set! next nil))
                (when (< 0 read-len)
                  (let ((len (parse-hex (vector->string len-buf))))
-                   
-                   (println (cons 'length len))
                    (let ((buf2 (make-vector len (byte 0))))
                      (fd:read slime buf2)
                      (let ((cmd (read-string (vector->string buf2))))
-                       (println (cons 'cmd cmd))
                        (with-exception-handler
                            (swank-handle-command slime cmd)
                          (lambda (ex)
