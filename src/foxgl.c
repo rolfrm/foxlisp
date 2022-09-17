@@ -337,7 +337,7 @@ lisp_value foxgl_color_to_int(lisp_value r, lisp_value g, lisp_value b, lisp_val
   int v = 0;
   for(int i = 0; i < array_count(values); i++){
     var x = values[i];
-    var l = is_nil(x) ? 255 : is_float(x) ? (int)(lisp_value_rational(x) * 255) : lisp_value_integer(x);
+    var l = is_nil(x) ? 255 : is_float(x) ? (int)(lisp_value_rational(x) * 255) : lisp_value_integer(x) * 255;
     v += (CLAMP(l, 0, 255) << (i * 8));
   }
 
