@@ -921,6 +921,10 @@ lisp_value lisp_eval_set(lisp_scope * scope, lisp_value symform){
   case LISP_LOCAL_INDEX:
     while(sym.local_index.scope_level > 0){
       scope = scope->super;
+      if(scope == NULL){
+        raise_string("Invalid l-value optimization");
+        return nil;
+      }
       ASSERT(scope != NULL);
       sym.local_index.scope_level -= 1;
     }
@@ -1565,13 +1569,13 @@ lisp_value lisp_eval_string(const char * str){
 lisp_value read_current_files = {0};
 
 lisp_value lisp_eval_file(const char * filepath){
+  printf("Eval: %s\n", filepath);
   char * buffer = read_file_to_string(filepath);
+  printf("Read: %s\n", buffer);
   println(read_current_file);
   read_current_file = lisp_string(filepath);
   read_current_files = new_cons(read_current_file, read_current_files);
 
-  lisp_register_value("lisp:++current-file++", read_current_file);
-  lisp_register_value("lisp:++current-files++", read_current_files);
   if(buffer == NULL) {
     printf("FILE: %s\n", filepath);
     raise_string("Unable to read file");
@@ -1581,9 +1585,6 @@ lisp_value lisp_eval_file(const char * filepath){
   free(buffer);
   read_current_files = cdr(read_current_files);
   read_current_file = car(read_current_files);
-  
-  lisp_register_value("lisp:++current-file++", read_current_file);
-  lisp_register_value("lisp:++current-files++", read_current_files);
   
   return r;
 }
@@ -2752,8 +2753,9 @@ lisp_context * lisp_context_new(){
   lisp_register_value("lisp:++stack++", lisp_pointer_to_lisp_value(&lisp_stack));
   lisp_register_value("lisp:++current-error++", lisp_pointer_to_lisp_value(&current_error));
   lisp_register_value("lisp:++current-error-stack++", lisp_pointer_to_lisp_value(&current_error_stack));
+  lisp_register_value("lisp:++current-file-ptr++", lisp_pointer_to_lisp_value(&read_current_file));
+  lisp_register_value("lisp:++current-files-ptr++", lisp_pointer_to_lisp_value(&read_current_files));
   
-
   load_modules();
 
   return ctx;

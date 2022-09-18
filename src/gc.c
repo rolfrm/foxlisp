@@ -9,8 +9,13 @@
 #include <dlfcn.h>
 
 #include "foxlisp.h"
+#ifdef WASM
+#define VALGRIND_MAKE_MEM_NOACCESS(x, y);
+#define VALGRIND_MAKE_MEM_DEFINED(x, y);
+#else
 #include "valgrind/memcheck.h"
-
+#define GCDEBUG
+#endif
 
 static void * heap_start = NULL;
 static void * heap_end = NULL;
@@ -53,8 +58,10 @@ struct __array_header{
   // this check is just for verifying the integrety and should always be assigned
   // the value ARRAY_CHECK.
   // Consider removing it in release builds for more performance.
+#ifdef GCDEBUG
   size_t reserved;
   size_t check;
+#endif
   array_header * next;
   size_t mark;
   
@@ -120,7 +127,9 @@ inline bool cons_is_marked(gc_context * gc, cons * c){
 static inline bool mark_vector(gc_context * gc, void * vector){
   if(vector == NULL) return false;
   array_header * mark = vector - sizeof(array_header);
+#ifdef GCDEBUG
   ASSERT(mark->check == ARRAY_CHECK);
+#endif
   if(mark->mark == gc->stage)
     return false; // already marked.
   mark->mark = gc->stage;
@@ -356,8 +365,9 @@ void gc_clear(gc_context * gc){
     while(ptr){
 
       var header = ptr;
+      #ifdef GCDEBUG
       ASSERT(header->check == ARRAY_CHECK);
-      
+      #endif
       header->mark = 0;
       ptr = header->next;
     }
@@ -411,7 +421,7 @@ void gc_recover_unmarked(gc_context * gc){
     var pool = array_pools + i;
     array_header * free = pool->occupied_arrays;
     while(free){
-      ASSERT(free->check == ARRAY_CHECK);
+      //ASSERT(free->check == ARRAY_CHECK);
       free = free->next;
     }
 
@@ -419,8 +429,9 @@ void gc_recover_unmarked(gc_context * gc){
     
     while(*place){
       array_header * obj = *place;
+      #ifdef GCDEBUG
       ASSERT(obj->check == ARRAY_CHECK);
-
+      #endif
       if(obj->mark == 0){
         //recover it this array by popping it from the list.
         array_header * next = obj->next;
@@ -619,7 +630,9 @@ static inline void * pool_alloc_array(gc_context * ctx, pool_info p){
     ctx->array_pool[p.pool_id].free_arrays = new_ptr->next;
     new_ptr->next = ctx->array_pool[p.pool_id].occupied_arrays;
     ctx->array_pool[p.pool_id].occupied_arrays = new_ptr;
+    #ifdef GCDEBUG
     ASSERT(new_ptr->check == ARRAY_CHECK);
+    #endif
     void * r = new_ptr + 1; 
     ASSERT((r - sizeof(array_header)) == new_ptr);
     VALGRIND_MAKE_MEM_DEFINED(r, p.alloc_size);
@@ -627,8 +640,9 @@ static inline void * pool_alloc_array(gc_context * ctx, pool_info p){
     return r;
   }
   array_header * arr = _alloc0(p.alloc_size + sizeof(array_header) + 8);
+  #ifdef GCDEBUG
   arr->check = ARRAY_CHECK;
-  
+  #endif
   arr->next = ctx->array_pool[p.pool_id].occupied_arrays;
   VALGRIND_MAKE_MEM_NOACCESS(&arr->reserved, sizeof(arr->reserved));
   ctx->array_pool[p.pool_id].occupied_arrays = arr;

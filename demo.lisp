@@ -17,7 +17,7 @@
     (lambda (events)
       (incf time2 (+ 0.0005 (* (+ 1.0 (sin time2)) 0.0025)))
       (incf real-time 0.016)
-      (set! guy-move (* 2.0 real-time))
+      (set! guy-move (* 1.0 real-time))
       (push-event (list 'frame time2))
       (when (> +dt+ 0.01)
         (set! +dt+ 0.01))
@@ -29,8 +29,8 @@
                   (set! my nil))
                 (when (eq (car x) 'mouse-scroll)
                   (let* ((amount (caddr x))
-                         (amount2 (math:pow 1.2 amount)))
-                    (set! zoom (* zoom amount2))
+                         (amount2 amount))
+                    (set! zoom (+ zoom amount2))
                     (println zoom)))
                 (when (eq (car x) 'mouse-move-delta)
                   (incf +dt2+ (* -0.1 (cadr x)))
@@ -47,10 +47,6 @@
                  
                     ))
       ))))
-
-(defvar dots nil)
-(dotimes! i 1000
-          (push! dots (* (- i 500) 0.03)))
 
 (define start-time (foxgl:timestamp))
 
@@ -115,6 +111,10 @@
 
 (define guy
     '(body
+      (blend ;shadow
+       (rgb (0 0 0 0.15)
+        (translate (-0.5 0.6 -0.5)
+         (ref tile-model))))
       (translate (0 2.5 0)
       (rgb (0.3 0.3 0.3) 
        (translate (-0.5 0.0 -0.1)
@@ -183,7 +183,7 @@
        
        )))
 
-(define fox-color '(1 0 0 1))
+(define fox-color '(0.9 0.25 0.25 1))
 
 (define fox-leg '
     (leg
@@ -218,6 +218,11 @@
 
     '
     (translate (0 0 -0.25)
+               (blend ;; shadow
+                (translate (-0.3 -0.8 -0.7)
+                          (scale (0.5 1.0 1.2) 
+                                 (rgb (0.0 0.0 0.0 0.15)
+                    (ref tile-model)))))
     (rgb (bind fox-color)
       (scale (0.5 0.5 1.0)
        (ref cube-2))
@@ -262,38 +267,34 @@
            
 
           ))
-         )))
-      (translate (0.2 -0.3 0.3)
-       (ref fox-leg))
-      (translate (-0.2 -0.3 0.3)
-       (ref fox-leg))
-      (translate (0.2 -0.3 -0.4)
-       (ref fox-leg))
-      (translate (-0.2 -0.3 -0.4)
-       (ref fox-leg))
-      (translate (-0.0 0.3 -0.5)
-       (ref fox-tail))
+                )))
+         (let ((leg-angle (sin (* 10.0 fox-move))))
+         (translate (0.2 -0.3 0.3)
+                    (rotate ((bind leg-angle) 0 0)
+                            (ref fox-leg)))
+         (translate (-0.2 -0.3 0.3)
+                    (rotate ((bind (- 0 leg-angle)) 0 0)
+                            (ref fox-leg)))
+           (translate (0.2 -0.3 -0.4)
+                      (rotate ((bind (- 0 leg-angle)) 0 0)
+                    
+                              (ref fox-leg)))
+           (translate (-0.2 -0.3 -0.4)
+                      (rotate ((bind leg-angle) 0 0)
+                              (ref fox-leg)))
+           
+           (translate (-0.0 0.3 -0.5)
+                      (rotate (0 0 (bind leg-angle))
+                    (ref fox-tail)))
   
-  )))
+  ))))
+
 
 (define model
     '(view :perspective (1.0 1.0 0.01 1000.0)
       (depth
-       (translate ((bind +dt2+) (bind (+ +dt+ 0))  -20)
+       (translate ((bind +dt2+) (bind (+ +dt+ 0))  (bind (+ -20 zoom)))
         (rotate (0.3 -0.0 0)
-       
-        (translate (-0.5 -0.5 -5.0)
-         (translate ((bind (* 10.0 (cos guy-move))) 0 (bind (* 10.0 (sin guy-move))))
-          (rotate (0 (bind guy-move) 0)
-           (ref guy)))
-         (for i (0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0 5.5 6.0)
-          (let ((fox-move (- guy-move i -0.15)))
-           (translate ((bind (* 10.0 (cos fox-move))) 1.5 (bind (* 10.0 (sin fox-move))))
-                      (rotate (0 (bind fox-move) 0)
-                              (ref fox-guy))))
-         
-         ))
-         
         
 
         (translate (0 0 -50)
@@ -352,5 +353,19 @@
             (translate (-0.5 -0.5)
              (ref square-model)))))
          )
+         (translate (-0.5 -0.5 -5.0)
+         (translate ((bind (* 10.0 (cos guy-move))) 0 (bind (* 10.0 (sin guy-move))))
+          (rotate (0 (bind guy-move) 0)
+           (ref guy)))
+         (for i (0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0 5.5 6.0)
+          (let ((fox-move (- guy-move i -0.15)))
+            (translate 
+             ((bind (* 10.0 (cos fox-move))) 1.5 (bind (* 10.0 (sin fox-move))))
+                      (rotate (0 (bind fox-move) 0)
+                              (ref fox-guy))))
+         
+         ))
+         
+        
 
         )))))

@@ -351,6 +351,7 @@ lisp_value foxgl_color(lisp_value color){
   }else{
     col = lisp_to_color(color);
   }
+
   if(blit3d_current_context != NULL)
 	 blit3d_color(blit3d_current_context, col);
   return nil;
@@ -588,10 +589,13 @@ lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
 }
 
 lisp_value foxgl_blend(lisp_value blend){
-  if(!is_nil(blend))
+  if(!is_nil(blend)){
     glEnable(GL_BLEND);
-  else
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  }
+  else{
     glDisable(GL_BLEND);
+  }
   return nil;
 }
 

@@ -119,9 +119,9 @@
   (if (= (car p) 'bind)
       (eval (cadr p) foxgl:current-scope)
       p))
-(defmacro !render-sub (model)
+(defmacro !render-sub (modelx)
   `(progn
-      (foxgl:render-sub-models ,model)
+      (foxgl:render-sub-models ,modelx)
       (set! model nil)
       ))
 (defvar matrix-cache nil)
@@ -166,7 +166,8 @@
        (match rgb (plookup (cdr model) ':rgba)
               (set! foxgl:current-color rgb)
               )
-       (!render-sub (cdr model))
+       (foxgl:render-sub-models (cdr model))
+       (set! model nil)
        (set! foxgl:current-color prev-color)
        ))
     (measure-model

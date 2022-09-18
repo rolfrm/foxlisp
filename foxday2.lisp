@@ -1,3 +1,4 @@
+(println 'eval1)
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 (load "vec2.lisp")
@@ -9,6 +10,7 @@
 
   )
 (define should-exit nil)
+(println 'load-demo)
 (load "demo.lisp")
 (lisp:collect-garbage)
 (defvar +custom-events+ ())
@@ -63,12 +65,11 @@
   (foxgl:load-font "DejaVuSans.ttf" (integer 22))
   (foxgl:set-title win window-title)
   )
-;(unless! lisp:*web-environment*
-(load "swank.lisp")
 
 (defun lisp:print-stack-trace()
+  (println '----stack-trace----)
   (for-each y (deref-pointer lisp:++current-error-stack++)
-            (print y)
+            (print (car y))
                       
             (let ((cd (lisp:code-location y)))
               (when cd
@@ -78,7 +79,11 @@
                 ))
             (println "")
             ))
-            
+
+(unless lisp:*web-environment*
+  (load "swank.lisp"))
+
+
 (unless lisp:*web-environment*
   (set! swnk (swank-server-new 8810))
 
@@ -103,6 +108,7 @@
   )
 
 (defun lisp:*web-update* ()
+  (print 'aaaa)
   (unless ld50:initialized
     (set! ld50:initialized t)
     (ld50:initialize))

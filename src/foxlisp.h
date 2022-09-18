@@ -412,3 +412,4 @@ lisp_value lisp_read_string(const char * str);
 #define cadddddddr(x) car(cdddddddr(x))
 
 #define TYPE_ASSERT(v, t) if(!type_assert(v, t)) return nil;
+#define RETURN_ERROR(err) {lisp_error(err); return nil;}

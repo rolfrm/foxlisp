@@ -431,7 +431,7 @@
 (defvar asd '(asd))
 (println (list (hashtable-ref lisp:++cons-file-offset++ asd) (hashtable-ref lisp:++cons-file++ asd)))
 (println lisp:++cons-file++) 
-(println lisp:++current-file++)
+(println (cons 'lisp-current-file lisp:++current-file-ptr++))
 (println (lisp:code-location asd))
 
 (defun test-func-1 () (+ 1 2))
@@ -455,8 +455,17 @@
       ;(print (cons 'ok i))
       )
     (lisp:collect-garbage)
-
     )
 
+
+(let ((a 10))
+  (load "test1-lib.lisp")
+  (println (test1-lib-test))
+  (lisp:collect-garbage)
+  (println (test1-lib-test))
+  
+  )
+(println (test1-lib-test))
+  
 (println "Tests Passed")
 
