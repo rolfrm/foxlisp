@@ -10,7 +10,7 @@
 (defvar time2 0.0)
 (defvar real-time 0.0)
 (defvar guy-move 2.0)
-
+(defvar sdf1 (test:poly))
 
 (defvar game-update
   (let ((mx nil) (my nil))
@@ -232,6 +232,7 @@
          (ref cube-2))))
 
       ;; head
+      (bake (bind fox-color)
       (translate (0 0.3 0.5)
        (scale (0.5 0.5 0.5)
         (rotate (0.7 0.7 0)
@@ -263,11 +264,8 @@
              (rotate (0.4 1 0.0)
               (scale 0.4
                (ref cube-2)))))
-           
-           
-
           ))
-                )))
+                ))))
          (let ((leg-angle (sin (* 10.0 fox-move))))
          (translate (0.2 -0.3 0.3)
                     (rotate ((bind leg-angle) 0 0)
@@ -293,7 +291,7 @@
 (define model
     '(view :perspective (1.0 1.0 0.01 1000.0)
       (depth
-       (translate ((bind +dt2+) (bind (+ +dt+ 0))  (bind (+ -20 zoom)))
+       (translate ((bind +dt2+) (bind (+ +dt+ 2))  (bind (+ -20 zoom)))
         (rotate (0.3 -0.0 0)
         
 
@@ -353,7 +351,22 @@
             (translate (-0.5 -0.5)
              (ref square-model)))))
          )
-         (translate (-0.5 -0.5 -5.0)
+         (rgb (1 1 1)
+          
+         (translate (-0.5 2.5 -5.0)
+            (scale 2
+             (translate (0 -1 0)
+              (sdf)))
+          )
+         (translate (-10.5 2.5 -30.0)
+          (scale 2
+           (rotate (0 2.0 0.0)
+             (translate (0 -1 0)
+              (sdf)))
+            )))
+         
+
+          
          (translate ((bind (* 10.0 (cos guy-move))) 0 (bind (* 10.0 (sin guy-move))))
           (rotate (0 (bind guy-move) 0)
            (ref guy)))

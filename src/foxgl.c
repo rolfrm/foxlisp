@@ -365,6 +365,7 @@ lisp_value foxgl_transform(lisp_value tform1){
 }
 
 lisp_value foxgl_init(){
+  iron_gl_debug = true;
   if(blit3d_current_context == NULL)
 	 blit3d_current_context = blit3d_context_new();
   blit3d_context_load(blit3d_current_context);
@@ -385,7 +386,7 @@ lisp_value foxgl_square2(){
   return nil;
 }
 
-lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, lisp_value opt_count){
+lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, lisp_value opt_count, lisp_value opt_type){
   if(blit3d_current_context == NULL) return nil;
   type_assert(val, LISP_VECTOR);
   type_assert(val.vector->default_value, LISP_FLOAT32);
@@ -423,8 +424,28 @@ lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, 
   return native_pointer(poly);
 }
 
+lisp_value blit_set_mode(lisp_value mode){
+  if(lisp_value_eq(mode, get_symbol(":points"))){
+    blit3d_set_mode(blit3d_current_context, BLIT3D_POINTS);
+    glEnable(GL_PROGRAM_POINT_SIZE);
+  }
+  else if(lisp_value_eq(mode, get_symbol(":triangles"))){
+    blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES);
+    //glEnable(GL_PROGRAM_POINT_SIZE);
+  }else if(lisp_value_eq(mode, get_symbol(":triangles-color"))){
+    blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES_COLOR);
+    //glEnable(GL_PROGRAM_POINT_SIZE);
+  }
+  else{
+    glDisable(GL_PROGRAM_POINT_SIZE);
+    blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLE_STRIP);
+  }
+    return nil;
+}
+
 lisp_value blit_polygon (lisp_value val){
   if(val.type == LISP_CONS){
+    
     blit3d_polygon * poly2[10];
     int i = 0;
     while(is_nil(val) == false){
@@ -638,9 +659,12 @@ lisp_value lisp_viewport(lisp_value w, lisp_value h){
   return nil;
 }
 
+
 void lrn(const char * l, int args, void * f){
   lisp_register_native(l, args, f);
 }
+
+lisp_value sft_poly();
 void tcp_register();
 void foxal_register();
 void foxgl_register(){
@@ -683,7 +707,7 @@ void foxgl_register(){
   lrn("foxgl:transform", 1, foxgl_transform);
   lrn("foxgl:init", 0, foxgl_init);
   lrn("foxgl:quad", 1, foxgl_square2);
-  lrn("foxgl:load-polygon", 4, load_polygon);
+  lrn("foxgl:load-polygon", 5, load_polygon);
   lrn("foxgl:blit-polygon", 1, blit_polygon);
   lrn("foxgl:delete-polygon", 1, delete_polygon);
 
@@ -700,6 +724,8 @@ void foxgl_register(){
   lrn("foxgl:depth", 1, foxgl_depth);
   lrn("foxgl:key-down?", 2, foxgl_key_down);
   lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
+  lrn("foxgl:blit-mode", 1, blit_set_mode);
+  lrn("test:poly", 0, sft_poly);
   tcp_register();
   foxal_register();
 }

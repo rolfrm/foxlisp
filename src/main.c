@@ -381,6 +381,8 @@ int64_t get_symbol_id(const char * s){
   return id;
 }
 
+
+
 lisp_value get_symbol(const char * s){
   if(s == NULL || strlen(s) == 0){
     raise_string("Symbol empty\n");
@@ -2498,7 +2500,7 @@ void setup_fpe_handler(){
 }
 
 void test_gc();
-
+void test_sdf();
 int main(int argc, char ** argv){
   for(int i = 1; i < argc; i++){
     if(strcmp(argv[i], "--test-gc") == 0){
@@ -2507,7 +2509,16 @@ int main(int argc, char ** argv){
     }
   }
 
+
   current_context = lisp_context_new();
+
+  for(int i = 1; i < argc; i++){
+  if(strcmp(argv[i], "--test-sdf") == 0){
+      test_sdf();
+      return 0;
+    }
+  }
+  
   
   setup_fpe_handler();
   

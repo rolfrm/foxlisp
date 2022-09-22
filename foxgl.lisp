@@ -448,7 +448,24 @@
      
      (set! model nil)
      )
-    
+    (sdf
+     (let ((r (hashtable-ref foxgl:polygon-cache :sdf)))
+       (unless r
+         (let ((poly (test:poly)))
+           (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)
+                                     (foxgl:load-polygon (cdr poly) 3 nil nil :triangles-color)
+                                     )))
+         (hashtable-set foxgl:polygon-cache :sdf r)
+         
+         ))
+       
+       (foxgl:color foxgl:current-color)
+       (foxgl:transform foxgl:current-transform)
+       (foxgl:blit-mode :triangles-color)
+       (foxgl:blit-polygon (cdr r))
+       (foxgl:blit-mode nil)
+       
+       ))
     (polygon
      (let ((dims 2)
            (poly (plookup (cdr model) :2d-triangle-strip)))
