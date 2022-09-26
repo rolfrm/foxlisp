@@ -322,6 +322,7 @@ lisp_value lisp_length(lisp_value lst);
 const char * lisp_type_to_string(lisp_type t);
 
 lisp_value new_cons(lisp_value a, lisp_value b);
+lisp_value new_stack_cons(cons * c, lisp_value a, lisp_value b);
 lisp_value copy_cons(lisp_value a);
 
 lisp_value car(lisp_value v);
@@ -390,7 +391,7 @@ bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * o
 lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 lisp_scope * lisp_context_get_root_scope();
-
+lisp_scope * lisp_get_root_scope();
 void lisp_register_value(const char * name, lisp_value value);
 void lisp_register_native(const char * name, int nargs, void * fptr);
 

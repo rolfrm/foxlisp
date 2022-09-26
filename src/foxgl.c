@@ -664,7 +664,7 @@ void lrn(const char * l, int args, void * f){
   lisp_register_native(l, args, f);
 }
 
-lisp_value sft_poly();
+lisp_value sdf_poly(lisp_value f);
 void tcp_register();
 void foxal_register();
 void foxgl_register(){
@@ -725,7 +725,7 @@ void foxgl_register(){
   lrn("foxgl:key-down?", 2, foxgl_key_down);
   lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
   lrn("foxgl:blit-mode", 1, blit_set_mode);
-  lrn("test:poly", 0, sft_poly);
+  lrn("foxgl:sdf-poly", 1, sdf_poly);
   tcp_register();
   foxal_register();
 }

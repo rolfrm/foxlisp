@@ -122,7 +122,7 @@ f32 d1(vec3 v, vec3 * c){
   return d;
 }
 
-f32 tree(vec3 v, vec3 * c){
+f32 tree(void * userdata, vec3 v, vec3 * c){
   v = vec3_scale(v, 1.2);
   //v.y += 2;
   f32 d1 = vert_capsule(vec3_sub(v, vec3_new(0,0,0)), 3.0, 0.5);
@@ -138,9 +138,16 @@ f32 tree(vec3 v, vec3 * c){
   var d = MIN(d1, dg);
  
   
-  if(d == d1)
-    *c = vec3_new(0.8,0.4,0.4);
-  if(d == dg){
+  if(d == d1){
+    rgb color1 = {.r = 0.7, .g = 0.4, .b = 0.4};
+    rgb color2 = {.r = 0.6, .g = 0.5, .b = 0.35};
+    f32 n = noise(vec2_new(v.x,v.z));
+        
+    var col = rgb_blend(color1, color2, n);
+    c->x = col.r;
+    c->y = col.g;
+    c->z = col.b;
+  }else if(d == dg){
     var rgb = get_color(vec2_new(v.x, v.y));;
     *c = vec3_new(rgb.r, rgb.g, rgb.b);
     //*c = vec3_new(0.5,0.8,0.5);
@@ -151,9 +158,11 @@ f32 tree(vec3 v, vec3 * c){
 
 
 typedef struct{
-  f32 (* sdf)(vec3 v, vec3 * color);
-  void (* emit_point)(vec3 pt, vec3 color);
+  f32 (* sdf)(void * userdata, vec3 v, vec3 * color);
+  void (* emit_point)(void * userdata, vec3 pt, vec3 color);
   f32 threshold;
+  void * userdata;
+  void * sdf_userdata;
 }df_ctx;
 
 vec3 sdf_gradient(df_ctx * ctx, vec3 pt, f32 size){
@@ -164,16 +173,16 @@ vec3 sdf_gradient(df_ctx * ctx, vec3 pt, f32 size){
   ptx.x += size * 0.2;
   pty.y += size * 0.2;
   ptz.z += size * 0.2;
-  var dx1 = ctx->sdf(ptx, &c);
-  var dy1 = ctx->sdf(pty, &c);
-  var dz1 = ctx->sdf(ptz, &c);
+  var dx1 = ctx->sdf(ctx->sdf_userdata, ptx, &c);
+  var dy1 = ctx->sdf(ctx->sdf_userdata, pty, &c);
+  var dz1 = ctx->sdf(ctx->sdf_userdata, ptz, &c);
 
   ptx.x -= size * 0.2 * 2;
   pty.y -= size * 0.2 * 2;
   ptz.z -= size * 0.2 * 2;
-  var dx2 = ctx->sdf(ptx, &c);
-  var dy2 = ctx->sdf(pty, &c);
-  var dz2 = ctx->sdf(ptz, &c);
+  var dx2 = ctx->sdf(ctx->sdf_userdata, ptx, &c);
+  var dy2 = ctx->sdf(ctx->sdf_userdata, pty, &c);
+  var dz2 = ctx->sdf(ctx->sdf_userdata, ptz, &c);
 
   var x = vec3_normalize(vec3_new(dx1 - dx2, dy1 - dy2, dz1 - dz2));
   return x;
@@ -182,7 +191,7 @@ vec3 sdf_gradient(df_ctx * ctx, vec3 pt, f32 size){
 vec3 trace_point(df_ctx * ctx, vec3 pt, f32 size){
   var x = sdf_gradient(ctx, pt, size);
   vec3 c;
-  var d0 = ctx->sdf(pt, &c);
+  var d0 = ctx->sdf(ctx->sdf_userdata, pt, &c);
 
   var r = vec3_sub(pt, vec3_scale(x, d0));
   return r;
@@ -192,12 +201,12 @@ vec3 trace_point(df_ctx * ctx, vec3 pt, f32 size){
 void trace_point_cloud(df_ctx * ctx, vec3 position, f32 size){
   f32 d;
   vec3 c;
-  d = ctx->sdf(position, &c);
+  d = ctx->sdf(ctx->sdf_userdata, position, &c);
   if(fabs(d) < size * 1.5 ){
     f32 s2 = size * 0.5;
     
-    if(size < ctx->threshold * 1.5){
-      size = size * 0.6;
+    if(size < ctx->threshold * 1.42){
+      size = size * 0.5;
       position = trace_point(ctx, position, size * 0.1);
       var g = sdf_gradient(ctx, position, size * 0.1);
       
@@ -220,21 +229,21 @@ void trace_point_cloud(df_ctx * ctx, vec3 position, f32 size){
         p3 = trace_point(ctx, p3, size * 0.1);
         p4 = trace_point(ctx, p4, size * 0.1);
 
-        ctx->sdf(p1, &c);
+        ctx->sdf(ctx->sdf_userdata, p1, &c);
         
-        ctx->emit_point(p1, c);
-        ctx->sdf(p2, &c);
+        ctx->emit_point(ctx->userdata, p1, c);
+        ctx->sdf(ctx->sdf_userdata, p2, &c);
         
-        ctx->emit_point(p2, c);
-        ctx->sdf(p4, &c);
-        ctx->emit_point(p4, c);
-        ctx->sdf(p2, &c);
+        ctx->emit_point(ctx->userdata, p2, c);
+        ctx->sdf(ctx->sdf_userdata, p4, &c);
+        ctx->emit_point(ctx->userdata, p4, c);
+        ctx->sdf(ctx->sdf_userdata, p2, &c);
         
-        ctx->emit_point(p2, c);
-        ctx->sdf(p3, &c);
-        ctx->emit_point(p3, c);
-        ctx->sdf(p4, &c);
-        ctx->emit_point(p4, c);
+        ctx->emit_point(ctx->userdata, p2, c);
+        ctx->sdf(ctx->sdf_userdata, p3, &c);
+        ctx->emit_point(ctx->userdata, p3, c);
+        ctx->sdf(ctx->sdf_userdata, p4, &c);
+        ctx->emit_point(ctx->userdata, p4, c);
       }
       }
       
@@ -253,52 +262,80 @@ void trace_point_cloud(df_ctx * ctx, vec3 position, f32 size){
   }
 }
 
-lisp_value sft_poly(){
-  int count = 0;
-  void emit_pt(vec3 p, vec3 c){
-    count += 1;
-  }
+typedef struct{
+  int count;
+  int i;
+  f32 * verts;
+  f32 * colors;
+}sft_context;
+
+void emit_pt2(void * userdata, vec3 p, vec3 c){
+  sft_context * id = userdata;
+  var i = id->i * 3;
+  id->verts[i] = p.x;
+  id->verts[i + 1] = p.y;
+  id->verts[i + 2] = p.z;
+  id->colors[i] = c.x;
+  id->colors[i + 1] = c.y;
+  id->colors[i + 2] = c.z;
+  id->i += 1;
+}
+
+static void emit_pt(void * userdata, vec3 p, vec3 c){
+  sft_context * ud = userdata;
+  ud->count += 1;
+}
+
+f32 lisp_sdf_func(void * data, vec3 pt, vec3 * color){
+  lisp_value * v = data;
+  var f1 = car(*v);
+  lisp_vector vec;
+  vec.data = pt.data;
+  vec.count = 3;
+  vec.elem_size = 4;
+  vec.default_value.type = LISP_FLOAT32;
+  lisp_value vec2 = vector_lisp_value(&vec);
+
+  cons a,b;
   
-  df_ctx c = {.sdf = tree/*d1*/, .emit_point = emit_pt, .threshold = 0.3};
+  lisp_value r = lisp_eval(lisp_get_root_scope(), new_stack_cons(&a, f1, new_stack_cons(&b, vec2, nil)));
+  var d = lisp_value_rational(r);
+
+  var f2 = cdr(*v);
+
+  lisp_value r2 = lisp_eval(lisp_get_root_scope(), new_stack_cons(&a, f2, new_stack_cons(&b, vec2, nil)));
+  f32 * f = r2.vector->data;
+  color->x = f[0];
+  color->y = f[1];
+  color->z = f[2];
+  
+  return d;
+  
+}
+
+lisp_value sdf_poly(lisp_value f){
+
+  sft_context ctx = {0};
+  
+  df_ctx c = {.sdf = tree/*d1*/, .userdata = &ctx, .emit_point = emit_pt, .threshold = 0.25};
+  if(!is_nil(f)){
+    c.sdf = lisp_sdf_func;
+    c.sdf_userdata = &f;
+  }
   trace_point_cloud(&c, vec3_new(0,0,0), 5.0);
-  var vec = make_vector(integer(count * 3), float32(0.0));
+  var vec = make_vector(integer(ctx.count * 3), float32(0.0));
   f32 * verts = vec.vector->data;
-  var vec2 = make_vector(integer(count * 3), float32(0.0));
+  var vec2 = make_vector(integer(ctx.count * 3), float32(0.0));
   f32 * colors = vec2.vector->data;
-  
-  int i = 0;
-  int i2 = 0;
-  void emit_pt2(vec3 p, vec3 c){
-    verts[i++] = p.x;
-    verts[i++] = p.y;
-    verts[i++] = p.z;
-    colors[i2++] = c.x;
-    colors[i2++] = c.y;
-    colors[i2++] = c.z;
-  }
+  ctx.colors = colors;
+  ctx.verts = verts;
   c.emit_point = emit_pt2;
-  
   trace_point_cloud(&c, vec3_new(0,0,0), 5.0);
-
-  trace_point(&c, vec3_new(0,0,0), 0.1);
-
-  trace_point(&c, vec3_new(1,0,0), 0.1);
-  trace_point(&c, vec3_new(5,5,0), 0.1);
-
-  vec3 p = trace_point(&c, vec3_new(0,10,0), 0.1);
-  //var g = sdf_gradient(&c, p, 0.01);
-
-  p = trace_point(&c, p, 0.1);
-  var g = sdf_gradient(&c, p, 0.1);
-      
-  var s1 = vec3_new(g.y, g.x, -g.z);;
-  
-  var s2 = vec3_mul_cross(g, s1);
-  printf("POINTS: %i\n", count);
+  printf("POINTS: %i\n", ctx.count);
   return new_cons(vec, vec2);
 }
 
 void test_sdf(){
-  sft_poly();
+  sdf_poly(nil);
 }
 

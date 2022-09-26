@@ -1,5 +1,7 @@
 ;(println (foxgl:timestamp))
-
+(defun spherex(c r v)
+  (- (vec3-len (vec3- v c)) r) 
+  )
 (defmacro measure(&rest body)
   `(let ((time-start (foxgl:timestamp))
          (result (progn ,@body))
@@ -451,7 +453,20 @@
     (sdf
      (let ((r (hashtable-ref foxgl:polygon-cache :sdf)))
        (unless r
-         (let ((poly (test:poly)))
+         (let ((poly 
+                 (foxgl:sdf-poly
+                  (cons (lambda (v)
+                          (min
+                           (spherex (vec3 0.0 2.0 0.0) 1.0 v)
+                           (spherex (vec3 1.5 2.0 0.0) 0.5 v)
+                           (spherex (vec3 2.5 2.0 0.0) 0.5 v)
+                           (spherex (vec3 3.5 2.0 0.0) 0.5 v)
+
+                           ))
+                        (lambda (v) (vec3 1.0 (+ 0.5 (* 0.5 (sin (vec3-x v)))) 0.0 1.0))
+                  ))
+                ;(foxgl:sdf-poly)
+                 ))
            (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)
                                      (foxgl:load-polygon (cdr poly) 3 nil nil :triangles-color)
                                      )))

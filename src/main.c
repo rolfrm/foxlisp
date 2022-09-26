@@ -54,6 +54,12 @@ void raise_string(const char * str){
   current_error_stack = copy_cons(lisp_stack);
 }
 
+lisp_value new_stack_cons(cons * c, lisp_value a, lisp_value b){
+  c->car = a;
+  c->cdr = b;
+  return (lisp_value){.type = LISP_CONS, .cons = c};
+}
+
 lisp_value lisp_error(lisp_value value){
   current_error = value;
   current_error_stack = copy_cons(lisp_stack);
@@ -287,7 +293,9 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
 }
 
 lisp_context * current_context;
-
+lisp_scope * lisp_get_root_scope(){
+  return current_context->globals;
+}
 
 inline lisp_value car(lisp_value v){
   if(is_cons(v))
@@ -1261,6 +1269,7 @@ lisp_value lisp_eval_vector_set(lisp_scope * scope, lisp_value vec_form, lisp_va
 lisp_value lisp_stack;
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
+  
   cons stk = {.car = value, .cdr = lisp_stack};
   lisp_stack = cons_lisp_value(&stk);
   var r = lisp_eval_inner(scope, value);

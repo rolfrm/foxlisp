@@ -3,14 +3,13 @@
 (define window-title "funky")
 (load "models.lisp")
 
-
 (defvar +dt+  5)
 (defvar +dt2+ 0.12)
 (defvar zoom 0.08)
 (defvar time2 0.0)
 (defvar real-time 0.0)
 (defvar guy-move 2.0)
-(defvar sdf1 (test:poly))
+;(defvar sdf1 (test:poly))
 
 (defvar game-update
   (let ((mx nil) (my nil))
@@ -291,7 +290,7 @@
 (define model
     '(view :perspective (1.0 1.0 0.01 1000.0)
       (depth
-       (translate ((bind +dt2+) (bind (+ +dt+ 2))  (bind (+ -20 zoom)))
+       (translate ((bind +dt2+) (bind (+ +dt+ 0))  (bind (+ -20 zoom)))
         (rotate (0.3 -0.0 0)
         
 
@@ -356,13 +355,15 @@
          (translate (-0.5 2.5 -5.0)
             (scale 2
              (translate (0 -1 0)
-              (sdf)))
+              (sdf)
+              ))
           )
          (translate (-10.5 2.5 -30.0)
           (scale 2
            (rotate (0 2.0 0.0)
              (translate (0 -1 0)
-              (sdf)))
+              ;(sdf)
+              ))
             )))
          
 
@@ -381,4 +382,4 @@
          
         
 
-        )))))
+        ))))
