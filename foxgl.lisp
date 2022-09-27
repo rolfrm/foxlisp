@@ -105,6 +105,8 @@
 (define foxgl:polygon-cache2 nil)
 (define foxgl:polygon-cache (make-hashtable))
 (define foxgl:square-buffers nil)
+(define foxgl:baking nil)
+(define foxgl:baking-stack nil)
 (defun foxgl:render-sub-models (model)
   (plist-rest model foxgl:render-model2))
 (define foxgl:test-tex nil)
@@ -140,6 +142,7 @@
 (defun release-matrix(mat)
   (push! matrix-cache mat)
   )
+
 
 (define foxgl:-points-array (make-vector 32 (float32 0.0)))
 (define foxgl:-points-array-count 0)
@@ -481,6 +484,34 @@
        (foxgl:blit-mode nil)
        
        ))
+    (bake
+     (let ((r (hashtable-ref foxgl:polygon-cache (cdr model))))
+       (unless r
+         (let ((tform foxgl:current-transform))
+           (set! foxgl:baking t)
+                                        ;(set! model nil)
+           (foxgl:render-sub-models (cdr model))
+           (let ((baked (foxgl:bake foxgl:baking-stack tform)))
+              (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil :triangles-color)
+                                        (foxgl:load-polygon (cdr baked) 3 nil nil :triangles-color)
+                                        )))
+              (hashtable-set foxgl:polygon-cache (cdr model) r)
+
+             )
+             
+           (set! foxgl:baking nil)
+           (set! foxgl:baking-stack nil)
+           
+           ))
+       (set! model nil)
+           
+       (foxgl:color '(1 1 1 1))
+       (foxgl:transform foxgl:current-transform)
+       (foxgl:blit-mode :triangle-strip-color)
+       (foxgl:blit-polygon (cdr r))
+       (foxgl:blit-mode nil)
+       
+       ))
     (polygon
      (let ((dims 2)
            (poly (plookup (cdr model) :2d-triangle-strip)))
@@ -489,6 +520,19 @@
          (set! dims 3)
          )
        (when poly
+         (if foxgl:baking
+             (progn
+               
+               (push! foxgl:baking-stack
+                      (list foxgl:current-color
+                            (math:*
+                             foxgl:current-transform
+                             mat4:*identity*)
+                            (list-to-array poly) dims))
+               
+               )
+               
+             
          (let ((r (hashtable-ref foxgl:polygon-cache (cdr model))))
            (unless r
              (println (list 'new-poly r))
@@ -499,11 +543,12 @@
                                         ;(register-finalizer r cache-delete)
              )
            
-           (foxgl:color foxgl:current-color)
-           (foxgl:transform foxgl:current-transform)
-           (foxgl:blit-polygon (cdr r))
-           )
-         )))
+             (foxgl:color foxgl:current-color)
+             (foxgl:transform foxgl:current-transform)
+             (foxgl:blit-polygon (cdr r))
+             
+           
+         )))))
     (hidden
      (set! model nil)))
   (when model

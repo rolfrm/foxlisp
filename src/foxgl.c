@@ -172,6 +172,7 @@ lisp_value math_rotate_in_place(lisp_value m, lisp_value x, lisp_value y, lisp_v
   return nil;
 }
 
+
 lisp_value math_mat4_rotate(lisp_value x, lisp_value y, lisp_value z){
   var m1 = mat4_identity();
   
@@ -180,6 +181,14 @@ lisp_value math_mat4_rotate(lisp_value x, lisp_value y, lisp_value z){
   m1 = mat4_rotate_Z(m1, z.rational);
   
   return mat4_to_lisp(m1);
+}
+
+mat4 lisp_value_mat4(lisp_value m){
+  mat4 nil = {0};
+  TYPE_ASSERT(m, LISP_VECTOR);
+
+  var m1 = (mat4 *) m.vector->data;
+  return *m1;
 }
 
 lisp_value math_translate_in_place(lisp_value m, lisp_value x, lisp_value y, lisp_value z){
@@ -435,6 +444,9 @@ lisp_value blit_set_mode(lisp_value mode){
   }else if(lisp_value_eq(mode, get_symbol(":triangles-color"))){
     blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES_COLOR);
     //glEnable(GL_PROGRAM_POINT_SIZE);
+  }else if(lisp_value_eq(mode, get_symbol(":triangle-strip-color"))){
+    blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLE_STRIP_COLOR);
+    //glEnable(GL_PROGRAM_POINT_SIZE);
   }
   else{
     glDisable(GL_PROGRAM_POINT_SIZE);
@@ -659,6 +671,74 @@ lisp_value lisp_viewport(lisp_value w, lisp_value h){
   return nil;
 }
 
+lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform){
+
+  var btform2 = lisp_value_mat4(base_tform);
+  var btformi = mat4_invert(btform2);
+  float * verts = NULL;
+  float * colors = NULL;
+  size_t vert_cnt = 0;
+  int vdims = 0;
+  while(!is_nil(polygons)){
+    var polygon = car(polygons);
+    var color = lisp_value_integer(car(polygon));
+    u8 *cpointer = (u8 *)&color;
+    var col2 = vec4_new(cpointer[0], cpointer[1], cpointer[2], cpointer[3]);
+    col2 = vec4_scale(col2, 1.0 / 255.0);
+    polygon = cdr(polygon);
+    var tform = lisp_value_mat4(car(polygon));
+    tform = mat4_mul(btformi, tform);
+    polygon = cdr(polygon);
+    var points = lisp_value_vector(car(polygon));
+    var pointsf = (f32 *)points->data;;
+    polygon = cdr(polygon);
+    var dims = lisp_value_integer(car(polygon));
+    if(vdims != dims && vdims != 0){
+      // error
+      return nil;
+    }
+    vdims = dims;
+    var thiscnt = points->count / dims;
+
+    var newcnt = vert_cnt + thiscnt + 2;
+    verts = realloc(verts, newcnt * dims * sizeof(f32));
+    colors = realloc(colors, newcnt * 3 * sizeof(f32));
+    for(int i = 0; i < thiscnt; i++){
+      var index = i + vert_cnt + 1;
+      vec3 pt = vec3_new(pointsf[i * 3], pointsf[i*3 + 1], pointsf[i*3 + 2]);
+      var pt2 = mat4_mul_vec3(tform, pt);
+      var outv = verts + index * 3;
+      outv[0] = pt2.x;
+      outv[1] = pt2.y;
+      outv[2] = pt2.z;
+      var outc = colors + index * 3;
+      outc[0] = col2.x;
+      outc[1] = col2.y;
+      outc[2] = col2.z;
+    }
+    
+
+    for(int i = 0; i < 3; i++){
+      verts[(vert_cnt) * 3 + i] = verts[(vert_cnt + 1) * 3 + i]; 
+      colors[(vert_cnt) * 3 + i] = colors[(vert_cnt + 1) * 3 + i]; 
+      verts[(newcnt - 1) * 3 + i] = verts[(newcnt - 2) * 3 + i];
+      colors[(newcnt - 1) * 3 + i] = colors[(newcnt - 2) * 3 + i];  
+    }
+    
+    vert_cnt = newcnt;
+    polygons = cdr(polygons);
+  }
+  var vec = make_vector(integer(vert_cnt * 3), float32(0.0));
+  f32 * verts2 = vec.vector->data;
+  var vec2 = make_vector(integer(vert_cnt * 3), float32(0.0));
+  f32 * colors2 = vec2.vector->data;
+  memcpy(verts2, verts, vert_cnt * 3 * sizeof(f32));
+  memcpy(colors2, colors, vert_cnt * 3 * sizeof(f32));
+  dealloc(colors);
+  dealloc(verts);
+  return new_cons(vec, vec2);
+}
+
 
 void lrn(const char * l, int args, void * f){
   lisp_register_native(l, args, f);
@@ -726,6 +806,7 @@ void foxgl_register(){
   lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
   lrn("foxgl:blit-mode", 1, blit_set_mode);
   lrn("foxgl:sdf-poly", 1, sdf_poly);
+  lrn("foxgl:bake", 2, foxgl_bake_polygons);
   tcp_register();
   foxal_register();
 }

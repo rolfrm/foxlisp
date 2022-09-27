@@ -185,7 +185,7 @@
 (define fox-color '(0.9 0.25 0.25 1))
 
 (define fox-leg '
-    (leg
+    (bake
      (scale (0.1 0.5 0.1)
             (ref cube-2)
             )
@@ -198,7 +198,8 @@
      ))
 
 (define fox-tail
-  '(tail
+    '(bake ;tail
+      (rgb (bind fox-color)
     (rotate (0.7 0.7 0)
      (scale (0.2 0.2 0.2)
       (ref cube-2)))
@@ -211,7 +212,7 @@
       (rotate (0.7 0.7 0)
        (scale (0.25 0.25 0.25)
         (ref cube-2)))))
-    ))
+    )))
 
 (define fox-guy
 
@@ -223,15 +224,16 @@
                                  (rgb (0.0 0.0 0.0 0.15)
                     (ref tile-model)))))
     (rgb (bind fox-color)
-      (scale (0.5 0.5 1.0)
-       (ref cube-2))
-      (translate (0.0 -0.1 0.05)
-       (scale (0.25 0.4 1.0)
-        (rgb (1.0 1.0 1.0)
-         (ref cube-2))))
+         (bake
+          (scale (0.5 0.5 1.0)
+                 (ref cube-2))
+          (translate (0.0 -0.1 0.05)
+                     (scale (0.25 0.4 1.0)
+                            (rgb (1.0 1.0 1.0)
+                                 (ref cube-2)))))
 
       ;; head
-      (bake (bind fox-color)
+      (bake ;(bind fox-color)
       (translate (0 0.3 0.5)
        (scale (0.5 0.5 0.5)
         (rotate (0.7 0.7 0)
@@ -291,7 +293,7 @@
     '(view :perspective (1.0 1.0 0.01 1000.0)
       (depth
        (translate ((bind +dt2+) (bind (+ +dt+ 0))  (bind (+ -20 zoom)))
-        (rotate (0.3 -0.0 0)
+        (rotate (0.3 0 0)
         
 
         (translate (0 0 -50)
@@ -351,17 +353,16 @@
              (ref square-model)))))
          )
          (rgb (1 1 1)
-          
-         (translate (-0.5 2.5 -5.0)
-            (scale 2
-             (translate (0 -1 0)
-              (sdf)
-              ))
-          )
+          (translate (0 6 0)
+           (scale 4
+            (rotate (0 1 0)
+             ;(bind fox-tail)
+             )))
          (translate (-10.5 2.5 -30.0)
           (scale 2
            (rotate (0 2.0 0.0)
-             (translate (0 -1 0)
+            (translate (0 -1 0)
+             (ref cube-model)
               ;(sdf)
               ))
             )))
