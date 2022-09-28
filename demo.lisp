@@ -72,7 +72,7 @@
            ))
 
 (define guy-arm
-    '(arm
+    '(bake ;arm
       (scale (1.2 1.2 1.2)
        (scale (0.6 0.3 0.3)
         (translate (0.0 -0.0 -0.5)
@@ -95,7 +95,7 @@
         (scale (0.2 1.0 0.2)
          (ref cube-model)))
         (translate (0 -0.22 0)
-         (rotate ((bind (* 1.0 leg-tilt)) 0 0)
+         (rotate ((bind (* 0.5 leg-tilt)) 0 0)
           (scale (0.3 0.2 0.5)
            (rgb (0.7 0.3 0.3)
             (ref cube-model)))))
@@ -131,22 +131,23 @@
         (rgb (0.7 0.6 0.5)
          (translate (-0.375 1.1 -0.5)
           
-            (scale (0.75 0.75 0.75)
-             (ref cube-model)))) ;head
+          (scale (0.75 0.75 0.75)
+           (ref cube-model)))) ;head
         (rgb (1.0 1.0 1.0)
-         
+         ;right eye
          (translate (0.25 1.3 0.20)
           (scale (0.1 (bind (* (blink real-time) 0.2)) 0.1)
            (ref cube-model)))
+         ;; left eye
+         (translate (-0.15 1.3 0.20)
+          (scale (0.1 (bind (* (blink real-time) 0.2)) 0.1)
+           (ref cube-model)))
+         (bake
          (translate (0.15 1.55 0.20)
           (rgb (0 0 0)
            (scale (0.2 0.1 0.1)
             (ref cube-model))))
 
-         ;; left eye
-         (translate (-0.15 1.3 0.20)
-          (scale (0.1 (bind (* (blink real-time) 0.2)) 0.1)
-           (ref cube-model)))
          ;; left eyebrow
          (translate (-0.25 1.55 0.20)
           (rgb (0 0 0)
@@ -158,7 +159,7 @@
            (scale (0.9 0.2 0.9)
             (ref cube-model))))
          
-         )))
+         ))))
 
        (rgb (0.7 0.6 0.5)
         (translate (0.5 0.8 0.2)
@@ -169,11 +170,11 @@
           (rotate ((bind (* 10.0 guy-move)) 0 -1.0)
            (ref guy-arm)))))
        
-       (let ((leg-tilt (* -0.5 (sin (* 20.0 guy-move)))))
+       (let ((leg-tilt (+ (* -0.5 (sin (* 10.0 guy-move))) 0.2)))
          (translate (0.3 -0.6 0)
                     (rotate ((bind leg-tilt) 0.0 0.0)
                             (ref guy-leg))))
-       (let ((leg-tilt (* 0.5 (sin (* 20.0 guy-move)))))
+       (let ((leg-tilt (+ (* 0.5 (sin (* 10.0 guy-move))) 0.2)))
        
          (translate (-0.3 -0.6 0)
                     (scale (-1.0 1.0 1.0)
@@ -288,6 +289,46 @@
   
   ))))
 
+(define chair
+    '(chr
+      (blend ;; shadow
+       (translate (-0.0 -0.5 -0.0)
+        (scale (1 1.0 1) 
+         (rgb (0.0 0.0 0.0 0.1)
+          (ref tile-model)))))
+      (bake
+       (rgb (0.6 0.35 0.25)
+        (translate (0 0 0)
+         (scale (0.1 1.0 0.1)
+          (ref cube-2)))
+        (translate (1 0 0)
+         (scale (0.1 1.0 0.1)
+          (ref cube-2)))
+        (translate (1 0.5 1)
+         (scale (0.1 2.0 0.1)
+          (ref cube-2)))
+        (translate (0 0.5 1)
+         (scale (0.1 2.0 0.1)
+          (ref cube-2)))
+        
+        (translate (0.5 0.5 0.5)
+         (scale (1.1 0.1 1.1)
+          (ref cube-2)))
+
+        (rgb (0.2 0.3 0.2)
+         (translate (0.5 0.55 0.5)
+          (scale (0.9 0.1 0.9)
+           (ref cube-2))))
+        
+        (for i (0 -2 -4 -6)
+         (translate (0.5 1.5 1)
+          (scale (1.1 0.1 0.1)
+           (translate (0 (bind i 0))
+            (ref cube-2)))
+          ))))))
+
+
+      
 
 (define model
     '(view :perspective (1.0 1.0 0.01 1000.0)
@@ -301,7 +342,7 @@
           (rotate (0 0.5 0)
            (ref cube-model))
           ))
-
+         (bake
          (translate (0 50 -300)
          (rgb (1.0 1.0 1.0)
           (rotate (0 0.0 0)
@@ -322,7 +363,7 @@
            (scale 14
            (ref cube-model)))
           ))
-
+          )
          
         (rgb (0.5 0.9 0.5)
          (translate (0 0.0 -100.0)
@@ -352,35 +393,25 @@
             (translate (-0.5 -0.5)
              (ref square-model)))))
          )
-         (rgb (1 1 1)
-          (translate (0 6 0)
-           (scale 4
-            (rotate (0 1 0)
-             ;(bind fox-tail)
-             )))
-         (translate (-10.5 2.5 -30.0)
-          (scale 2
-           (rotate (0 2.0 0.0)
-            (translate (0 -1 0)
-             (ref cube-model)
-              ;(sdf)
-              ))
-            )))
-         
-
           
-         (translate ((bind (* 10.0 (cos guy-move))) 0 (bind (* 10.0 (sin guy-move))))
+         (translate ((bind (* 7.0 (cos guy-move))) 0 (bind (* 7.0 (sin guy-move))))
           (rotate (0 (bind guy-move) 0)
            (ref guy)))
          (for i (0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0 5.5 6.0)
           (let ((fox-move (- guy-move i -0.15)))
             (translate 
-             ((bind (* 10.0 (cos fox-move))) 1.5 (bind (* 10.0 (sin fox-move))))
+             ((bind (* 7.0 (cos fox-move))) 1.5 (bind (* 7.0 (sin fox-move))))
                       (rotate (0 (bind fox-move) 0)
                               (ref fox-guy))))
          
-         ))
-         
+          )
+
+         (translate (0.5 1 0.5)
+          (rotate (0 2.5 0)
+           (scale 1.4
+            (ref chair))))
+        
+         )
         
 
         ))))

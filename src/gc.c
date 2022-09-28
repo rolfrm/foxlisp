@@ -675,11 +675,6 @@ lisp_value lisp_get_allocated(){
 }
 
 
-void * lisp_malloc_atomic(size_t v){
-  return lisp_malloc(v);
-  //return GC_malloc_atomic(v);
-}
-
 void lisp_free(void * p){
   //free(p);
 }

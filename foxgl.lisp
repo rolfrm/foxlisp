@@ -501,7 +501,6 @@
              
            (set! foxgl:baking nil)
            (set! foxgl:baking-stack nil)
-           
            ))
        (set! model nil)
            

@@ -335,7 +335,6 @@ lisp_value pop(lisp_value * v);
 lisp_value lisp_append(lisp_value a, lisp_value b);
 void * lisp_malloc(size_t s);
 void * lisp_realloc(void * p, size_t s);
-void * lisp_malloc_atomic(size_t s);
 void lisp_free(void * p);
 lisp_value lisp_trace_allocations(lisp_value c);
 lisp_value lisp_get_allocated();

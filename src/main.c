@@ -297,15 +297,23 @@ lisp_scope * lisp_get_root_scope(){
   return current_context->globals;
 }
 
+inline lisp_value car_nocheck(lisp_value v){
+  return lisp_value_cons(v)->car;
+}
+
 inline lisp_value car(lisp_value v){
   if(is_cons(v))
-	 return lisp_value_cons(v)->car;
+	 return car_nocheck(v);
   return nil;
+}
+
+inline lisp_value cdr_nocheck(lisp_value v){
+  return lisp_value_cons(v)->cdr;
 }
 
 inline lisp_value cdr(lisp_value v){
   if(is_cons(v))
-	 return lisp_value_cons(v)->cdr;
+	 return cdr_nocheck(v);
   return nil;
 }
 
@@ -337,7 +345,7 @@ size_t list_length(lisp_value lst){
   size_t l = 0;
   while(is_cons(lst)){
 	 l += 1;
-	 lst = cdr(lst);
+	 lst = cdr_nocheck(lst);
   }
   return l;
 }
@@ -587,9 +595,10 @@ lisp_value lisp_collect_garbage(){
 static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value statement){
   size_t c = 0;
   while(is_cons(statement)){
-    var first = car(statement);
-    
-    if(is_regular_symbol(first)){
+    var first = car_nocheck(statement);
+    switch(lisp_value_type(first)){
+    case LISP_SYMBOL:
+      {
       lisp_scope * s1;
       int i1, i2;
       if(lisp_scope_try_get_value2(scope, lisp_value_symbol(first), &s1, &i1, &i2)){
@@ -609,6 +618,13 @@ static inline size_t lisp_optimize_statement(lisp_scope * scope, lisp_value stat
           set_car(statement, new);
         }
       }
+      break;
+      }
+    case LISP_GLOBAL_INDEX:
+    case LISP_LOCAL_INDEX:
+      return c + 1 + list_length(cdr_nocheck(statement));
+    default:
+      break;
     }
     statement = cdr(statement);
     c += 1;
@@ -837,28 +853,25 @@ lisp_value lisp_eval_with_exception_handler(lisp_scope * scope, lisp_value body,
 
 static lisp_value lisp_eval_case(lisp_scope * scope, lisp_value condition, lisp_value cases){
   var result = lisp_eval(scope, condition);
-  while(is_nil(cases) == false){
-    var c = car(cases);
+  var result_type = lisp_value_type(result);
+  while(is_cons(cases)){
+    var c = car_nocheck(cases);
     var test = car(c);
-    bool passed = false;
-    if(is_cons(test)){
+    var test_type = lisp_value_type(test);
+    if(test_type == LISP_CONS){
       while(is_cons(test)){
-        if(lisp_value_eq(result, car(test))){
-          passed = true;
-          break;
-        }
+        if(lisp_value_eq(result, car_nocheck(test)))
+          return lisp_eval_progn(scope, cdr(c));      
+        
         test = cdr(test);
       }
-    }else if (lisp_value_eq(result, test)){
-      passed = true;
-    }else if(lisp_value_eq(test, otherwise_sym) && is_symbol(test)){
-      passed = true;
+    }else if (test_type == result_type && lisp_value_eq(result, test)){
+      return lisp_eval_progn(scope, cdr(c));
+    }else if(test_type == LISP_SYMBOL && lisp_value_eq(test, otherwise_sym)){
+      return lisp_eval_progn(scope, cdr(c));
     }
     
-    if(passed)
-      return lisp_eval_progn(scope, cdr(c));
-    
-    cases = cdr(cases);
+    cases = cdr_nocheck(cases);
   }
   return nil;
 }
@@ -959,9 +972,10 @@ lisp_value lisp_eval_set(lisp_scope * scope, lisp_value symform){
 lisp_value lisp_eval_define(lisp_scope * scope, lisp_value sym, lisp_value value){
   TYPE_ASSERT(sym, LISP_SYMBOL);
     
-  if(!is_symbol(sym))
-    return nil; // error
-  
+  if(!is_symbol(sym)){
+    raise_string("Invalid symbol for define");
+    return nil;
+  }
   var value2 = lisp_eval(scope, value);
   if(lisp_is_in_error())
     return nil;
@@ -1273,7 +1287,7 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
   cons stk = {.car = value, .cdr = lisp_stack};
   lisp_stack = cons_lisp_value(&stk);
   var r = lisp_eval_inner(scope, value);
-  lisp_stack = cdr(lisp_stack);
+  lisp_stack = cdr_nocheck(lisp_stack);
   return r;
 }
 
@@ -1290,12 +1304,11 @@ static inline lisp_value lookup_local_index(lisp_scope * scope, lisp_local_index
   return scope->values[index.scope_index];  
 }
 
-
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
   switch(lisp_value_type(value)){
   case LISP_CONS:
 	 {
-      var first = car(value);
+      var first = car_nocheck(value);
       lisp_value first_value = first;
 
       lisp_scope * s1;
@@ -2763,8 +2776,9 @@ lisp_context * lisp_context_new(){
 #endif
 
   // keeping track of debug information
-  read_cons_offset = lisp_make_hashtable_weak_keys();
-  read_cons_file = lisp_make_hashtable_weak_keys();
+  read_cons_offset = nil;//lisp_make_hashtable_weak_keys();
+  read_cons_file = nil;//lisp_make_hashtable_weak_keys();
+  
   lisp_register_value("lisp:++cons-file-offset++", read_cons_offset);
   lisp_register_value("lisp:++cons-file-offset2++", lisp_pointer_to_lisp_value(&read_cons_offset));
   lisp_register_value("lisp:++cons-file++", read_cons_file);
