@@ -219,8 +219,8 @@
     (view
      (let ((prev-transform foxgl:current-transform))
        (match p (unbind (plookup (cdr model) :perspective))
-              (let ((fov (car p))
-                    (aspect (cadr p))
+              (let ((fov (unbind (car p)))
+                    (aspect (unbind (cadr p)))
                     (near (caddr p))
                     (far (cadddr p))
                     (prev-tform foxgl:current-transform))

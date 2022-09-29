@@ -321,6 +321,14 @@ lisp_value foxgl_set_title(lisp_value win, lisp_value title){
   return nil;
 }
 
+lisp_value foxgl_set_window_size(lisp_value _win, lisp_value _w, lisp_value _h){
+  gl_window * win = _win.native_pointer;
+  int w = lisp_value_integer(_w);
+  int h = lisp_value_integer(_h);
+  
+  gl_window_set_size(win, w, h);
+}
+
 lisp_value foxgl_swap(lisp_value win){
   TYPE_ASSERT(win, LISP_NATIVE_POINTER);
   gl_window_swap(win.native_pointer);
@@ -744,6 +752,12 @@ void lrn(const char * l, int args, void * f){
   lisp_register_native(l, args, f);
 }
 
+lisp_value foxgl_web_canvas_size(){
+  int w = 0, h = 0;
+  gl_canvas_get_size(&w, &h);
+  return new_cons(integer_lisp_value(w), integer_lisp_value(h));
+}
+
 lisp_value sdf_poly(lisp_value f);
 void tcp_register();
 void foxal_register();
@@ -759,12 +773,14 @@ void foxgl_register(){
   lrn("foxgl:load-font", 2, foxgl_load_font);
   lrn("foxgl:load-texture-from-path", 1, foxgl_load_texture_from_path);
   lrn("foxgl:create-window", 2, foxgl_create_window);
+  lrn("foxgl:window-set-size", 3, foxgl_set_window_size);
   lrn("foxgl:make-current", 1, foxgl_make_current);
   lrn("foxgl:set-title", 2, foxgl_set_title);
   lrn("foxgl:window-size", 1, lisp_window_size);
   lrn("foxgl:swap", 1, foxgl_swap);
   lrn("foxgl:viewport", 2, lisp_viewport);
   lrn("foxgl:poll-events", 0, foxgl_poll_events);
+  lrn("foxgl:get-web-canvas-size", 0, foxgl_web_canvas_size);
   
   lrn("math:*", 2, math_mul);
   lrn("math:*!", 3, math_mul_in_place);

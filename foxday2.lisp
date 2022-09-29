@@ -28,12 +28,15 @@
                                (cons e (cdr tsl)))))))
       (concat evts2 (swap +custom-events+))
       )))
-
+(defvar foxgl:aspect-ratio 1.0)
 (defvar foxday-debug-state nil)
 (defun update ()
   (lisp:collect-garbage)
   (let ((s (foxgl:window-size win)))
-    (foxgl:viewport (integer (car s)) (integer (cadr s))))
+    (foxgl:viewport (integer (car s)) (integer (cadr s)))
+    (set! foxgl:aspect-ratio (/ (rational (car s)) (rational (cadr s))))
+    (println foxgl:aspect-ratio)
+    )
   (foxgl:clear)
   (let ((events (poll-events2)))
     (for-each evt events
@@ -107,17 +110,29 @@
   (println 'exiting)
   )
 
+(define last-size nil)
+
 (defun lisp:*web-update* ()
-  (print 'aaaa)
   (unless ld50:initialized
     (set! ld50:initialized t)
     (ld50:initialize))
   
   (foxgl:make-current win)
+  (let ((s (foxgl:get-web-canvas-size)))
+    (println s)
+    (when (or (eq nil last-size)
+              (> (+ (abs (-  (car s) (car last-size)))
+                    (abs (-  (cdr s) (cdr last-size)))) 4))
+      (foxgl:window-set-size win (car s) (cdr s)))
+    (set! last-size s)
+    
+    )
+  
   (with-exception-handler
       (update)
     (lambda (x)
       (println 'exception-handler)
+      (println x)
       (thread:sleep 0.5)
       ))
   

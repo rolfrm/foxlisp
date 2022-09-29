@@ -41,14 +41,20 @@
 <div class="emscripten">
   <progress value="0" max="100" id="progress" height="0" hidden=1></progress>
 </div>
-<div id="editor-and-view" class="container" style="display: flex;">
 
-  <div class="emscripten_border">
+</div>
+<div id="emscripten_border" style="height: 100%;width: 100%;">
+
+</div>
+<div id="editor-and-view" class="container" style="position: fixed; top:0px;">
+
+  <div class="emscripten_border" >
     <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
   </div>
+  <!--
   <div id="editor">
     (+ 1 2 3)
-  </div>
+  </div>-->
 
 </div>
 
@@ -64,7 +70,9 @@
   var Module = {
       canvas : canv,
       preRun: [],
-      postRun: [function () {loadLispCode('demo.lisp');}],
+      postRun: [
+          //function () {loadLispCode('demo.lisp');}
+      ],
       print: (function () {
           var element = document.querySelector('#output');
           if (element) element.value = ''; // clear browser cache

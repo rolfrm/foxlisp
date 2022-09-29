@@ -331,7 +331,7 @@
       
 
 (define model
-    '(view :perspective (1.0 1.0 0.01 1000.0)
+    '(view :perspective (1.0 (bind foxgl:aspect-ratio) 0.01 1000.0)
       (depth
        (translate ((bind +dt2+) (bind (+ +dt+ 0))  (bind (+ -20 zoom)))
         (rotate (0.3 0 0)
