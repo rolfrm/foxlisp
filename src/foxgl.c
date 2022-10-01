@@ -760,6 +760,9 @@ lisp_value foxgl_web_canvas_size(){
   return new_cons(integer_lisp_value(w), integer_lisp_value(h));
 }
 
+
+lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2);
+
 lisp_value sdf_poly(lisp_value f);
 void tcp_register();
 void foxal_register();
@@ -825,6 +828,7 @@ void foxgl_register(){
   lrn("foxgl:blit-mode", 1, blit_set_mode);
   lrn("foxgl:sdf-poly", 1, sdf_poly);
   lrn("foxgl:bake", 2, foxgl_bake_polygons);
+  lrn("foxgl:detect-collision", 2, foxgl_detect_collision);
   tcp_register();
   foxal_register();
 }

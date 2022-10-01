@@ -44,6 +44,16 @@
     (cons (f2 (car lst))
           (map (cdr lst) f2))))
 
+
+(defun mapi2 (lst f2 i)
+  (when lst
+    (cons (f2 i (car lst))
+          (mapi2 (cdr lst) f2 (+ i 1)))))
+
+(defun mapi (lst f2)
+  (mapi2 lst f2 0))
+
+
 (defun map! (f2 lst)
   (loop lst
         (f2 (car lst))
@@ -230,8 +240,9 @@
   (let ((result nil))
     (loop list
           (when (f (car list))
-            (set! result (cons (car list) result)))
-          (set! list nil))
+            (set! result (car list))
+            (set! list nil))
+          (set! list (cdr list)))
     result))
 
 

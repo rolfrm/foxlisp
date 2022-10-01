@@ -339,3 +339,91 @@ void test_sdf(){
   sdf_poly(nil);
 }
 
+
+typedef struct{
+  f32 (* sdf1)(void * userdata, vec3 v);
+  f32 (* sdf2)(void * userdata, vec3 v);
+  f32 threshold;
+  void * userdata1;
+  void * userdata2;
+  vec3 pt;
+  bool collision_detected;
+}cdf_ctx;
+
+
+void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
+  if(ctx->collision_detected) return;
+  var d = ctx->sdf1(ctx->userdata1, position);
+  var d2 = ctx->sdf2(ctx->userdata2, position);
+  //vec3_print(position);
+  //printf("%f %f %f\n", d, d2, size);
+  if(d < size * 1.8 && d2 < size * 1.8 ){
+    f32 s2 = size * 0.5;
+    
+    if(size < ctx->threshold * 1.42){
+      // collison detected
+      ctx->pt = position;
+      ctx->collision_detected = true;
+      vec3_print(position);printf("\n");
+      return;
+    }
+    else{
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, -s2, -s2)), s2);
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, -s2, -s2)), s2);
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, s2, -s2)), s2);
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, s2, -s2)), s2);
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, -s2, s2)), s2);
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, -s2, s2)), s2);
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, s2, s2)), s2);
+      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, s2, s2)), s2);
+      
+    }
+  }
+}
+static vec3 lv_vec3(lisp_value v){
+  return vec3_new(
+                  lisp_value_as_rational(car(v)),
+                  lisp_value_as_rational(cadr(v)),
+                  lisp_value_as_rational(caddr(v)));
+                  
+}
+
+
+typedef struct{
+  vec3 pos;
+  vec3 size;
+
+}AABB;
+
+
+f32 aabb_sdf(void * ud, vec3 p){
+  AABB * a = ud;
+  p = vec3_sub(p, a->pos);
+  vec3 q = vec3_sub(vec3_abs(p), vec3_scale(a->size, 0.5));
+  return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x,MAX(q.y,q.z)),0.0);
+}
+
+lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
+  var p1 = lv_vec3(car(obj1));
+  var p2 = lv_vec3(car(obj2));
+  obj1 = cdr(obj1);
+  obj2 = cdr(obj2);
+  var rot1 = lisp_value_rational(car(obj1));
+  var rot2 = lisp_value_rational(car(obj2));
+  obj1 = cdr(obj1);
+  obj2 = cdr(obj2);
+  var o1 = car(obj1);
+  var o2 = car(obj2);
+  AABB a = {.pos = p1, .size = vec3_new(0.5,0.5,0.5)};
+  AABB b = {.pos = p2, .size = vec3_new(0.5,0.5,0.5)};
+  cdf_ctx ctx = {
+    .sdf1 = aabb_sdf,
+    .sdf2 = aabb_sdf,
+    .userdata1 = &a,
+    .userdata2 = &b,
+    .threshold = 0.1
+  };
+  sdf_detect_collision(&ctx, p2, 10.0);
+  
+  return ctx.collision_detected ? t : nil;
+}

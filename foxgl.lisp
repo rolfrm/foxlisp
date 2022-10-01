@@ -181,9 +181,9 @@
      )
     (ref
      
-     (foxgl:render-model2 (symbol-value  (cadr model)) t))
+     (foxgl:render-model2 (symbol-value  (unbind (cadr model))) t))
     (bind
-     (foxgl:render-model2 (eval (cadr model))))
+     (foxgl:render-model2 (eval (cadr model) foxgl:current-scope)))
     (for
      (let* ((var (cadr model))
             (evalues (or (unbind (caddr model)) nil))
@@ -632,7 +632,7 @@
 (define foxgl:key-a 65)
 (define foxgl:key-s 83)
 (define foxgl:key-d 68)
-
+(define foxgl:key-space 32)
 (define foxgl:mappings '((up 264)
                          (down 265)))
                          
