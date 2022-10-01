@@ -44,8 +44,8 @@
 (defvar floor-tiles ())
 
 (defvar goals-list '(
-                     ;(object-1 object-2 object-3)
-                     ;(object-5) (object-4)
+                     (object-1 object-2 object-3)
+                     (object-5) (object-4)
                      (object-6 object-7)
                      (object-6 object-7)
                      (object-6 object-7)))
@@ -299,14 +299,14 @@
        
        (ref ninja-leg)))
 
-     (translate (0 1.25 0.05)
+     (translate (0 1.4 0.05)
       (rotate ((bind player-body-rot) 0 0)
        
-      (scale (0.5 0.5 0.2)
+      (scale (0.5 0.3d 0.2)
        (ref cube-2) ;; lower-body
        )
       
-      (translate (0 0.6 0)
+      (translate (0 0.4 0)
        (rotate ((bind player-body-rot) 0 0)
        (scale (0.5 0.5 0.2)
         (ref cube-2)) ;; upper body
