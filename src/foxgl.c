@@ -670,6 +670,10 @@ lisp_value foxgl_timestamp(){
   return integer(timestamp());
 }
 
+lisp_value foxgl_timestampf(){
+  return rational(timestampf());
+}
+
 lisp_value lisp_vec2_len(lisp_value v){
   TYPE_ASSERT(v, LISP_VECTOR);
   vec2 * x = v.vector->data;
@@ -800,6 +804,7 @@ void foxgl_register(){
   lrn("vec2:len", 1, lisp_vec2_len);
 
   lrn("foxgl:timestamp", 0, foxgl_timestamp);
+  lrn("foxgl:timestampf", 0, foxgl_timestampf);
   lrn("foxgl:clear", 0, foxgl_clear);
   lrn("foxgl:get-events", 0, foxgl_get_events);
   

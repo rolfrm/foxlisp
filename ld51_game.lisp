@@ -3,8 +3,6 @@
 (define window-title "Ninja Thief")
 (load "models.lisp")
 
-(defvar +dt+  5)
-(defvar +dt2+ 0.12)
 (defvar zoom 0.08)
 (defvar time2 0.0)
 (defvar real-time 0.0)
@@ -16,6 +14,12 @@
 (defvar player-move 0.0)
 (defvar pick-anim nil)
 (defvar pick-state nil)
+(defvar timer-start (foxgl:timestampf))
+(defvar timer-end (+ (foxgl:timestampf) 10))
+
+(defun delta-time ()
+  (/ (- (foxgl:timestampf) timer-start) (- timer-end timer-start)))
+
 (defvar player-body-rot 1)
 (defvar drop-point-loc
   `((0 0 5) 0 drop-point))
@@ -25,10 +29,28 @@
     ((2.0 0 -5) 0 object-1)
     ((2.0 0 -2) 0 object-1)
     ((-2.0 0 3) 0 object-2)
+    ((-2.0 0 -3) 0 object-4)
+    ((2.0 0 3) ,(* 0.5 pi) object-4)
+    ((4 0 -4) 0 object-5)
+    ((-10 0 -9) 0 object-6)
+    ((-11 0 -6) 0 object-6)
+    ((-12 0 -3) 0 object-6)
+    
+    ((-10 0 -3) 0 object-7)
+    ((-10 0 -6) 0 object-7)
+    ((-8 0 -9) 0 object-7)
     )
   )
+(defvar floor-tiles ())
 
-(defvar goal-objects '(object-1 object-2 object-3))
+(defvar goals-list '(
+                     ;(object-1 object-2 object-3)
+                     ;(object-5) (object-4)
+                     (object-6 object-7)
+                     (object-6 object-7)
+                     (object-6 object-7)))
+
+(defvar goal-objects (pop! goals-list));'(object-1 object-2 object-3))
 
 (defvar picked-objects '())
 (defun player-collision(px py)
@@ -54,7 +76,8 @@
   (let ((mx nil) (my nil))
     
     (lambda (events)
-      (player-collision)
+      ;(println (- (foxgl:timestampf) timer-start))
+      ;(player-collision)
                                         ;(println (cons player-x player-y))
       (incf ang (* 0.1 turn))
       (incf player-move (* 0.1 move-forward))
@@ -82,10 +105,8 @@
               (when pick
                 (set! level-objects (take (lambda (x) (not (eq x pick))) level-objects))
                 (push! picked-objects pick)
-                ;(println (list nx ny pick))
                 )
               (when dp
-                (println (list 'DP dp))
                 (let ((thing nil))
                   (while (set! thing
                                (first (lambda (x)
@@ -94,7 +115,19 @@
                                       picked-objects))
                          (set! picked-objects (take (lambda (x) (not (eq x thing))) picked-objects))
                          (set! goal-objects (take (lambda (x) (not (eq x (caddr thing)))) goal-objects))
-                (println (cons 'DROP! thing)))))
+                         (when (not goal-objects)
+                           (set! goal-objects (pop! goals-list))
+
+                           )
+                         (incf timer-end 10.0)
+                         (set! timer-start (foxgl:timestampf))
+                         (println (cons 'DROP! thing)))))
+              
+              (unless (or pick dp)
+                (let ((set (pop! picked-objects)))
+                  (when set
+                    (push! level-objects set)))
+                )
               
               ))
       
@@ -108,8 +141,6 @@
         
         
       (incf real-time 0.016)
-      (when (> +dt+ 0.01)
-        (set! +dt+ 0.01))
       (for-each x events
                 (unless (eq (car x) 'frame)
                   (println x))
@@ -153,8 +184,6 @@
                     )
                   )
                 (when (eq (car x) 'mouse-move-delta)
-                  (incf +dt2+ (* -0.1 (cadr x)))
-                  (incf +dt+ (* 0.1 (caddr x)))
                   )
                 (when (eq (car x) 'mouse-move)
                   (let ((mx2 (rational (cadr x)))
@@ -322,6 +351,32 @@
       (translate (0 1.0 0)
        (scale (1.3 2.5 0.1)
         (ref cube-2)))))
+
+(defvar object-4
+  '(rgb (1 1 0)
+    (translate (0 0.5 0)
+     (scale (1 1 2)
+      (ref cube-2)))))
+
+(defvar object-5
+  '(rgb (1 1 0)
+    (translate (0 1 0)
+     (scale (1 2 1)
+      (ref cube-2)))))
+
+(defvar object-6
+  '(rgb (1 0.5 0.5)
+    (translate (0 1 0)
+     (scale (2 2 1)
+      (ref cube-2)))))
+
+(defvar object-7
+  '(rgb (0.5 1.0 0.5)
+    (translate (0.25 0.5 0.25)
+     (scale (0.5 2 0.5)
+      (ref cube-2)))))
+
+
 (defvar drop-point
   '(rgb (0.9 0.8 0.8 1.0)
     (ref tile-model)))
@@ -329,40 +384,77 @@
 
 
 (define model
-    '(view :perspective (1.0 (bind foxgl:aspect-ratio) 0.01 1000.0)
+    '(view :perspective (1.0 (bind foxgl:aspect-ratio) 0.1 1000.0)
       (depth
        (view :orthographic (1.0 1.0 2.0) 
-       (translate (0.8 -0.7 -1)
-        (rotate (0 0.0 0)
-        (rotate (0.5 0 0)
-         (rotate (0 (bind real-time) 0)
-          (scale (0.2 0.2 0.2)
-           (for i (bind (mapi goal-objects (lambda (i x) (cons i x))))
-            (translate (0 (bind (* (car i) 1.5)) 0)
-             (bind (eval (cdr i))))
-         )))))))
+        (translate (0.8 -0.7 0.5)
+         (rotate (0 0.0 0)
+          (rotate (0.5 0 0)
+           (rotate (0 (bind real-time) 0)
+            (scale (0.2 0.2 0.2)
+             (for i (bind (mapi goal-objects (lambda (i x) (cons i x))))
+              (translate (0 (bind (* (car i) 1.5)) 0)
+               (bind (eval (cdr i))))
+              ))))))
+        (translate (-0.8 0.8 2.0)
+         (scale 0.1
+          (rgb (0.5 0.0 0.5)
+           (translate (-1 -1 -0.2)
+            (scale 2
+             (ref square-model))))
+          (rotate (0 0 (bind (* 3.14 2 (delta-time))))
+           (translate (0 0.5 0)
+            
+            (scale (0.05 1.0 0.1)
+             (ref cube-2)
+             ))))
+
+
+         ))
        
        (translate (0 -1  (bind (+ -10 zoom)))
         (rotate (0.9 0 0)
          (translate ((bind (* -1.0 player-x)) 0 (bind (* -1.0 player-y)))
-         (rgb (0.6 0.6 0.3)
-          (translate (-5 0 -5)
-           (scale (10 0 10)
-            (ref tile-model)
-            )))
+          (rgb (0.6 0.6 0.3)
+           ; floors
+           (translate (-5 0 -5)
+            (scale (10 0 10)
+             (ref tile-model)
+             ))
+           (translate (-16 0 -10)
+            (scale (10 0 15)
+             (ref tile-model)
+             ))
+           (translate (-16 0 -25.5)
+            (scale (10 0 15)
+             (ref tile-model)
+             ))
+           (translate (-12 0 -10.5)
+            (scale (2 0 15)
+             (ref tile-model)
+             ))
+
+           
+           (translate (-7 0 -1)
+            (scale (4 1 2)
+             (ref tile-model)
+             ))   
+           )
          
          (rgb (0 0 0)
           (translate ((bind player-x) 0 (bind player-y))
            (rotate (0 (bind ang) 0)
             (ref model-player)
-            (translate (0 2.5 0)
-            (for p (bind (mapi picked-objects (lambda (i x) (cons i x))))
-             (translate (0 (bind (* (car p) 1.1)) 0)
-              (bind (eval (cadddr p))))
-            )))))
-          ;(translate (1 0 0)
-          ; (ref object-1))
+            (translate (0 1.3 0)
+            
+            (rotate ((bind player-body-rot) 0 0)
 
+             (translate (0 1.5 0)
+              (for p (bind (mapi picked-objects (lambda (i x) (cons i x))))
+               (translate (0 (bind (* (car p) 1.1)) 0)
+                (bind (eval (cadddr p))))
+               )))))))
+          
           (for obj (bind level-objects)
            (translate (bind (car obj))
             (rotate (0 (bind (cadr obj)) 0)
