@@ -327,6 +327,7 @@ lisp_value foxgl_set_window_size(lisp_value _win, lisp_value _w, lisp_value _h){
   int h = lisp_value_integer(_h);
   
   gl_window_set_size(win, w, h);
+  return nil;
 }
 
 lisp_value foxgl_swap(lisp_value win){
@@ -524,9 +525,10 @@ lisp_value foxgl_get_events(){
                         new_cons(rational(evt.mouse_scroll.x), new_cons(rational(evt.mouse_scroll.y), nil)));
         
         break;
+      case EVT_KEY_REPEAT:
+        break;
       case EVT_KEY_DOWN:
       case EVT_KEY_UP:
-      case EVT_KEY_REPEAT:
         {
         char keystr[6] = {0};
         if(evt.key.codept != 0)

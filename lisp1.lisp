@@ -154,6 +154,9 @@
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))
 
+(defmacro decf (var value)
+  `(set! ,var (- ,var ,value)))
+
 (defmacro dotimes! (a n &rest body)
   `(let ((,a 0))
     (loop (< ,a ,n)

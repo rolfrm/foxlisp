@@ -328,6 +328,13 @@
           ))))))
 
 
+(defun gen-chair-items (n)
+  (let ((l nil))
+    (dotimes! i n
+       (push! l (* 2 pi (/ (rational i) (rational n)))))
+    l))
+      
+(defvar chair-items (gen-chair-items 7))
       
 
 (define model
@@ -405,13 +412,15 @@
                               (ref fox-guy))))
          
           )
-
-         (translate (0.5 1 0.5)
-          (rotate (0 2.5 0)
-           (scale 1.4
-            (ref chair))))
+         (for i (bind chair-items 8)
+          (rotate (0 (bind i) 0)
+         
+           (translate (0.5 1 4)
+            (rotate (0 3.14 0)
+             (scale 1.4
+              (ref chair)))))
         
          )
         
 
-        ))))
+         )))))
