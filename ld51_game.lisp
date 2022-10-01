@@ -302,7 +302,7 @@
      (translate (0 1.4 0.05)
       (rotate ((bind player-body-rot) 0 0)
        
-      (scale (0.5 0.3d 0.2)
+      (scale (0.5 0.3 0.2)
        (ref cube-2) ;; lower-body
        )
       
@@ -389,7 +389,7 @@
        (view :orthographic (1.0 1.0 2.0) 
         (translate (0.8 -0.7 0.5)
          (rotate (0 0.0 0)
-          (rotate (0.5 0 0)
+          (rotate (0.9 0 0)
            (rotate (0 (bind real-time) 0)
             (scale (0.2 0.2 0.2)
              (for i (bind (mapi goal-objects (lambda (i x) (cons i x))))
