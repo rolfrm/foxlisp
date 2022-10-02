@@ -47,7 +47,9 @@ lisp_value math_round(lisp_value a, lisp_value dec){
   return nil;
 }
 
-lisp_value math_atan(lisp_value a){
+lisp_value math_atan(lisp_value a, lisp_value b){
+  if(!is_nil(b))
+    return rational_lisp_value(atan2(lisp_value_as_rational(a), lisp_value_as_rational(b)));
   return rational_lisp_value(atan(lisp_value_as_rational(a)));
 }
 lisp_value math_tan(lisp_value a){
@@ -644,7 +646,6 @@ lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
   type_assert(text, LISP_STRING);
   type_assert(matrix, LISP_VECTOR);
   mat4 * m1 = matrix.vector->data;
-
   blit3d_text(blit3d_current_context, mat4_identity(), *m1, text.string);
 
   return nil;
@@ -653,7 +654,7 @@ lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
 lisp_value foxgl_blend(lisp_value blend){
   if(!is_nil(blend)){
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   }
   else{
     glDisable(GL_BLEND);
@@ -797,7 +798,7 @@ void foxgl_register(){
   lrn("math:random", 1, math_random);
   lrn("math:mod", 2, math_mod);
   lrn("math:tan", 1, math_tan);
-  lrn("math:atan", 1, math_atan);
+  lrn("math:atan", 2, math_atan);
   lrn("math:round", 2, math_round);
   lrn("foxgl:load-font", 2, foxgl_load_font);
   lrn("foxgl:load-texture-from-path", 1, foxgl_load_texture_from_path);

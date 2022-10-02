@@ -9,13 +9,14 @@
 (defvar move-forward 0.0)
 (defvar turn 0.0)
 (defvar ang 0.0)
-(defvar player-x -10.0)
+(defvar player-x -0.0)
 (defvar player-y -0.0)
 (defvar player-move 0.0)
 (defvar pick-anim nil)
 (defvar pick-state nil)
 (defvar timer-start (foxgl:timestampf))
 (defvar timer-end (+ (foxgl:timestampf) 10))
+(defvar game-state :running)
 
 (defun delta-time ()
   (/ (- (foxgl:timestampf) timer-start) (- timer-end timer-start)))
@@ -33,19 +34,19 @@
 
 (defvar level-objects
   `(
-    ;((-5.0 0 0) ,(* 0.5 pi) object-3)
-    ;((-11.0 0 -10) 0 object-3)
-    ((2.0 0 -4.5) 0 object-1)
-    ((1.0 0 -4.5) 0 object-1)
-    ((0.0 0 -4.5) 0 object-1)
-    ((2.0 0 -2) ,pi object-1)
-    ((1.0 0 -2) ,pi object-1)
-    ((0.0 0 -2) ,pi object-1)
+    ((-5.0 0 0) ,(* 0.5 pi) object-3)
+    ((-11.0 0 -10) 0 object-3)
+    ((2.0 0 -3.5) 0 object-1)
+    ((1.0 0 -3.5) 0 object-1)
+    ((0.0 0 -3.5) 0 object-1)
+    ((2.0 0 -1) ,pi object-1)
+    ((1.0 0 -1) ,pi object-1)
+    ((0.0 0 -1) ,pi object-1)
     ((-3.0 0 4.5) 10 object-2)
     ((-4.0 0 3) 0 object-2)
     ((-4.2 0 -3) 0 object-4-sofa)
     ((-2.0 0 -1) ,(* 1.5 pi) object-4-sofa)
-    ((-0.5 0 -4) 0 o14-table)
+    ((-0.5 0 -3) 0 o14-table)
 
     ((3.0 0 3) 0 o13-cup)
     ((0.0 1 -3) 0 o13-cup)
@@ -114,28 +115,59 @@
     ))
 
 (defvar goals-list '(
-                     (o13-cup o13-cup)
-                     (o16-dog)
-                     (o15-baby)
+                     (o13-cup)
+                     (object-4-sofa)
                      
-                     (o13-cup object-1)
-                     (object-2)
-                     (object-1 object-2 )
-                     (object-5) (object-4-sofa)
+                     (o13-cup object-2)
+                     
+                     (object-1 )
 
                      ;; level 2 access
                      (object-3)
-                     (o20-human o20-human)
-                     (o21-bed o21-bed)
-                     (o17-tv o13-cup)
 
+                     (object-1 object-1 object-1)
+                     
+                     (o20-human)
+                     (o13-cup o20-human)
+                     (o13-cup o16-dog)
+                     (o17-tv o12-picture)
+                     (object-5 object-4-sofa)
+
+                     (o15-baby)
+                     (o21-bed o21-bed)
+                     (o8-picture o8-picture)
+                     (o17-tv o17-tv o17-tv o17-tv o17-tv)
                      ;; level 3 access
                      (object-3)
+                     (o22-bush o22-bush o22-bush o22-bush o22-bush)
+                     (o17-tv o17-tv o17-tv o17-tv o12-picture)
+                     (object-2 object-2 object-2 )
+                     (object-1 object-1 o14-table)
+                     (o22-bush o22-bush)
+                     (o23-huge-baby)
+                     (o9-wall o9-wall)
+                     (o10-wall o10-wall)
                      ))
 
 (defvar goal-objects (pop! goals-list));'(object-1 object-2 object-3))
-
 (defvar picked-objects '())
+
+(defvar save-state (list goals-list goal-objects level-objects))
+(defun restart-game()
+  (set! goals-list (car save-state))
+  (set! goal-objects (cadr save-state))
+  (set! level-objects (caddr save-state))
+  (set! picked-objects nil)
+  (set! player-x 0.0)
+  (set! player-y 4.0)
+  (set! game-state :running)
+  (set! timer-start (foxgl:timestampf))
+  (set! timer-end (+ timer-start 10))
+  (set! turn 0)
+  (set! move-forward 0)
+  )
+(restart-game)
+
 (defun player-collision (px py)
   
   (let ((player-object `((,px 0 ,py) ,ang player)))
@@ -190,7 +222,11 @@
       ;(println (- (foxgl:timestampf) timer-start))
       ;(player-collision)
                                         ;(println (cons player-x player-y))
-
+      (when (and (eq game-state :running) (> (foxgl:timestampf) timer-end))
+        (set! game-state :game-over))
+      (when (and (eq game-state :running) (not goal-objects))
+        (set! game-state :game-win))
+      
       (incf ang (* 0.1 turn))
       (incf player-move (* 0.1 move-forward))
       (let ((angle ang))
@@ -237,10 +273,10 @@
                          
                          (set! goal-objects (remove-first (caddr thing) goal-objects))
                          (when (not goal-objects)
+                           (incf timer-end 10.0)
                            (set! goal-objects (pop! goals-list))
 
                            )
-                         (incf timer-end 10.0)
                          (set! timer-start (foxgl:timestampf))
                          (push! fly-off-objects (cons timer-start thing))
                          (println (cons 'DROP! thing)))))
@@ -289,6 +325,9 @@
                     )
                   (when (eq (caddr x) foxgl:key-d)
                     (incf turn 1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-g)
+                    (restart-game)
                     )
                   )
                 (when (eq (car x) 'key-up)
@@ -1059,6 +1098,34 @@ w      (ref cube-2)))))
               (translate (0 (bind (* (car i) 1.5)) 0)
                (bind (eval (cdr i))))
               ))))))
+        
+        (translate (0 0 0)
+         (scale (1 (bind (if (eq game-state :game-over) 1.0 0.0)) 1)
+                                        ;(bind z-square)
+          
+          (translate (-0.4 0 2.0)
+           (scale (0.0025 -0.003)
+            (text "Game over! Press g to restart.")))
+          (translate (-0.5 -0.5 0.0)
+           (rgb (0.2 0 0)
+            (ref square-model))
+           
+          ))
+         (scale (1 (bind (if (eq game-state :game-win) 1.0 0.0)) 1)
+                                        ;(bind z-square)
+          (translate (-0.9 0 1.0)
+           (scale (0.0025 -0.003)
+            (text "Game Completed! You are so good! Press g to restart.")))
+          )
+         ;(blend
+         (translate (-0.8 -0.85 2.0)
+           (scale (0.0025 -0.003)
+            (text "Move: WASD, Pick up / throw: Space.")))
+          
+         (translate (-0.8 -0.9 2.0)
+           (scale (0.0025 -0.003)
+            (text "Throw the things through the window to win."))))
+         
         (translate (-0.8 0.8 2.0)
          (translate (1 0 0)
           (rgb (1 1 1)
@@ -1082,9 +1149,14 @@ w      (ref cube-2)))))
 
          ))
        
+       
        (translate (0 -1  (bind (+ -10 zoom)))
-        (rotate (0.6 0 0)
+        (rotate (0.7 0 0)
          (translate ((bind (* -1.0 player-x)) 0 (bind (* -1.0 player-y)))
+          (rgb (0 0 0.1)
+           (scale (100 1 100)
+            (ref tile-model-2)))
+            
           (rgb (0.7 0.7 0.5)
            (for f (bind floor-tiles)
             (let ((p (car f)) (s (cadr f)))
