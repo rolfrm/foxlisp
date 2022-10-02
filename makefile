@@ -1,4 +1,4 @@
-OPT = -O2 -g2
+OPT = -O3 -g0
 LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c process.c parser.c test.c surface.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
@@ -35,7 +35,7 @@ libmicroio.bc:
 libiron.bc: iron/libiron.bc
 	cp iron/libiron.bc .
 
-index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp spinning-cube.lisp foxgl.lisp libiron.bc foxday2.lisp demo.lisp models.lisp ld51_game.lisp
+index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp spinning-cube.lisp foxgl.lisp libiron.bc foxday2.lisp demo.lisp models.lisp ld51_game.lisp ld51.lisp
 	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -sEXPORTED_RUNTIME_METHODS=ccall -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp --embed-file ./spinning-cube.lisp@spinning-cube.lisp --embed-file ./spinning-cube-model.lisp@spinning-cube-model.lisp --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf --embed-file ./ld51.lisp --embed-file ./ld51_game.lisp --embed-file ./models.lisp
 
 libmicroio.a:libmicroio/libmicroio.a

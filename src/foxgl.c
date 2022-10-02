@@ -466,7 +466,7 @@ lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, 
 lisp_value blit_set_mode(lisp_value mode){
   if(lisp_value_eq(mode, get_symbol(":points"))){
     blit3d_set_mode(blit3d_current_context, BLIT3D_POINTS);
-    glEnable(GL_PROGRAM_POINT_SIZE);
+    //glEnable(GL_PROGRAM_POINT_SIZE);
   }
   else if(lisp_value_eq(mode, get_symbol(":triangles"))){
     blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES);
@@ -479,7 +479,7 @@ lisp_value blit_set_mode(lisp_value mode){
     //glEnable(GL_PROGRAM_POINT_SIZE);
   }
   else{
-    glDisable(GL_PROGRAM_POINT_SIZE);
+    //glDisable(GL_PROGRAM_POINT_SIZE);
     blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLE_STRIP);
   }
     return nil;
@@ -605,7 +605,7 @@ lisp_value foxgl_bind_framebuffer(lisp_value fb){
 }
 
 lisp_value foxgl_clear(){
-  glClearColor(0,0,0,0);
+  glClearColor(0,0,0,1);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   return nil;
 }
@@ -654,10 +654,12 @@ lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
 lisp_value foxgl_blend(lisp_value blend){
   if(!is_nil(blend)){
     glEnable(GL_BLEND);
-    //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(false);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   }
   else{
     glDisable(GL_BLEND);
+    glDepthMask(true);
   }
   return nil;
 }
