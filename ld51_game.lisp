@@ -21,11 +21,18 @@
   (/ (- (foxgl:timestampf) timer-start) (- timer-end timer-start)))
 
 (defvar player-body-rot 1)
-(defvar drop-point-loc
-  `((0 0 5) 0 drop-point))
+(defvar drop-points
+  '(
+    ((0 0 5) 0 drop-point)
+    ((-10 0 5) 0 drop-point)
+    ))
+
+(defvar fly-off-objects
+  '())
+
 (defvar level-objects
   `(
-    ((-5.0 0 0) ,(* 0.5 pi) object-3)
+                                        ;((-5.0 0 0) ,(* 0.5 pi) object-3)
     ((2.0 0 -4.5) 0 object-1)
     ((1.0 0 -4.5) 0 object-1)
     ((0.0 0 -4.5) 0 object-1)
@@ -70,7 +77,8 @@
     ((-5 -0)(4 2))
     ))
 
-(defvar goals-list '(
+(defvar goals-list '((o13-cup)
+                     (o13-cup object-1)
                      (object-2)
                      (object-1 object-2 )
                      (object-5) (object-4-sofa)
@@ -94,11 +102,13 @@
 
 (defun drop-point-collision(px py)
   (let ((player-object `((,px 0 ,py) ,ang player)))
+    
     (let ((col nil))
-      (when (foxgl:detect-collision drop-point-loc player-object)
-        (println (list 'collision drop-point-loc))
-        (set! col drop-point-loc)
-        )
+      (for-each drop-point-loc drop-points
+                (when (foxgl:detect-collision drop-point-loc player-object)
+                  (println (list 'collision drop-point-loc))
+                  (set! col drop-point-loc)
+                  ))
       col)))
 
 (defun player-floor-collision (px py)
@@ -136,6 +146,8 @@
               (set! player-x nx)
               (set! player-y ny)))
           ))
+      (when (and fly-off-objects (> (- (foxgl:timestampf) (caar fly-off-objects)) 5))
+        (set! fly-off-objects nil))
       
       (when pick-anim
         (set! player-body-rot (- 1 (abs (- pick-anim 1.0))))
@@ -166,6 +178,7 @@
                            )
                          (incf timer-end 10.0)
                          (set! timer-start (foxgl:timestampf))
+                         (push! fly-off-objects (cons timer-start thing))
                          (println (cons 'DROP! thing)))))
               
               (unless (or pick dp)
@@ -738,7 +751,8 @@
 
        )
 
-      (head 
+      (head
+       (rotate ((bind (* 0.2 (sin real-time))) 0 0)
        (rotate (0.0 0 0.2)
       (translate (0 0.1 0)
        (scale (1 0.7 1.0)
@@ -780,7 +794,7 @@
        
         (ref cube-2)))
 
-      )))))))
+      ))))))))
 
 (defvar obj-window
   `(translate (0 1.25 0)
@@ -862,9 +876,18 @@
             (rotate (0 (bind (cadr obj)) 0)
              (bind (eval (caddr obj)))
              )))
-          (translate (0 0.0 5)
-           (scale (1 1 1)
-            (ref drop-point)))
-         ))))))
+          
+          (for w (bind drop-points)
+          (translate (bind (car w))
+           (bind  (eval (caddr w))))
+           )
+          (for w (bind fly-off-objects)
+           (let ((time (car w))
+                 (obj (cdr w)))
+             (translate (0 0 (bind (let ((ti (+ 0.5 (- (foxgl:timestampf) time))))
+                                          (+ 3  (* ti 7.0)))))
+                        (bind (eval (caddr obj))))))
+
+          ))))))
         
 

@@ -418,7 +418,7 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
   var o1 = car(obj1);
   var o2 = car(obj2);
   AABB a = {.pos = p1, .size = vec3_new(0.5,0.5,0.5)};
-  AABB b = {.pos = p2, .size = vec3_new(0.5,0.5,0.5)};
+  AABB b = {.pos = p2, .size = vec3_new(0.5,1.5,0.5)};
   cdf_ctx ctx = {
     .sdf1 = aabb_sdf,
     .sdf2 = aabb_sdf,
