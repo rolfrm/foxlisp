@@ -9,8 +9,8 @@
 (defvar move-forward 0.0)
 (defvar turn 0.0)
 (defvar ang 0.0)
-(defvar player-x 0.0)
-(defvar player-y 0.0)
+(defvar player-x -10.0)
+(defvar player-y -0.0)
 (defvar player-move 0.0)
 (defvar pick-anim nil)
 (defvar pick-state nil)
@@ -25,6 +25,7 @@
   '(
     ((0 0 5) 0 drop-point)
     ((-10 0 5) 0 drop-point)
+    ((-21 0 -15) 1.6 drop-point)
     ))
 
 (defvar fly-off-objects
@@ -32,15 +33,15 @@
 
 (defvar level-objects
   `(
-    ((-5.0 0 0) ,(* 0.5 pi) object-3)
-    ((-11.0 0 -10) 0 object-3)
+    ;((-5.0 0 0) ,(* 0.5 pi) object-3)
+    ;((-11.0 0 -10) 0 object-3)
     ((2.0 0 -4.5) 0 object-1)
     ((1.0 0 -4.5) 0 object-1)
     ((0.0 0 -4.5) 0 object-1)
     ((2.0 0 -2) ,pi object-1)
     ((1.0 0 -2) ,pi object-1)
     ((0.0 0 -2) ,pi object-1)
-    ((-3.0 0 4.5) 0 object-2)
+    ((-3.0 0 4.5) 10 object-2)
     ((-4.0 0 3) 0 object-2)
     ((-4.2 0 -3) 0 object-4-sofa)
     ((-2.0 0 -1) ,(* 1.5 pi) object-4-sofa)
@@ -48,6 +49,7 @@
 
     ((3.0 0 3) 0 o13-cup)
     ((0.0 1 -3) 0 o13-cup)
+    ((3.0 0 2) 0 o13-cup)
     ((4 0 0) 0 o15-baby)
     ((-1.8 0 1.0) ,(* 0.3 pi) o16-dog)
     ((4 0 3) ,(* 0.5 pi) o17-tv)
@@ -57,7 +59,19 @@
     ((-14 0.8 1.5) 0 o20-human)
     ((-14 0 0) 0 o21-bed)
     ((-14 0 -9.9) 0 o8-picture)
-    ((-14.5 0 -5) 0 o17-tv)
+    ((-15.2 0 -5) 0 o17-tv)
+    ((-14.1 0 -5) 0 o17-tv)
+    ((-13 0 -5) 0 o17-tv)
+    ((-12 0 -5) 0 o17-tv)
+    ((-11 0 -5) 0 o17-tv)
+    ((-10 0 -5) 0 o17-tv)
+    ((-9 0 -5) 0 o17-tv)
+    ((-7.9 0 -5) 0 o17-tv)
+    ((-6.7 0 -5) 0 o17-tv)
+    ((-6.1 0 3.9) ,(* 0.5 pi) o12-picture)
+    ((-8.0 0 4.5) 10 object-2)
+    ((-12.0 0 4.5) 10 object-2)
+
     ((-14 0 3) 0 o13-cup)
 
     
@@ -73,6 +87,21 @@
     ((-6 0 -10.0)  ,(* 0.5 pi) o18-wall)
     ((-10 0 -10.0)  0 o10-wall)
     ((-16 0 -10.0)  0 o10-wall)
+    ((-16 0 -10.0) ,(* 0.5 pi) o9-wall)
+    ((-16 0 0.0) ,(* 0.5 pi) o10-wall)
+    ((-6 0 1.0) ,(* 0.5 pi) o10-wall)
+    
+
+    
+    ((-17 0 -18) 0 o22-bush)
+    ((-13 0 -18) 0 o22-bush)
+    ((-18 0 -21) 0 o22-bush)
+    ((-16 0 -21) 0 o22-bush)
+    ((-20 0 -21) 0 o22-bush)
+    ((-14 0 -21) 0 o22-bush)
+    ((-12 0 -21) 0 o22-bush)
+    
+    ((-17 0 -24) 0 o23-huge-baby)
     )
   )
 (defvar floor-tiles
@@ -85,7 +114,7 @@
     ))
 
 (defvar goals-list '(
-                     (o13-cup)
+                     (o13-cup o13-cup)
                      (o16-dog)
                      (o15-baby)
                      
@@ -96,14 +125,19 @@
 
                      ;; level 2 access
                      (object-3)
-                     (object-6 object-7)
-                     (object-6 object-7)
-                     (object-6 object-7)))
+                     (o20-human o20-human)
+                     (o21-bed o21-bed)
+                     (o17-tv o13-cup)
+
+                     ;; level 3 access
+                     (object-3)
+                     ))
 
 (defvar goal-objects (pop! goals-list));'(object-1 object-2 object-3))
 
 (defvar picked-objects '())
-(defun player-collision(px py)
+(defun player-collision (px py)
+  
   (let ((player-object `((,px 0 ,py) ,ang player)))
     (let ((col nil))
       (for-each i level-objects
@@ -112,6 +146,20 @@
                   (set! col i)
                   ))
       col)))
+
+(defun player-collision-goal-objects (px py)
+  
+  (let ((player-object `((,px 0 ,py) ,ang player)))
+    (let ((col nil))
+      (for-each i level-objects
+                (when (find (caddr i) goal-objects)
+                  (println (cons 'found i))
+                  (when (foxgl:detect-collision i player-object)
+                    (println (cons 'grab i))
+                    (set! col i)
+                  )))
+      col)))
+
 
 (defun drop-point-collision(px py)
   (let ((player-object `((,px 0 ,py) ,ang player)))
@@ -170,9 +218,10 @@
           (let ((angle ang))
             (let* ((nx (+ player-x (* -0.5 (sin angle))))
                    (ny (+ player-y (* 0.5 (cos angle))))
-                   (pick (player-collision nx ny))
+                   (pick (player-collision-goal-objects nx ny))
                    (dp (drop-point-collision nx ny)))
               (when pick
+                (println 'pick!)
                 (set! level-objects (take (lambda (x) (not (eq x pick))) level-objects))
                 (push! picked-objects pick)
                 )
@@ -183,8 +232,10 @@
                                         (first (lambda (y) (println (eq (println (caddr x)) (println y))))
                                                goal-objects))
                                       picked-objects))
+                         
                          (set! picked-objects (take (lambda (x) (not (eq x thing))) picked-objects))
-                         (set! goal-objects (take (lambda (x) (not (eq x (caddr thing)))) goal-objects))
+                         
+                         (set! goal-objects (remove-first (caddr thing) goal-objects))
                          (when (not goal-objects)
                            (set! goal-objects (pop! goals-list))
 
@@ -429,7 +480,8 @@
        )))))
 
 (defvar object-2 ;; flower
-    '(rgb (0.85 0.4 0.2)
+  '(bake
+    (rgb (0.8 0.5 0.4)
       (translate (0 0.0 0)
        (scale (0.5 0.3 0.5)
         (ref upcube)
@@ -443,15 +495,17 @@
                   (translate (-0.0 0.2 -0.3)
                    (rotate (0.6 0 0)
                     (ref upcube))))))
-         (rgb (0.3 0.9 0.3)
+         (rgb (0.4 0.8 0.3)
                 (translate (0 0.3 0)
               (for i (0.0 1.2 0.5 1.9 2.5 2.8 3.1 3.9 4.4)
                    (rotate (0.0 (bind i) 0.0)
+                           (rgb ((bind (+ 0.4 (* 0.2 (sin (* 100 i))))) 0.8 0.3)
+         
                            (rotate (0 0 0.5)
                                (scale 0.75
-                                      (bind leaf))))))
+                                      (bind leaf)))))))
 
-         )))))
+         ))))))
 
 (defvar object-3
     '(rgb (0.6 0.4 0.2)
@@ -535,7 +589,7 @@
   '(rgb (0.5 1.0 0.5)
     (translate (0.25 0.5 0.25)
      (scale (0.5 2 0.5)
-      (ref cube-2)))))
+w      (ref cube-2)))))
 
 (defvar o8-picture
   '(bake (translate (0 2 0)
@@ -693,14 +747,22 @@
       (bind cube-2))
      (let ((arm '(scale (0.5 0.3 0.3)
                   (translate (-0.5 0 0)
-                   (ref cube-2)))))
-       (translate (-0.4 0 0)
+                   (ref cube-2)
+                   (translate (-0.5 0 -0.5)
+                    (ref cube-2))
+
+                   )
+                  
+
+                  )))
+       (rotate ((bind (+ -0.5 (* 0.2 (sin (+ 3.14 (* 10 real-time)))))) 0 0)  (translate (-0.4 0 0)
                   (bind arm)
-                  )
+                  ))
+       (rotate ((bind (+ -0.5 (* 0.2 (sin (* 10 real-time))))) 0 0)
        (translate (0.4 0 0)
                   (scale (-1 1 1)
                   (bind arm)
-                  ))
+                  )))
 
        )
      
@@ -709,7 +771,7 @@
        (rgb (1 1 1)
         (bind cube-2))))
      (let ((leg
-             '(bake
+             '(bake2
                (translate (0.5 0 0.6)
                
                (rotate (0 0.9 0)
@@ -730,7 +792,10 @@
        ))
      )
     ))))
-
+(defvar o15-baby2
+  '(let ((color-skin '(0.4 0.2 0.2)))
+    (ref o15-baby)))
+ 
 (defvar o16-dog
   `(rgb (0.4 0.4 0.4)
     (scale 0.4
@@ -816,7 +881,7 @@
       ))))))))
 (defvar o17-tv
   `(rgb (0.4 0.4 0.4)
-    (translate (0 1.1 0)
+    (translate (0 0.8 0)
      (scale 0.9 
      (skew (11 -0.5)
       (ref cube-2))
@@ -907,16 +972,7 @@
            (translate (0.075 0.1 0.2)
             (scale (0.09 0.02 0.05)
              (ref cube-2)))
-           
-
-           )
-            
-    
-          )
-       )
-
-
-     ))))
+           )))))))
 
 (defvar o20-human
   '(rotate (-1.5 0 0)
@@ -944,7 +1000,31 @@
                  (scale (-1 1 1)
                  (bind leg)))
 
-    ))))
+      ))))
+(defvar o22-bush
+  '(rgb (0.3 0.7 0.3)
+    (rgb (0.4 0.3 0.2)
+     (scale (2 0.1 2)
+     (ref upcube)
+      ))
+    (scale (1 2 1)
+     (ref upcube))
+    (translate (0.8 0.2 0.3)
+     (scale (1 4 1)
+      (ref upcube))
+     )
+    (translate (-0.8 -0.2 -0.3)
+     (scale (1 4 1)
+      (ref upcube))
+     )
+    ))
+(defvar o23-huge-baby
+  '(scale 4
+    (ref o15-baby)
+    ))
+         
+    
+    
 (defvar obj-window
   `(translate (0 1.25 0)
     (scale 1
@@ -967,9 +1047,9 @@
 
 
 (define model
-    '(view :perspective (1.0 (bind foxgl:aspect-ratio) 0.1 1000.0)
+    '(view :perspective (1.0 (bind  foxgl:aspect-ratio) 0.1 1000.0)
       (depth
-       (view :orthographic (1.0 1.0 2.0) 
+       (view :orthographic ((bind (max 1.0 foxgl:aspect-ratio)) 1.0 2.0) 
         (translate (0.8 -0.7 0.5)
          (rotate (0 0.0 0)
           (rotate (0.9 0 0)
@@ -980,6 +1060,13 @@
                (bind (eval (cdr i))))
               ))))))
         (translate (-0.8 0.8 2.0)
+         (translate (1 0 0)
+          (rgb (1 1 1)
+           (translate (-1 0.2 -0.2)
+            (scale (0.0025 -0.003)
+             (text (bind
+                    (* 0.1 (math:round (* 10.0 (abs (- (foxgl:timestampf) timer-end)))))))))))
+          
          (scale 0.1
           (rgb (0.5 0.0 0.5)
            (translate (-1 -1 -0.2)
@@ -996,7 +1083,7 @@
          ))
        
        (translate (0 -1  (bind (+ -10 zoom)))
-        (rotate (0.9 0 0)
+        (rotate (0.6 0 0)
          (translate ((bind (* -1.0 player-x)) 0 (bind (* -1.0 player-y)))
           (rgb (0.7 0.7 0.5)
            (for f (bind floor-tiles)
@@ -1027,8 +1114,9 @@
              )))
           
           (for w (bind drop-points)
-          (translate (bind (car w))
-           (bind  (eval (caddr w))))
+           (translate (bind (car w))
+            (rotate (0 (bind (cadr w)) 0)
+             (bind  (eval (caddr w)))))
            )
           (for w (bind fly-off-objects)
            (let ((time (car w))

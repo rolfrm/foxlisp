@@ -53,12 +53,27 @@
 (defun mapi (lst f2)
   (mapi2 lst f2 0))
 
-
 (defun map! (f2 lst)
   (loop lst
         (f2 (car lst))
         (set! lst (cdr lst)))
   nil)
+
+(defun remove-first (elem lst)
+
+  (if (eq elem (car lst))
+      (cdr lst)
+      (when lst 
+        (cons (car lst) (remove-first elem (cdr lst)))
+      )))
+
+(defun find (elem lst)
+  (if (eq elem (car lst))
+      lst
+      (when lst
+        (find elem (cdr lst))
+        )))
+
 
 (defun do-times(n f2)
   (let ((x 0))

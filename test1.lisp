@@ -427,17 +427,17 @@
   (let (( r (lisp:with-sub-scope test-scope 'c 30 '((+ a b c)))))
     (assert (eq r 60))
     ))
+(println (remove-first 2 (list 1 2 3 4)))
 
 (defvar asd '(asd))
-(println (list (hashtable-ref lisp:++cons-file-offset++ asd) (hashtable-ref lisp:++cons-file++ asd)))
-(println lisp:++cons-file++) 
-(println (cons 'lisp-current-file lisp:++current-file-ptr++))
+;(println (list (hashtable-ref lisp:++cons-file-offset++ asd) (hashtable-ref lisp:++cons-file++ asd)))
+;(println lisp:++cons-file++) 
+;(println (cons 'lisp-current-file lisp:++current-file-ptr++))
 (println (lisp:code-location asd))
 
 (defun test-func-1 () (+ 1 2))
 ;;; blank line!!
 (defun test-func-2 () (+ 1 2))
-
 (println (car (function->code test-func-1)))
 ;(println (hashtable-keys lisp:++cons-file-offset++))
 (assert (eq (cadr (println (lisp:function-location test-func-1)))
