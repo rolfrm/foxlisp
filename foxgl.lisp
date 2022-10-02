@@ -294,6 +294,19 @@
        (set! foxgl:current-transform prev-tform)
        (release-matrix new-transform)
        ))
+    (skew
+     (let ((prev-tform foxgl:current-transform)
+           (new-transform (get-matrix))
+           (skew (unbind (cadr model))))
+       (math:*! new-transform new-transform foxgl:current-transform)
+       (math:skew! new-transform skew)
+       
+       (set! foxgl:current-transform new-transform)
+       (foxgl:render-sub-models (cddr model))
+       (set! model nil)
+       (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
+       ))
     (transform
      (let ((prev-tform foxgl:current-transform)
            (new-transform (get-matrix)))

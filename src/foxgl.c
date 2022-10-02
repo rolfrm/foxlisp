@@ -183,6 +183,25 @@ lisp_value math_mat4_rotate(lisp_value x, lisp_value y, lisp_value z){
   return mat4_to_lisp(m1);
 }
 
+lisp_value math_skew_in_place(lisp_value m, lisp_value values){
+  mat4 m0 = mat4_identity();
+  var m1 = (mat4 *) m.vector->data;
+  float * pts = (f32 *) &m0;
+  while(!is_nil(values)){
+    int index = lisp_value_integer(car(values));
+    values = cdr(values);
+    f32 value = lisp_value_as_rational(car(values));
+    values = cdr(values);
+    if(index <0 || index >= 16)
+      return nil;
+    pts[index] = value;
+  }
+  *m1 = mat4_mul(*m1, m0);
+  
+  return nil;
+}
+
+
 mat4 lisp_value_mat4(lisp_value m){
   mat4 nil = {0};
   TYPE_ASSERT(m, LISP_VECTOR);
@@ -797,6 +816,7 @@ void foxgl_register(){
   lrn("math:rotate!", 4, math_rotate_in_place);
   lrn("math:scale!", 4, math_scale_in_place);
   lrn("math:translate!", 4, math_translate_in_place);
+  lrn("math:skew!", 2, math_skew_in_place);
   lrn("mat4:rotate", 3, math_mat4_rotate);
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);

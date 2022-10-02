@@ -32,7 +32,8 @@
 
 (defvar level-objects
   `(
-                                        ;((-5.0 0 0) ,(* 0.5 pi) object-3)
+    ((-5.0 0 0) ,(* 0.5 pi) object-3)
+    ((-11.0 0 -10) 0 object-3)
     ((2.0 0 -4.5) 0 object-1)
     ((1.0 0 -4.5) 0 object-1)
     ((0.0 0 -4.5) 0 object-1)
@@ -49,15 +50,18 @@
     ((0.0 1 -3) 0 o13-cup)
     ((4 0 0) 0 o15-baby)
     ((-1.8 0 1.0) ,(* 0.3 pi) o16-dog)
+    ((4 0 3) ,(* 0.5 pi) o17-tv)
+
+    ((-15 0.8 1.5) 0 o20-human)
+    ((-15 0 0) 0 o21-bed)
+    ((-14 0.8 1.5) 0 o20-human)
+    ((-14 0 0) 0 o21-bed)
+    ((-14 0 -9.9) 0 o8-picture)
+    ((-14.5 0 -5) 0 o17-tv)
+    ((-14 0 3) 0 o13-cup)
 
     
     ((4 0 -4) 0 object-5)
-    ((-10 0 -9) 0 object-6)
-    ((-11 0 -6) 0 object-6)
-    ((-12 0 -3) 0 object-6)
-    ((-10 0 -3) 0 object-7)
-    ((-10 0 -6) 0 object-7)
-    ((-8 0 -9) 0 object-7)
     ((-2 0 -4.9) 0 o8-picture)
     
     ((4.9 0 -0.9) ,(* 0.5 pi) o12-picture)
@@ -66,6 +70,9 @@
     ((-5 0 1.0) ,(* 0.5 pi) o10-wall)
     ((-6 0 -1.0) 0 o11-wall)
     ((5 0 -5.0) ,(* 0.5 pi) o9-wall)
+    ((-6 0 -10.0)  ,(* 0.5 pi) o18-wall)
+    ((-10 0 -10.0)  0 o10-wall)
+    ((-16 0 -10.0)  0 o10-wall)
     )
   )
 (defvar floor-tiles
@@ -73,15 +80,21 @@
     ((0 0) (10 10))
     ((-11 -2.5) (10 15))
     ((-16 -20) (10 15))
-    ((-12 -12.5) (2 15))
+    ((-11 -12.5) (2 15))
     ((-5 -0)(4 2))
     ))
 
-(defvar goals-list '((o13-cup)
+(defvar goals-list '(
+                     (o13-cup)
+                     (o16-dog)
+                     (o15-baby)
+                     
                      (o13-cup object-1)
                      (object-2)
                      (object-1 object-2 )
                      (object-5) (object-4-sofa)
+
+                     ;; level 2 access
                      (object-3)
                      (object-6 object-7)
                      (object-6 object-7)
@@ -442,7 +455,7 @@
 
 (defvar object-3
     '(rgb (0.6 0.4 0.2)
-      (translate (0 1.0 0)
+      (translate (0 1.4 0)
        (scale 1.3
        (scale (1.3 2.5 0.1)
         (ref cube-2))))
@@ -562,6 +575,12 @@
      (scale (10 4 0.1)
       (translate (0.5 0 0)
        (ref upcube))))))
+(defvar o18-wall
+  '(translate (0 0 0)
+    (rgb (0.6 0.5 0.3)
+     (scale (9 4 0.1)
+      (translate (0.5 0 0)
+       (ref upcube))))))
 
 (defvar o10-wall
   '(translate (0 0 0)
@@ -654,9 +673,9 @@
                  (bind leg)))
 
     )))
-
+(defvar color-skin '(1.0 0.8 0.7))
 (defvar o15-baby
-  '(rgb (1.0 0.8 0.7)
+  '(rgb (bind color-skin)
     (scale 0.4
     (translate (0 0.5 0)
     (bind cube-2)
@@ -795,7 +814,137 @@
         (ref cube-2)))
 
       ))))))))
+(defvar o17-tv
+  `(rgb (0.4 0.4 0.4)
+    (translate (0 1.1 0)
+     (scale 0.9 
+     (skew (11 -0.5)
+      (ref cube-2))
+     (translate (0 -0.25 0)
+      (ref cube-2))
+     
+     (rgb (1 1 1)
+      (translate (0 0 0.67)
+       (scale (1 1 0.05)
+        (ref cube-2)))
+      )
+     (rgb (0.5 0.4 0.4)
+      (translate (0 (bind (* 0.45 (sin (* 3 (math:round (* 10.0 real-time)))))) 0.69)
+       (scale (1 0.2 0.05)
+        (ref cube-2)))
+      )
+     (rgb (0.6 0.6 0.5)
+      (translate (0 (bind (* 0.45 (sin (+ 1 (* 3 (math:round (* 10.0 real-time))))))) 0.69)
+       (scale (1 0.2 0.05)
+        (ref cube-2)))
+      )
+      ))))
+(defvar color-jeans '(0.5 0.5 0.8))
+(defvar color-flannel '(0.9 0.5 0.2))
+(defvar o19-human
+  '(translate (0.0 1.0 0)
+    (rgb (bind color-skin)
+    (let ((leg '(leg
+       (rotate (-0.0 0 0)
+        (translate (0 0 0)
+      
+         (translate (0 -0.4 0)
+          (scale (0.1 0.5 0.1)
+           (ref cube1)); thigh
+          
+          (translate (0 -0.125 0)
+           
+           (rotate (0.0 0 0)
+            (translate (0.0 -0.35 0)
+             (scale (0.1 0.5 0.1)
+              (ref cube1))
+                                        ; foot
+             (translate (0 0.05 0.05)
+              (scale (0.1 0.1 0.2)
+             (ref cube1))))
+            
+            )
+           ))
+         )))))
+      (rgb (bind color-jeans)
+      (translate (-0.25 0 0)
+                 (bind leg))
+      (translate (0.25 0 0)
+                 (scale (-1 1 1)
+                        (bind leg)))
+      ))
+    (translate (0 0.2 0.05)
+     (scale (0.5 0.3 0.2)
+      (rgb (bind color-jeans)
+       (ref cube-2) ;; lower-body
+       ))
+      
+      (translate (0 0.4 0)
+       (scale (0.5 0.5 0.2)
+        (translate (0 0.5 0)
+         (rgb (bind color-flannel)
+         (ref cube-2)))) ;; upper body
+       (let ((arm
+               '(scale (0.1 1.0 0.1)
+                 (bind cube-2))))
+         (rgb (bind color-flannel)
+         
+         (translate (0.3 0 0)
+                    (bind arm))
+         (translate (-0.3 0 0)
+                    (bind arm))
+         )
+         )
+         
+       
+         (translate (0 0.75 0)
+           (scale (0.3 0.3 0.3)
+            (ref cube-2))  ;; head
+          (rgb (1 1 1)
+           (translate (-0.075 0.1 0.2)
+            (scale (0.09 0.02 0.05)
+             (ref cube-2)))
+           (translate (0.075 0.1 0.2)
+            (scale (0.09 0.02 0.05)
+             (ref cube-2)))
+           
 
+           )
+            
+    
+          )
+       )
+
+
+     ))))
+
+(defvar o20-human
+  '(rotate (-1.5 0 0)
+    (ref o19-human)))
+(defvar o21-bed
+    '(rgb (0.7 0.4 0.2)
+      (translate (-0.5 0 -1)
+      (translate (0 0.3 0)
+     (scale (1 0.4 2)
+      (rgb (0.9 0.9 0.9)
+       (ref cube-model)))
+     )
+    (let ((leg '(scale (0.1 1 0.1)
+                 (ref cube-model))))
+      (translate (0 0 0)
+                 
+                 (bind leg))
+      (translate (0 0 2.0)
+                 (scale (1 0.5 -1)
+                        (bind leg)))
+      (translate (1.0 0 2.0)
+                 (scale (-1 0.5 -1)
+                        (bind leg)))
+      (translate (1.0 0 0)
+                 (scale (-1 1 1)
+                 (bind leg)))
+
+    ))))
 (defvar obj-window
   `(translate (0 1.25 0)
     (scale 1
