@@ -273,7 +273,7 @@
                          
                          (set! goal-objects (remove-first (caddr thing) goal-objects))
                          (when (not goal-objects)
-                           (incf timer-end 10.0)
+                           (incf timer-end 11.0)
                            (set! goal-objects (pop! goals-list))
 
                            )
@@ -831,10 +831,7 @@ w      (ref cube-2)))))
        ))
      )
     ))))
-(defvar o15-baby2
-  '(let ((color-skin '(0.4 0.2 0.2)))
-    (ref o15-baby)))
- 
+(
 (defvar o16-dog
   `(rgb (0.4 0.4 0.4)
     (scale 0.4
