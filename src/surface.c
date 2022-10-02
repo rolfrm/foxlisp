@@ -364,7 +364,9 @@ void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
       // collison detected
       ctx->pt = position;
       ctx->collision_detected = true;
-      vec3_print(position);printf("\n");
+
+      //printf(">>> %f %f\n", d, d2);
+      //vec3_print(position);printf("\n");
       return;
     }
     else{
@@ -398,6 +400,7 @@ typedef struct{
 
 f32 aabb_sdf(void * ud, vec3 p){
   AABB * a = ud;
+
   p = vec3_sub(p, a->pos);
   vec3 q = vec3_sub(vec3_abs(p), vec3_scale(a->size, 0.5));
   return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x,MAX(q.y,q.z)),0.0);
@@ -408,8 +411,8 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
   var p2 = lv_vec3(car(obj2));
   obj1 = cdr(obj1);
   obj2 = cdr(obj2);
-  var rot1 = lisp_value_rational(car(obj1));
-  var rot2 = lisp_value_rational(car(obj2));
+  var rot1 = lisp_value_as_rational(car(obj1));
+  var rot2 = lisp_value_as_rational(car(obj2));
   obj1 = cdr(obj1);
   obj2 = cdr(obj2);
   var o1 = car(obj1);
@@ -423,6 +426,35 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
     .userdata2 = &b,
     .threshold = 0.1
   };
+  sdf_detect_collision(&ctx, p2, 10.0);
+  
+  return ctx.collision_detected ? t : nil;
+}
+
+
+lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2){
+  var p1l = car(floor_tile);
+  var p1 = vec3_new(lisp_value_as_rational(car(p1l)), 0, lisp_value_as_rational(cadr(p1l)));
+  var p2 = lv_vec3(car(obj2));
+  floor_tile = cdr(floor_tile);
+  obj2 = cdr(obj2);
+  var rot2 = lisp_value_as_rational(car(obj2));
+  obj2 = cdr(obj2);
+  var o2 = car(obj2);
+  var s1l = car(floor_tile);
+  //println(floor_tile); printf("<<<\n");
+  var size = vec3_new(lisp_value_as_rational(car(s1l)), 10.0, lisp_value_as_rational(cadr(s1l)));
+  //vec3_print(size);printf("\n");
+  AABB a = {.pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
+  AABB b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
+  cdf_ctx ctx = {
+    .sdf1 = aabb_sdf,
+    .sdf2 = aabb_sdf,
+    .userdata1 = &a,
+    .userdata2 = &b,
+    .threshold = 0.1
+  };
+  
   sdf_detect_collision(&ctx, p2, 10.0);
   
   return ctx.collision_detected ? t : nil;
