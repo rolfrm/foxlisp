@@ -335,10 +335,6 @@ lisp_value sdf_poly(lisp_value f){
   return new_cons(vec, vec2);
 }
 
-void test_sdf(){
-  sdf_poly(nil);
-}
-
 
 typedef struct{
   f32 (* sdf1)(void * userdata, vec3 v);
@@ -348,6 +344,8 @@ typedef struct{
   void * userdata2;
   vec3 pt;
   bool collision_detected;
+  f32 greatest_common_overlap;
+  int iterations;
 }cdf_ctx;
 
 
@@ -382,6 +380,80 @@ void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
     }
   }
 }
+
+typedef struct{
+  f32 d, d2;
+  i32 i;
+}fi_pair;
+
+int sort_pairs(const fi_pair * a, const fi_pair * b){
+  return a->d > b->d ? 1 : -1;
+}
+
+void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
+  // minimize max(d(p), d2(p))
+  ctx->iterations += 1;
+  
+  if(size < ctx->threshold * 1.7){
+    var d = ctx->sdf1(ctx->userdata1, position);
+    var d2 = ctx->sdf2(ctx->userdata2, position);
+    var min_d = d - size * 1.73 * 0.5;
+    var min_d2 = d2 - size * 1.73 * 0.5;
+  
+
+    // collison detected
+    ctx->pt = position;
+    ctx->collision_detected = true;
+    ctx->greatest_common_overlap = MAX(min_d, min_d2);
+    printf("overlap detected %f\n",  ctx->greatest_common_overlap);
+    return;
+  }
+    
+    else{
+      f32 s2 = size * 0.5;
+      
+      fi_pair candidates[8] = {0};
+      f32 o[] = {-s2, s2};
+      for(int i = 0; i < 8; i++){
+        vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
+        
+        var p = vec3_add(offset, position);
+        var d = ctx->sdf1(ctx->userdata1, p);
+        var d2 = ctx->sdf2(ctx->userdata2, p);
+        var min_d = d ;
+        var min_d2 = d2;
+        candidates[i] = (fi_pair){
+          .d = MAX(min_d2, min_d),
+          .d2 = MIN(min_d2, min_d),
+          .i = i};
+        
+      }
+      qsort(candidates, 8, sizeof(fi_pair), (__compar_fn_t) sort_pairs);
+      for(int i = 0; i < 8; i++){
+        var d = candidates[i].d;
+        printf("%f ",d );
+      }
+      printf("\n");
+      for(int _i = 0; _i < 8; _i++){
+        int i = candidates[_i].i;
+        var d = candidates[i].d;
+        if(d - s2 * 1.73 * 0.25 > ctx->greatest_common_overlap){
+          printf("early out\n");
+          break;
+        }
+        
+        vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
+        printf("Finding: %i %f ", i, d);
+        vec3_print(offset);
+        printf("\n");
+        var p = vec3_add(offset, position);
+        sdf_detect_max_overlap(ctx, p, s2);
+      }      
+    }
+  printf("return\n");
+}
+
+
 static vec3 lv_vec3(lisp_value v){
   return vec3_new(
                   lisp_value_as_rational(car(v)),
@@ -390,20 +462,67 @@ static vec3 lv_vec3(lisp_value v){
                   
 }
 
+typedef enum{
+  SDF_TYPE_UNRECOGNIZED,
+  SDF_TYPE_SPHERE,
+  SDF_TYPE_AABB,
+  SDF_TYPE_TRANSFORM
+}sdf_type;
 
 typedef struct{
+  sdf_type type;
   vec3 pos;
   vec3 size;
+}SDF_AABB;
 
-}AABB;
+typedef struct{
+  sdf_type type;
+  vec3 pos;
+  f32 radius;
+}SDF_SPHERE;
 
+typedef struct {
+  sdf_type type;
+  mat4 inv_tform;
+  void * sub_model;
+
+}SDF_TRANSFORM;
+f32 generic_sdf(void * ud, vec3 p);
+
+f32 sphere_sdf(void * ud, vec3 p){
+  SDF_SPHERE * a = ud;
+  return vec3_len(vec3_sub(p, a->pos)) - a->radius;
+}
 
 f32 aabb_sdf(void * ud, vec3 p){
-  AABB * a = ud;
+  SDF_AABB * a = ud;
 
   p = vec3_sub(p, a->pos);
-  vec3 q = vec3_sub(vec3_abs(p), vec3_scale(a->size, 0.5));
+  vec3 q = vec3_sub(vec3_abs(p), vec3_scale(a->size, 1.0));
   return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x,MAX(q.y,q.z)),0.0);
+}
+
+f32 transform_sdf(void * ud, vec3 p){
+  SDF_TRANSFORM * a = ud;
+  p = mat4_mul_vec3(a->inv_tform, p);
+  return generic_sdf(a->sub_model, p);
+}
+
+
+f32 generic_sdf(void * ud, vec3 p){
+  sdf_type * tp = ud;
+  switch(tp[0]){
+  case SDF_TYPE_TRANSFORM:
+    return transform_sdf(ud, p);
+  case SDF_TYPE_AABB:
+    return aabb_sdf(ud, p);
+  case SDF_TYPE_SPHERE:
+    return sphere_sdf(ud, p);
+  default:
+  }
+  printf("Unrecognized SDF type\n");
+  return 1000000.0;
+
 }
 
 lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
@@ -417,17 +536,33 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
   obj2 = cdr(obj2);
   var o1 = car(obj1);
   var o2 = car(obj2);
-  AABB a = {.pos = p1, .size = vec3_new(0.5,0.5,0.5)};
-  AABB b = {.pos = p2, .size = vec3_new(0.5,1.5,0.5)};
-  cdf_ctx ctx = {
-    .sdf1 = aabb_sdf,
-    .sdf2 = aabb_sdf,
-    .userdata1 = &a,
-    .userdata2 = &b,
-    .threshold = 0.1
-  };
-  sdf_detect_collision(&ctx, p2, 10.0);
+  SDF_AABB a = {.type = SDF_TYPE_AABB, .pos = vec3_zero, .size = vec3_new(0.25, 05, 0.25)};
+  SDF_AABB b = {.type = SDF_TYPE_AABB, .pos = vec3_zero, .size = vec3_new(0.25,0.5,0.25)};
+  SDF_TRANSFORM a_t = {
+    .type = SDF_TYPE_TRANSFORM,
+    .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot1),
+                                         -p1.x, -p1.y, -p1.z ),
+    .sub_model = &a };
+  SDF_TRANSFORM b_t = {
+    .type = SDF_TYPE_TRANSFORM,
+    .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot2),
+                                         -p2.x,-p2.y,-p2.z ),
+    .sub_model = &b };
   
+  cdf_ctx ctx = {
+    .sdf1 = transform_sdf,
+    .sdf2 = transform_sdf,
+    .userdata1 = &a_t,
+    .userdata2 = &b_t,
+    .threshold = 0.01,
+    .greatest_common_overlap = 100.0
+  };
+  cdf_ctx ctx2 = ctx;
+  sdf_detect_collision(&ctx, p2, 10.0);
+  if(ctx.collision_detected){
+    sdf_detect_max_overlap(&ctx2, p2, 10.0);
+    printf("Overlap: %f\n", ctx2.greatest_common_overlap);
+  }
   return ctx.collision_detected ? t : nil;
 }
 
@@ -445,8 +580,8 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2){
   //println(floor_tile); printf("<<<\n");
   var size = vec3_new(lisp_value_as_rational(car(s1l)), 10.0, lisp_value_as_rational(cadr(s1l)));
   //vec3_print(size);printf("\n");
-  AABB a = {.pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
-  AABB b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
+  SDF_AABB a = {.pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
+  SDF_AABB b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
   cdf_ctx ctx = {
     .sdf1 = aabb_sdf,
     .sdf2 = aabb_sdf,
@@ -454,8 +589,60 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2){
     .userdata2 = &b,
     .threshold = 0.1
   };
-  
+
   sdf_detect_collision(&ctx, p2, 10.0);
   
   return ctx.collision_detected ? t : nil;
+}
+
+
+void test_sdf_col(){
+  
+  SDF_SPHERE s1 = {.pos = vec3_new(-0.1, -0.1, 0), .radius = 1.0 };
+  SDF_SPHERE s2= {.pos = vec3_new(1.599, 0, 0), .radius = 1.0 };
+  cdf_ctx ctx = {
+    .sdf1 = sphere_sdf,
+    .sdf2 = sphere_sdf,
+    .userdata1 = &s1,
+    .userdata2 = &s2,
+    .threshold = 0.01,
+    .greatest_common_overlap = 10.0
+  };
+  sdf_detect_max_overlap(&ctx, vec3_new(2,2,2), 10.0);
+  var truth = vec3_len(vec3_sub(s1.pos, s2.pos)) - s1.radius  - s2.radius;
+  
+  
+  printf("MAx overlap: %f == %f %i? \n", ctx.greatest_common_overlap, truth, ctx.iterations);
+  if(ctx.greatest_common_overlap > 0.0){
+    return;
+  }
+  //return;
+  
+  {
+  SDF_AABB a = {.pos = vec3_new(0, 0, 0), .size = vec3_new(0.5,0.5,0.5)};
+  SDF_AABB b = {.pos = vec3_new(0.9, 0, 0.), .size = vec3_new(0.5, 0.5, 0.5)};
+  cdf_ctx ctx = {
+    .sdf1 = aabb_sdf,
+    .sdf2 = aabb_sdf,
+    .userdata1 = &a,
+    .userdata2 = &b,
+    .threshold = 0.01,
+    .greatest_common_overlap = 10
+  };
+  sdf_detect_max_overlap(&ctx, vec3_new(0,0,0), 10.0);
+  var truth = vec3_len(vec3_sub(s1.pos, s2.pos)) - s1.radius  - s2.radius;
+
+  
+  printf("MAx overlap: %f == %f %i? \n", ctx.greatest_common_overlap, truth, ctx.iterations);
+
+  }
+  
+}
+
+
+
+
+void test_sdf(){
+  test_sdf_col();
+  //sdf_poly(nil);
 }

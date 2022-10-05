@@ -55,6 +55,7 @@ typedef enum {
               LISP_OR,
               LISP_GET_SCOPE,
               LISP_GET_SCOPE_UNSAFE,
+              LISP_REF,
 
               // added for optimization
               LISP_CAR,

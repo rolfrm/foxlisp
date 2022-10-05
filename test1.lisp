@@ -463,10 +463,9 @@
   (println (test1-lib-test))
   (lisp:collect-garbage)
   (println (test1-lib-test))
-  
+  (print (deref-pointer (ref!! a)))
   )
 (println (test1-lib-test))
 
 
 (println "Tests Passed")
-

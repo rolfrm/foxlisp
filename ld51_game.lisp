@@ -145,8 +145,6 @@
                      (object-1 object-1 o14-table)
                      (o22-bush o22-bush)
                      (o23-huge-baby)
-                     (o9-wall o9-wall)
-                     (o10-wall o10-wall)
                      ))
 
 (defvar goal-objects (pop! goals-list));'(object-1 object-2 object-3))
@@ -199,6 +197,7 @@
     (let ((col nil))
       (for-each drop-point-loc drop-points
                 (when (foxgl:detect-collision drop-point-loc player-object)
+                  
                   (println (list 'collision drop-point-loc))
                   (set! col drop-point-loc)
                   ))
@@ -329,6 +328,9 @@
                   (when (eq (caddr x) foxgl:key-g)
                     (restart-game)
                     )
+                  (when (eq (caddr x) foxgl:key-i)
+                    (set! game-state :test)
+                    )
                   )
                 (when (eq (car x) 'key-up)
                   (when (eq (caddr x) foxgl:key-w)
@@ -368,7 +370,7 @@
       (/ (abs (- x 97.5)) 2.5)))
 
 (defvar ninja-leg
-  '(leg
+  '(bake ;leg
     (rotate (-0.0 0 0)
      (translate (0 0 0)
       
@@ -396,7 +398,7 @@
        ))))
 
 (defvar ninja-arm
-  '(arm
+  '(bake ;arm
     (rotate (-0.0 0 0)
      (translate (0 0 0)
       
@@ -445,9 +447,10 @@
      (translate (0 1.4 0.05)
       (rotate ((bind player-body-rot) 0 0)
        
-      (scale (0.5 0.3 0.2)
+       (bake
+        (scale (0.5 0.3 0.2)
        (ref cube-2) ;; lower-body
-       )
+       ))
       
       (translate (0 0.3 0)
        (rotate ((bind player-body-rot) 0 0)
@@ -547,7 +550,7 @@
          ))))))
 
 (defvar object-3
-    '(rgb (0.6 0.4 0.2)
+    '(bake (rgb (0.6 0.4 0.2)
       (translate (0 1.4 0)
        (scale 1.3
        (scale (1.3 2.5 0.1)
@@ -560,10 +563,10 @@
 
        ;)
 
-      ))
+      )))
 
 (defvar object-4-sofa
-  '(rgb (0.7 0.5 0.3)
+  '(bake (rgb (0.7 0.5 0.3)
     (translate (0 0.5 -1)
      (scale (1 1 0.2)
       (ref cube-2)))
@@ -610,25 +613,25 @@
         (scale (1 0.45 0.45)
          (ref cube-2)
          )))))
-    ))
+    )))
 
 (defvar object-5
-  '(rgb (0.75 0.5 0.3)
+  '(bake (rgb (0.75 0.5 0.3)
     (translate (0 1 0)
      (scale (1 5 1)
-      (ref cube-2)))))
+      (ref cube-2))))))
 
 (defvar object-6
-  '(rgb (1 0.5 0.5)
+  '(bake (rgb (1 0.5 0.5)
     (translate (0 1 0)
      (scale (2 2 1)
-      (ref cube-2)))))
+      (ref cube-2))))))
 
 (defvar object-7
   '(rgb (0.5 1.0 0.5)
     (translate (0.25 0.5 0.25)
      (scale (0.5 2 0.5)
-w      (ref cube-2)))))
+      (ref cube-2)))))
 
 (defvar o8-picture
   '(bake (translate (0 2 0)
@@ -663,31 +666,32 @@ w      (ref cube-2)))))
      ))))))))
 
 (defvar o9-wall
-  '(translate (0 0 0)
+  '(bake
+    (translate (0 0 0)
     (rgb (0.6 0.5 0.3)
      (scale (10 4 0.1)
       (translate (0.5 0 0)
-       (ref upcube))))))
+       (ref upcube)))))))
 (defvar o18-wall
-  '(translate (0 0 0)
+  '(bake (translate (0 0 0)
     (rgb (0.6 0.5 0.3)
      (scale (9 4 0.1)
       (translate (0.5 0 0)
-       (ref upcube))))))
+       (ref upcube)))))))
 
 (defvar o10-wall
-  '(translate (0 0 0)
+  '(bake(translate (0 0 0)
     (rgb (0.6 0.5 0.3)
      (scale (4 4 0.1)
       (translate (0.5 0 0)
-       (ref upcube))))))
+       (ref upcube)))))))
 
 (defvar o11-wall
-  '(translate (0 0 0)
+  '(bake (translate (0 0 0)
     (rgb (0.6 0.5 0.3)
      (scale (1 4 0.1)
       (translate (0.5 0 0)
-       (ref upcube))))))
+       (ref upcube)))))))
 
 (defvar o12-picture
   '(bake
@@ -716,7 +720,9 @@ w      (ref cube-2)))))
         ))))))))))
 
 (defvar o13-cup
-  '(translate (0 0.25 0)
+  '(bake
+    (aabb (0.25 0.25 0.25))
+    (translate (0 0.25 0)
   (scale 0.25 (rgb (0.9 0.9 0.9)
     
     (for i (0 1 2 3)
@@ -742,7 +748,7 @@ w      (ref cube-2)))))
      (scale (1 0.5 1)
      (ref cube-2)
      )
-    ))))))
+    )))))))
 
 (defvar o14-table
   '(rgb (0.7 0.4 0.2)
@@ -831,12 +837,13 @@ w      (ref cube-2)))))
        ))
      )
     ))))
-(
+
 (defvar o16-dog
   `(rgb (0.4 0.4 0.4)
     (scale 0.4
      (translate (0 2.2 0)
-     (body
+      (body
+       (bake
        (translate (-0.2 -1 0)
         (rotate (0 0 -0.5)
         (scale (1 2 1)
@@ -846,13 +853,14 @@ w      (ref cube-2)))))
          (ref cube-2)))
        (translate (0.1 -1 -0.5)
         (scale (0.4 1.5 0.2)
-         (ref cube-2)))
+         (ref cube-2))))
        (translate (-0.8 -1.5 -0.0)
         (rotate ((bind (* 0.5 (sin (* 8.0 real-time)))) 0 0)
          (rotate (0 0.0 0.7)
          (scale (0.4 1.5 0.2)
           
           (ref upcube)))))
+       (bake
        (let ((foot 
                '(translate (1.0 -1 0.5)
                  (translate (0 0 -0.5)
@@ -866,14 +874,15 @@ w      (ref cube-2)))))
          (bind foot)
          (translate (0 0 0.5)
                     (bind foot)))
-         )
+         ))
       
 
        )
 
       (head
        (rotate ((bind (* 0.2 (sin real-time))) 0 0)
-       (rotate (0.0 0 0.2)
+
+        (bake (rotate (0.0 0 0.2)
       (translate (0 0.1 0)
        (scale (1 0.7 1.0)
         (ref cube-2)))
@@ -914,13 +923,14 @@ w      (ref cube-2)))))
        
         (ref cube-2)))
 
-      ))))))))
+      )))))))))
 (defvar o17-tv
   `(rgb (0.4 0.4 0.4)
     (translate (0 0.8 0)
      (scale 0.9 
      (skew (11 -0.5)
-      (ref cube-2))
+      (bake(ref cube-2)))
+      (bake
      (translate (0 -0.25 0)
       (ref cube-2))
      
@@ -928,7 +938,7 @@ w      (ref cube-2)))))
       (translate (0 0 0.67)
        (scale (1 1 0.05)
         (ref cube-2)))
-      )
+      ))
      (rgb (0.5 0.4 0.4)
       (translate (0 (bind (* 0.45 (sin (* 3 (math:round (* 10.0 real-time)))))) 0.69)
        (scale (1 0.2 0.05)
@@ -1014,7 +1024,8 @@ w      (ref cube-2)))))
   '(rotate (-1.5 0 0)
     (ref o19-human)))
 (defvar o21-bed
-    '(rgb (0.7 0.4 0.2)
+  '
+  (bake(rgb (0.7 0.4 0.2)
       (translate (-0.5 0 -1)
       (translate (0 0.3 0)
      (scale (1 0.4 2)
@@ -1036,9 +1047,10 @@ w      (ref cube-2)))))
                  (scale (-1 1 1)
                  (bind leg)))
 
-      ))))
+      )))))
 (defvar o22-bush
-  '(rgb (0.3 0.7 0.3)
+  '(bake
+    (rgb (0.3 0.7 0.3)
     (rgb (0.4 0.3 0.2)
      (scale (2 0.1 2)
      (ref upcube)
@@ -1053,7 +1065,7 @@ w      (ref cube-2)))))
      (scale (1 4 1)
       (ref upcube))
      )
-    ))
+    )))
 (defvar o23-huge-baby
   '(scale 4
     (ref o15-baby)

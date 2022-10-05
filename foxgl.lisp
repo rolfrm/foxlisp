@@ -647,6 +647,8 @@
 (define foxgl:key-s 83)
 (define foxgl:key-d 68)
 (define foxgl:key-g 71)
+
+(define foxgl:key-i 73)
 (define foxgl:key-space 32)
 (define foxgl:mappings '((up 264)
                          (down 265)))

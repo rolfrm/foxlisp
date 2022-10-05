@@ -220,9 +220,30 @@ bool lisp_scope_try_get_value2(lisp_scope * scope, i64 sym, lisp_scope ** out, i
   }
   scope = scope->super;
   goto start;
-  return false;
-    
+  return false;  
 }
+
+lisp_value * lisp_scope_pointer(lisp_scope * scope, i64 sym){
+  int index = 0;
+ start:
+  if(scope == NULL) return NULL;
+  if(scope->lookup != NULL){
+    var argcnt = scope->argcnt;
+    for(size_t i = 0; i < argcnt; i++){
+      var v = lisp_value_symbol(scope->lookup[i].car);
+      if(v == 0) break;
+      if(v == sym)
+        return &scope->lookup[i].cdr;
+    }
+  }
+  if(scope->values != NULL && ht_get(scope->values_index, &sym, &index)){
+    return &scope->values[index];
+  }
+  scope = scope->super;
+  goto start;
+  return NULL;;
+}
+
 
 
 lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value){
@@ -914,6 +935,41 @@ lisp_value lisp_eval_get_scope(lisp_scope * scope){
  return (lisp_value){.scope = lisp_scope_unstack(scope), .type = LISP_SCOPE}; 
 }
 
+lisp_value lisp_eval_ref(lisp_scope * scope, lisp_value sym){
+  var t = lisp_value_type(sym);
+  lisp_value * ptr;
+  if(t == LISP_LOCAL_INDEX){
+     while(sym.local_index.scope_level > 0){
+      scope = scope->super;
+      if(scope == NULL){
+        raise_string("Invalid l-value optimization");
+        return nil;
+      }
+      ASSERT(scope != NULL);
+      sym.local_index.scope_level -= 1;
+    }
+    if(sym.local_index.scope_type == 0){
+      cons * v = scope->lookup + sym.local_index.scope_index;
+      ptr = &v->cdr;
+    }else{
+      lisp_value * v = scope->values + sym.local_index.scope_index;
+      ptr = v;
+    }
+    
+  } 
+  else if(t == LISP_GLOBAL_INDEX){
+    ptr = &current_context->globals->values[sym.integer];
+  }else{
+    TYPE_ASSERT(sym, LISP_SYMBOL);
+    ptr = lisp_scope_pointer(scope, sym.integer);
+  }
+  if(ptr == NULL) return nil;
+  lisp_value v = {.type = LISP_NATIVE_POINTER_TO_VALUE, .pointer = ptr};
+  return v;
+    
+}
+
+
 lisp_value lisp_eval_get_scope_unsafe(lisp_scope * scope){
   return (lisp_value){.scope = scope, .type = LISP_SCOPE};
 }
@@ -1394,6 +1450,9 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
           return lisp_eval_or(scope, cdr(value));
         case LISP_GET_SCOPE:
           return lisp_eval_get_scope(scope);
+        case LISP_REF:
+          return lisp_eval_ref(scope, cadr(value));
+            
         case LISP_GET_SCOPE_UNSAFE:
           return lisp_eval_get_scope_unsafe(scope);
         case LISP_CAR:
@@ -2748,6 +2807,7 @@ lisp_context * lisp_context_new(){
   lisp_register_macro("with-exception-handler", LISP_WITH_EXCEPTION_HANDLER);
   lisp_register_macro("lisp:get-current-scope", LISP_GET_SCOPE);
   lisp_register_macro("lisp:get-current-scope!!", LISP_GET_SCOPE_UNSAFE);
+  lisp_register_macro("ref!!", LISP_REF);
 
   lisp_register_macro("car", LISP_CAR);
   lisp_register_macro("cdr", LISP_CDR);
@@ -2776,8 +2836,11 @@ lisp_context * lisp_context_new(){
 #endif
 
   // keeping track of debug information
-  read_cons_offset = nil;//lisp_make_hashtable_weak_keys();
-  read_cons_file = nil;//lisp_make_hashtable_weak_keys();
+  // to optimize: insert nil here instead.
+  read_cons_offset = lisp_make_hashtable_weak_keys();
+  read_cons_file = lisp_make_hashtable_weak_keys();
+
+
   
   lisp_register_value("lisp:++cons-file-offset++", read_cons_offset);
   lisp_register_value("lisp:++cons-file-offset2++", lisp_pointer_to_lisp_value(&read_cons_offset));
