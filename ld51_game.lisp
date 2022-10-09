@@ -252,20 +252,33 @@
     collider
     ))
 
+
+
 (defvar game-update
-  (let ((mx nil) (my nil))
+  (let ((mx nil) (my nil)
+        (last-timestamp nil)
+        (dt 1.0)
+        )
     
     (lambda (events)
+      (when last-timestamp
+
+        (set! dt (math:sqrt (/ (- (foxgl:timestampf) last-timestamp)
+                    0.0166
+                    )))
+        )
+      (set! last-timestamp (foxgl:timestampf))
+      
       (when (and (eq game-state :running) (> (foxgl:timestampf) timer-end))
         (set! game-state :game-over))
       (when (and (eq game-state :running) (not goal-objects))
         (set! game-state :game-win))
       
-      (incf ang (* 0.1 turn))
-      (incf player-move (* 0.1 move-forward))
+      (incf ang (* 0.1 dt turn))
+      (incf player-move (* 0.1 dt move-forward))
       (let ((angle ang))
-        (let ((nx (+ player-x (* -0.1 move-forward (sin angle))))
-              (ny (+ player-y (* 0.1 move-forward (cos angle))))
+        (let ((nx (+ player-x (* -0.1 dt move-forward (sin angle))))
+              (ny (+ player-y (* 0.1 dt move-forward (cos angle))))
               (fc1 (player-floor-collision nx ny))
               (fc2 (player-floor-collision player-x player-y))
               )
@@ -282,7 +295,7 @@
       
       (when pick-anim
         (set! player-body-rot (- 1 (abs (- pick-anim 1.0))))
-        (incf pick-anim 0.05)
+        (incf pick-anim (* dt 0.05))
         (when (and (not pick-state) (> pick-anim 1.0))
           (set! pick-state t)
           (let ((angle ang))
@@ -332,7 +345,7 @@
         ))
         
         
-      (incf real-time 0.016)
+      (incf real-time (* dt 0.016))
       (for-each x events
                 (unless (eq (car x) 'frame)
                   (println x))
@@ -687,7 +700,10 @@
       (ref cube-2)))))
 
 (defvar o8-picture
-  '(bake (translate (0 2 0)
+  '(bake
+    (aabb 1 1 0.1)
+    (translate (0 2 0)
+          
   (rgb (0.7 0.3 0.3)
     (for r (0 1 2 3)
      (rotate (0 0 (bind (* 0.5 r pi)))
@@ -720,11 +736,14 @@
 
 (defvar o9-wall
   '(bake
+    (translate (5 0 0)
+     (aabb 5 2 0.1))
     (translate (0 0 0)
     (rgb (0.6 0.5 0.3)
      (scale (10 4 0.1)
       (translate (0.5 0 0)
        (ref upcube)))))))
+
 (defvar o18-wall
   '(bake (translate (0 0 0)
     (rgb (0.6 0.5 0.3)
@@ -733,14 +752,20 @@
        (ref upcube)))))))
 
 (defvar o10-wall
-  '(bake(translate (0 0 0)
+  '(bake
+    (translate (2 0 0)
+     (aabb 2 2 0.1))
+    (translate (0 0 0)
     (rgb (0.6 0.5 0.3)
      (scale (4 4 0.1)
       (translate (0.5 0 0)
        (ref upcube)))))))
 
 (defvar o11-wall
-  '(bake (translate (0 0 0)
+  '(bake
+    (translate (0.5 0 2)
+     (aabb 0.5 2 0.1))
+    (translate (0 0 0)
     (rgb (0.6 0.5 0.3)
      (scale (1 4 0.1)
       (translate (0.5 0 0)
@@ -748,6 +773,7 @@
 
 (defvar o12-picture
   '(bake
+    (aabb 1 1 0.1)
     (translate (0 2 0)
     (scale 1.1
   (rgb (0.4 0.4 0.7)
@@ -1096,8 +1122,9 @@
       (rgb (0.9 0.9 0.9)
        (ref cube-model)))
      )
-    (let ((leg '(scale (0.1 1 0.1)
-                 (ref cube-model))))
+          (let ((leg '(scale (0.12 1 0.12)
+                       (translate (-0.01 0 -0.01)
+                        (ref cube-model)))))
       (translate (0 0 0)
                  
                  (bind leg))
@@ -1220,13 +1247,11 @@
             (scale (0.05 1.0 0.1)
              (ref cube-2)
              ))))
-
-
          ))
        
        
        (translate (0 -1  (bind (+ -10 zoom)))
-        (rotate (0.7 0 0)
+        (rotate (0.8 0 0)
          (translate ((bind (* -1.0 player-x)) 0 (bind (* -1.0 player-y)))
           (rgb (0 0 0.1)
            (scale (100 1 100)
