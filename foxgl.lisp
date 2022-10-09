@@ -568,6 +568,211 @@
     (plist-rest (cdr model) foxgl:render-model2))  
   )
 
+(defun foxgl:build-sub-models (model)
+  (plist-rest model foxgl:build-physics))
+
+(defvar physics-out '())
+
+(defmacro foxgl:build-physics0(model)
+  `(let ((cscope foxgl:current-scope))
+    (set! foxgl:current-scope (lisp:get-current-scope))
+    (foxgl:build-physics ,model)
+    (set! foxgl:current-scope cscope)
+    (swap physics-out nil)
+    ))
+
+(defun clone-mat4(mat)
+  (math:* (mat4-identity) mat))
+
+(defun foxgl:build-physics (model)
+  (case (car model)
+    (aabb
+     (push! physics-out (cons (clone-mat4 foxgl:current-transform) model))
+     )
+    (sphere
+     (push! physics-out (cons (clone-mat4 foxgl:current-transform) model))
+     )
+    (capsule
+     (push! physics-out (cons (clone-mat4 foxgl:current-transform) model))
+     )
+    (rgb )
+    (color )
+    (measure-model )
+    (ref (foxgl:build-physics (symbol-value  (unbind (cadr model)))))
+    (bind (foxgl:build-physics (eval (cadr model) foxgl:current-scope)))
+    (for
+     (let* ((var (cadr model))
+            (evalues (or (unbind (caddr model)) nil))
+            (rest (cdddr model))
+            (prev-scope foxgl:current-scope))
+       (lisp:with-scope-variable prev-scope (lisp:get-current-scope!!) '(evalues rest var) var
+          '(
+            (set! foxgl:current-scope (lisp:get-current-scope!!))
+            (loop evalues
+                 (lisp:scope-set! foxgl:current-scope var (unbind (car evalues)))
+                 (foxgl:build-sub-models rest)
+                 (set! evalues (cdr evalues)))
+            ))
+       (set! foxgl:current-scope prev-scope)
+       (set! model nil)
+       ))
+    
+    (let
+        (let ((vars (cadr model))
+              (body (cddr model))
+              (prev-scope foxgl:current-scope))
+          (lisp:with-scope-binding prev-scope (lisp:get-current-scope) '(body) vars
+                                   '((set! foxgl:current-scope (lisp:get-current-scope))
+                                     
+                                     (foxgl:build-sub-models body)
+
+                   ))
+      
+      
+      (set! model nil)
+      (set! foxgl:current-scope prev-scope)))
+          
+    (view
+     (let ((prev-transform foxgl:current-transform))
+       (match p (unbind (plookup (cdr model) :perspective))
+              (let ((fov (unbind (car p)))
+                    (aspect (unbind (cadr p)))
+                    (near (caddr p))
+                    (far (cadddr p))
+                    (prev-tform foxgl:current-transform))
+                (set! foxgl:current-transform (mat4:perspective fov aspect near far))
+                ))
+       (match p (plookup (cdr model) :orthographic)
+              (let ((w (unbind (car p)))
+                    (h (unbind (cadr p)))
+                    (z (unbind (caddr p)))
+                    (prev-tform foxgl:current-transform))
+                (set! foxgl:current-transform (mat4:orthographic w h z))
+                ))
+       (foxgl:build-sub-models (cdr model))
+       (set! model nil)
+       (set! foxgl:current-transform prev-transform)
+       ))
+    (rotate
+     (let ((prev-tform foxgl:current-transform)
+           (new-transform (get-matrix))
+           (rot (unbind (cadr model))))
+       (math:*! new-transform new-transform foxgl:current-transform)
+       (if (cons? rot)
+           (math:rotate!  new-transform
+                          (unbind (car rot))
+                          (or (unbind (cadr rot)) 0.0)
+                          (or (unbind (caddr rot)) 0.0))
+           (math:rotate!  new-transform
+                          0.0
+                          0.0
+                          (unbind rot))
+           )
+       (set! foxgl:current-transform new-transform)
+       (foxgl:build-sub-models (cddr model))
+       (set! model nil)
+       (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
+       ))
+    (translate
+     (let ((prev-tform foxgl:current-transform)
+           (new-transform (get-matrix))
+           (rot (unbind (cadr model))))
+       (math:*! new-transform new-transform foxgl:current-transform)
+       (math:translate! new-transform
+                         (unbind (car rot))
+                         (or (unbind (cadr rot)) 0.0)
+                         (or (unbind (caddr rot)) 0.0))
+       
+       (set! foxgl:current-transform new-transform)
+       (foxgl:build-sub-models (cddr model))
+       (set! foxgl:current-transform prev-tform)
+       (set! model nil)
+       (release-matrix new-transform)
+       ))
+    (scale
+     (let ((prev-tform foxgl:current-transform)
+           (new-transform (get-matrix))
+           (rot (unbind (cadr model))))
+       (math:*! new-transform new-transform foxgl:current-transform)
+       (if (list? rot)
+           (math:scale! new-transform
+                        (unbind (car rot))
+                        (or (unbind (cadr rot)) 1.0)
+                        (or (unbind (caddr rot)) 1.0))
+           (math:scale! new-transform
+                        rot rot rot))
+           
+       
+       (set! foxgl:current-transform new-transform)
+       (foxgl:build-sub-models (cddr model))
+       (set! model nil)
+       (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
+       )) 
+    
+    (skew
+     (let ((prev-tform foxgl:current-transform)
+           (new-transform (get-matrix))
+           (skew (unbind (cadr model))))
+       (math:*! new-transform new-transform foxgl:current-transform)
+       (math:skew! new-transform skew)
+       ;(println skew)
+       
+       (set! foxgl:current-transform new-transform)
+       (foxgl:build-sub-models (cddr model))
+       (set! model nil)
+       (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
+       ))
+    (transform
+     (let ((prev-tform foxgl:current-transform)
+           (new-transform (get-matrix)))
+       (when foxgl:current-transform
+         (math:*! new-transform new-transform foxgl:current-transform))
+       
+       (match tlate (unbind (plookup (cdr model) ':translate))
+              (math:translate! new-transform
+                               (unbind (car tlate))
+                               (unbind (cadr tlate))
+                               (or (unbind (caddr tlate)) 0.0)
+                               ))
+       
+       
+       (match scale (unbind (plookup (cdr model) ':scale))
+              (math:scale! new-transform 
+                           (car scale) (cadr scale) (or (caddr scale) 1.0)))
+       
+       (match rotation (unbind (plookup (cdr model) ':rotate))
+              
+              (math:rotate!  new-transform
+                             (unbind (car rotation))
+                             (or (unbind (cadr rotation)) 0.0)
+                             (or (unbind (caddr rotation)) 0.0)))
+       (set! foxgl:current-transform new-transform)
+       (foxgl:build-sub-models (cdr model))
+       (set! model nil)
+       (set! foxgl:current-transform prev-tform)
+       (release-matrix new-transform)
+       ))
+    (render-callback )
+    (unit-square )
+    (print-model)
+    (blend )
+    (depth )
+    (text )
+    (flat)
+    (line )
+    (point )
+    (sdf)
+    (bake)
+    (polygon)
+    (hidden
+     (set! model nil)))
+  (when model
+    (plist-rest (cdr model) foxgl:build-physics))  
+  )
+
 (let ((m1 (mat4-translation 4 0 0))
       (m2 (mat4-translation 3 2 1)))
   (mat4:print m1)

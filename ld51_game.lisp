@@ -165,26 +165,54 @@
   (set! move-forward 0)
   )
 (restart-game)
+(defvar empty-cons (cons nil nil))
+(defvar physics-models (make-hashtable))
+(defun get-physics-model-name (name)
+  (let ((content (symbol-value name)))
+    (let ((r (hashtable-ref physics-models content)))
+      (unless r
+        (set! r (or (foxgl:build-physics0 content) 0))
+        (println (list name r content))
+        
+        (hashtable-set! physics-models content r)
+        )
+      r
+  
+      )))
+  
 
 (defun player-collision (px py)
   
-  (let ((player-object `((,px 0 ,py) ,ang player)))
-    (let ((col nil))
+  (let ((player-object `((,px 0 ,py) ,ang model-player)))
+    (let ((col nil)
+          (outcons (cons nil nil))
+          )
       (for-each i level-objects
-                (when (foxgl:detect-collision i player-object)
-                  (println (list 'collision i))
+                (when (foxgl:detect-collision
+                       i player-object
+                       (get-physics-model-name (caddr i))
+                       (get-physics-model-name (caddr player-object))
+                       outcons
+                       )
+                  (println (list 'collision i outcons))
                   (set! col i)
                   ))
       col)))
 
 (defun player-collision-goal-objects (px py)
   
-  (let ((player-object `((,px 0 ,py) ,ang player)))
-    (let ((col nil))
+  (let ((player-object `((,px 0 ,py) ,ang model-player)))
+    (let ((col nil)
+          (outcons (cons nil nil)))
       (for-each i level-objects
                 (when (find (caddr i) goal-objects)
                   (println (cons 'found i))
-                  (when (foxgl:detect-collision i player-object)
+                  (when (foxgl:detect-collision
+                         i player-object
+                         (get-physics-model-name (caddr i))
+                         (get-physics-model-name (caddr player-object))
+                         outcons
+                         )
                     (println (cons 'grab i))
                     (set! col i)
                   )))
@@ -194,11 +222,19 @@
 (defun drop-point-collision(px py)
   (let ((player-object `((,px 0 ,py) ,ang player)))
     
-    (let ((col nil))
+    (let ((col nil)
+          (colpt (cons nil nil)))
       (for-each drop-point-loc drop-points
-                (when (foxgl:detect-collision drop-point-loc player-object)
+                (when
+                    (foxgl:detect-collision
+                     drop-point-loc player-object
+                     (get-physics-model-name (caddr drop-point-loc))
+                     (get-physics-model-name (caddr player-object))
+                                                
+                     
+                     colpt)
                   
-                  (println (list 'collision drop-point-loc))
+                  (println (list 'collision drop-point-loc colpt))
                   (set! col drop-point-loc)
                   ))
       col)))
@@ -213,14 +249,11 @@
     
     collider
     ))
-  
+
 (defvar game-update
   (let ((mx nil) (my nil))
     
     (lambda (events)
-      ;(println (- (foxgl:timestampf) timer-start))
-      ;(player-collision)
-                                        ;(println (cons player-x player-y))
       (when (and (eq game-state :running) (> (foxgl:timestampf) timer-end))
         (set! game-state :game-over))
       (when (and (eq game-state :running) (not goal-objects))
@@ -369,6 +402,12 @@
       1.0
       (/ (abs (- x 97.5)) 2.5)))
 
+(defvar aabb-tile
+  '(rgb (1 0 0)
+    (translate (-1 0.1 -1)
+     (scale (2 1 2)
+      (ref tile-model)))))
+
 (defvar ninja-leg
   '(bake ;leg
     (rotate (-0.0 0 0)
@@ -428,6 +467,7 @@
 (defvar ninja-color '(0.2 0.2 0.2))
 (defvar model-player
   '(ninja
+    (capsule 1.0 0.25)
     (blend
     (rgb (0 0 0 0.2)
      (scale (0.45 1 0.45)
@@ -523,6 +563,7 @@
 
 (defvar object-2 ;; flower
   '(bake
+    (sphere 0.3)
     (rgb (0.8 0.5 0.4)
       (translate (0 0.0 0)
        (scale (0.5 0.3 0.5)
@@ -550,7 +591,10 @@
          ))))))
 
 (defvar object-3
-    '(bake (rgb (0.6 0.4 0.2)
+  '(bake
+    (aabb 1.3 2.5 0.1)
+
+    (rgb (0.6 0.4 0.2)
       (translate (0 1.4 0)
        (scale 1.3
        (scale (1.3 2.5 0.1)
@@ -566,8 +610,15 @@
       )))
 
 (defvar object-4-sofa
-  '(bake (rgb (0.7 0.5 0.3)
-    (translate (0 0.5 -1)
+  '(sofa
+    (translate (-0.1 0.0 0)
+     (scale (0.6 1.0 1.2)
+      (aabb 1.0 1.0 1.0)
+      ;(ref aabb-tile)
+     ))
+     
+    (rgb (0.7 0.5 0.3)
+     (translate (0 0.5 -1)
      (scale (1 1 0.2)
       (ref cube-2)))
 
@@ -721,7 +772,7 @@
 
 (defvar o13-cup
   '(bake
-    (aabb (0.25 0.25 0.25))
+    (aabb 0.2 0.1 0.2)
     (translate (0 0.25 0)
   (scale 0.25 (rgb (0.9 0.9 0.9)
     
@@ -752,6 +803,8 @@
 
 (defvar o14-table
   '(rgb (0.7 0.4 0.2)
+    (translate (1.5 0 0.76)
+     (aabb 1.5 0.5 0.75))
     (translate (0 1 0)
      (scale (3 0.1 1.5)
       (ref cube-model))
@@ -840,6 +893,7 @@
 
 (defvar o16-dog
   `(rgb (0.4 0.4 0.4)
+    (aabb 0.25 1.0 0.25)
     (scale 0.4
      (translate (0 2.2 0)
       (body
@@ -926,6 +980,7 @@
       )))))))))
 (defvar o17-tv
   `(rgb (0.4 0.4 0.4)
+    (aabb 0.5 0.5 0.5)
     (translate (0 0.8 0)
      (scale 0.9 
      (skew (11 -0.5)
@@ -954,6 +1009,8 @@
 (defvar color-flannel '(0.9 0.5 0.2))
 (defvar o19-human
   '(translate (0.0 1.0 0)
+    (translate (0.0 0.2 0.0)
+     (aabb 0.3 1 0.3))
     (rgb (bind color-skin)
     (let ((leg '(leg
        (rotate (-0.0 0 0)
@@ -1025,9 +1082,14 @@
     (ref o19-human)))
 (defvar o21-bed
   '
-  (bake(rgb (0.7 0.4 0.2)
+  (bake
+   
+   (rgb (0.7 0.4 0.2)
+        (aabb 0.5 0.4 1)
+
       (translate (-0.5 0 -1)
-      (translate (0 0.3 0)
+                 
+          (translate (0 0.3 0)
      (scale (1 0.4 2)
       (rgb (0.9 0.9 0.9)
        (ref cube-model)))
@@ -1051,7 +1113,9 @@
 (defvar o22-bush
   '(bake
     (rgb (0.3 0.7 0.3)
-    (rgb (0.4 0.3 0.2)
+     (rgb (0.4 0.3 0.2)
+      (translate (0 0 0.5)
+       (aabb 1 1 0.5))
      (scale (2 0.1 2)
      (ref upcube)
       ))

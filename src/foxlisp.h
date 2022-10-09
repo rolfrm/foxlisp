@@ -405,6 +405,8 @@ lisp_value lisp_read_string(const char * str);
 #define cddddddr(x) cdr(cdddddr(x))
 #define cdddddddr(x) cdr(cddddddr(x))
 
+#define caar(x) car(car(x))
+#define cdar(x) cdr(car(x))
 #define caddr(x) car(cddr(x))
 #define cadddr(x) car(cdddr(x))
 #define caddddr(x) car(cddddr(x))

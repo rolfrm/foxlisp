@@ -857,7 +857,7 @@ void foxgl_register(){
   lrn("foxgl:blit-mode", 1, blit_set_mode);
   lrn("foxgl:sdf-poly", 1, sdf_poly);
   lrn("foxgl:bake", 2, foxgl_bake_polygons);
-  lrn("foxgl:detect-collision", 2, foxgl_detect_collision);
+  lrn("foxgl:detect-collision", 5, foxgl_detect_collision);
   lrn("foxgl:detect-collision-floor", 2, foxgl_detect_collision_floor);
   tcp_register();
   foxal_register();

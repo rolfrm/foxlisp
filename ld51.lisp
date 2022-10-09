@@ -99,7 +99,7 @@
               (update)
               )
           (lambda (x)
-            ;(lisp:print-stack-trace)
+            (lisp:print-stack-trace)
             (println x)
             (thread:sleep 0.1)
       

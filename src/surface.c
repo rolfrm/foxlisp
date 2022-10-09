@@ -348,6 +348,7 @@ typedef struct{
   int iterations;
 }cdf_ctx;
 
+const float sqrt_3 = 1.73205; 
 
 void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
   if(ctx->collision_detected) return;
@@ -355,16 +356,13 @@ void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
   var d2 = ctx->sdf2(ctx->userdata2, position);
   //vec3_print(position);
   //printf("%f %f %f\n", d, d2, size);
-  if(d < size * 1.8 && d2 < size * 1.8 ){
+  if(d < size * sqrt_3 && d2 < size * sqrt_3 ){
     f32 s2 = size * 0.5;
     
-    if(size < ctx->threshold * 1.42){
+    if(size < ctx->threshold * sqrt_3){
       // collison detected
       ctx->pt = position;
-      ctx->collision_detected = true;
-
-      //printf(">>> %f %f\n", d, d2);
-      //vec3_print(position);printf("\n");
+      ctx->collision_detected = MAX(d, d2) < -ctx->threshold;
       return;
     }
     else{
@@ -405,7 +403,6 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
     ctx->pt = position;
     ctx->collision_detected = true;
     ctx->greatest_common_overlap = MAX(min_d, min_d2);
-    printf("overlap detected %f\n",  ctx->greatest_common_overlap);
     return;
   }
     
@@ -431,26 +428,19 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
       qsort(candidates, 8, sizeof(fi_pair), (__compar_fn_t) sort_pairs);
       for(int i = 0; i < 8; i++){
         var d = candidates[i].d;
-        printf("%f ",d );
       }
-      printf("\n");
       for(int _i = 0; _i < 8; _i++){
         int i = candidates[_i].i;
         var d = candidates[i].d;
-        if(d - s2 * 1.73 * 0.25 > ctx->greatest_common_overlap){
-          printf("early out\n");
+        if(d - s2 * 1.73 * 0.5 > ctx->greatest_common_overlap){
           break;
         }
         
         vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
-        printf("Finding: %i %f ", i, d);
-        vec3_print(offset);
-        printf("\n");
         var p = vec3_add(offset, position);
         sdf_detect_max_overlap(ctx, p, s2);
       }      
     }
-  printf("return\n");
 }
 
 
@@ -466,48 +456,85 @@ typedef enum{
   SDF_TYPE_UNRECOGNIZED,
   SDF_TYPE_SPHERE,
   SDF_TYPE_AABB,
-  SDF_TYPE_TRANSFORM
+  SDF_TYPE_VERT_CAPSULE,
+  SDF_TYPE_TRANSFORM,
+  SDF_TYPE_MODELS
 }sdf_type;
 
 typedef struct{
   sdf_type type;
   vec3 pos;
   vec3 size;
-}SDF_AABB;
+}sdf_aabb;
 
 typedef struct{
   sdf_type type;
   vec3 pos;
   f32 radius;
-}SDF_SPHERE;
+}sdf_sphere;
+
+typedef struct{
+  sdf_type type;
+  f32 radius;
+  f32 height;
+
+}sdf_vert_capsule;
+//f32 d1 = vert_capsule(vec3_sub(v, vec3_new(0,0,0)), 3.0, 0.5);
 
 typedef struct {
   sdf_type type;
   mat4 inv_tform;
   void * sub_model;
+}sdf_transform;
 
-}SDF_TRANSFORM;
+typedef struct {
+  void ** models;
+  size_t model_count;
+}sdf_models;
+
+
 f32 generic_sdf(void * ud, vec3 p);
 
 f32 sphere_sdf(void * ud, vec3 p){
-  SDF_SPHERE * a = ud;
+  sdf_sphere * a = ud;
   return vec3_len(vec3_sub(p, a->pos)) - a->radius;
 }
 
 f32 aabb_sdf(void * ud, vec3 p){
-  SDF_AABB * a = ud;
+  sdf_aabb * a = ud;
 
   p = vec3_sub(p, a->pos);
-  vec3 q = vec3_sub(vec3_abs(p), vec3_scale(a->size, 1.0));
+  vec3 q = vec3_sub(vec3_abs(p), a->size);
   return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x,MAX(q.y,q.z)),0.0);
 }
 
-f32 transform_sdf(void * ud, vec3 p){
-  SDF_TRANSFORM * a = ud;
-  p = mat4_mul_vec3(a->inv_tform, p);
-  return generic_sdf(a->sub_model, p);
+
+f32 vert_capsule_sdf(void * ud, vec3 p){
+  sdf_vert_capsule * a = ud;
+  return vert_capsule(p, a->height, a->radius);
 }
 
+
+
+f32 transform_sdf(void * ud, vec3 p){
+  sdf_transform * a = ud;
+  p = mat4_mul_vec3(a->inv_tform, p);
+
+  vec3 x1 = mat4_mul_vec3(a->inv_tform, vec3_new(0,0,0));
+  vec3 x2 = mat4_mul_vec3(a->inv_tform, vec3_new(1,1,1));
+  f32 eig = vec3_len(vec3_sub(x2, x1)) / sqrtf(3);
+  return generic_sdf(a->sub_model, p) / eig;
+}
+
+f32 models_sdf(void * ud, vec3 p){
+  sdf_models * models = ud;
+  f32 d = 100000;
+  for(var i = 0; i < models->model_count; i++){
+    var d1 = generic_sdf(models->models[i], p);
+    d = MIN(d1, d);
+  }
+  return d;
+}
 
 f32 generic_sdf(void * ud, vec3 p){
   sdf_type * tp = ud;
@@ -518,6 +545,10 @@ f32 generic_sdf(void * ud, vec3 p){
     return aabb_sdf(ud, p);
   case SDF_TYPE_SPHERE:
     return sphere_sdf(ud, p);
+  case SDF_TYPE_VERT_CAPSULE:
+    return vert_capsule_sdf(ud, p);
+  case SDF_TYPE_MODELS:
+    return models_sdf(ud, p);
   default:
   }
   printf("Unrecognized SDF type\n");
@@ -525,7 +556,117 @@ f32 generic_sdf(void * ud, vec3 p){
 
 }
 
-lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
+lisp_value sdf_lookup;
+static void * get_physics_sdf(lisp_value value){
+  println(value);
+  void ** models = NULL;
+  size_t model_count = 0;
+  while(is_cons(value)){
+    var tform = caar(value);
+    mat4 * m = lisp_value_vector(tform)->data;
+    
+    sdf_transform a_t = {
+      .type = SDF_TYPE_TRANSFORM,
+      .inv_tform = mat4_invert(*m),
+      .sub_model = NULL
+    };
+    
+    var model_type = cdar(value);
+    println(model_type);
+    if(lisp_value_eq(car(model_type), get_symbol("aabb"))){
+      vec3 s = lv_vec3(cdr(model_type));
+
+      sdf_aabb * aabb = alloc(sizeof(*aabb));
+      aabb->type = SDF_TYPE_AABB;
+      aabb->pos = vec3_zero;
+      aabb->size = s;
+      vec3_print(s);printf("<--\n");
+      a_t.sub_model = aabb;
+    }
+    if(lisp_value_eq(car(model_type), get_symbol("sphere"))){
+      f32 s = lisp_value_rational(cadr(model_type));
+
+      sdf_sphere * sphere = alloc(sizeof(*sphere));
+
+      sphere->type = SDF_TYPE_SPHERE;
+      sphere->pos = vec3_zero;
+      sphere->radius = s;
+      a_t.sub_model = sphere;
+    }
+    if(lisp_value_eq(car(model_type), get_symbol("capsule"))){
+      f32 h = lisp_value_rational(cadr(model_type));
+      f32 r = lisp_value_rational(caddr(model_type));
+
+      sdf_vert_capsule * capsule = alloc(sizeof(*capsule));
+
+      capsule->type = SDF_TYPE_VERT_CAPSULE;
+      capsule->radius = r;
+      capsule->height = h;
+      a_t.sub_model = capsule;
+    }
+        
+    if(a_t.sub_model != NULL){
+      models = realloc(models, sizeof(void *) * ++model_count);
+      models[model_count-1] = iron_clone(&a_t, sizeof(a_t));
+    }
+    value = cdr(value);
+  }
+  if(models == NULL) return NULL;
+  if(model_count == 1) {
+    var r = models[0];
+    dealloc(models);
+    return r;
+  }
+  return models;
+}
+
+
+void describe_sdf(void * ptr){
+  static int level = 0;
+  sdf_type * tp = ptr;
+  switch(tp[0]){
+  case SDF_TYPE_TRANSFORM:{
+    sdf_transform * t = ptr;
+    printf("Transform: ");
+    mat4_print(t->inv_tform);
+    describe_sdf(t->sub_model);
+    break;
+  }
+  case SDF_TYPE_AABB:{
+    sdf_aabb * t = ptr;
+    printf("AABB ");vec3_print(t->size);printf("\n");
+    break;
+  }
+   case SDF_TYPE_SPHERE:{
+     sdf_sphere * t = ptr;
+     printf("SPHERE %f\n", t->radius);
+     break;
+   }
+  case SDF_TYPE_VERT_CAPSULE:{
+     sdf_vert_capsule * t = ptr;
+     printf("CAPSULE r=%f h=%f\n", t->radius, t->height);
+     break;
+   }
+  case SDF_TYPE_MODELS:{
+    
+    sdf_models * m = ptr;
+    printf("Models: %i\n", m->model_count);
+    for(size_t i = 0; i < m->model_count; i++)
+      describe_sdf(m->models[i]);
+    break;
+  }
+  default:
+    printf("EEERR\n");
+  }
+}
+
+
+lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value physics1, lisp_value physics2, lisp_value out_cons){
+  if(is_nil(sdf_lookup)){
+    sdf_lookup = lisp_make_hashtable();
+    lisp_register_value("++sdf-lookup", sdf_lookup);
+  }
+
   var p1 = lv_vec3(car(obj1));
   var p2 = lv_vec3(car(obj2));
   obj1 = cdr(obj1);
@@ -536,19 +677,72 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
   obj2 = cdr(obj2);
   var o1 = car(obj1);
   var o2 = car(obj2);
-  SDF_AABB a = {.type = SDF_TYPE_AABB, .pos = vec3_zero, .size = vec3_new(0.25, 05, 0.25)};
-  SDF_AABB b = {.type = SDF_TYPE_AABB, .pos = vec3_zero, .size = vec3_new(0.25,0.5,0.25)};
-  SDF_TRANSFORM a_t = {
+  sdf_aabb a = {
+    .type = SDF_TYPE_AABB,
+    .pos = vec3_zero,
+    .size = vec3_new(0.25, 05, 0.25)
+  };
+  sdf_aabb b = {
+    .type = SDF_TYPE_AABB,
+    .pos = vec3_zero,
+    .size = vec3_new(0.25,0.5,0.25)
+  };
+  sdf_transform a_t = {
     .type = SDF_TYPE_TRANSFORM,
     .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot1),
                                          -p1.x, -p1.y, -p1.z ),
     .sub_model = &a };
-  SDF_TRANSFORM b_t = {
+  
+  void * ptr1 = NULL;
+  if(!is_nil(physics1)){
+    var thing = lisp_hashtable_get(sdf_lookup, physics1);
+    if(is_nil(thing)){
+      void * sdf = get_physics_sdf(physics1);
+      if(sdf == NULL)
+        thing = integer_lisp_value(0);
+      else
+        thing = native_pointer_lisp_value(sdf);
+      lisp_hashtable_set(sdf_lookup, physics1, thing);
+      ptr1 = thing.pointer;
+    }else{
+      ptr1 = thing.pointer;
+    }
+    
+  }
+  if(ptr1 == NULL)
+    ptr1 = &a;
+  
+  a_t.sub_model = ptr1;
+
+  
+  sdf_transform b_t = {
     .type = SDF_TYPE_TRANSFORM,
     .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot2),
                                          -p2.x,-p2.y,-p2.z ),
-    .sub_model = &b };
+    .sub_model = &b
+  };
+
+  void * ptr2 = NULL;
+  if(!is_nil(physics2)){
+    var thing = lisp_hashtable_get(sdf_lookup, physics2);
+    if(is_nil(thing)){
+      void * sdf = get_physics_sdf(physics2);
+      if(sdf == NULL)
+        thing = integer_lisp_value(0);
+      else
+        thing = native_pointer_lisp_value(sdf);
+      lisp_hashtable_set(sdf_lookup, physics2, thing);
+      ptr2 = thing.pointer;
+    }else{
+      ptr2 = thing.pointer;
+    } 
+  }
   
+  if(ptr2 == NULL)
+    ptr2 = &b;
+  
+  b_t.sub_model = ptr2;
+   
   cdf_ctx ctx = {
     .sdf1 = transform_sdf,
     .sdf2 = transform_sdf,
@@ -559,9 +753,17 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2){
   };
   cdf_ctx ctx2 = ctx;
   sdf_detect_collision(&ctx, p2, 10.0);
-  if(ctx.collision_detected){
+  if(ctx.collision_detected && is_cons(out_cons)){
+    ctx2.threshold = 0.01;
+    //describe_sdf(&a_t);
+    //describe_sdf(&b_t);
+    
+    describe_sdf(ctx.userdata1);
+    describe_sdf(ctx.userdata2);
     sdf_detect_max_overlap(&ctx2, p2, 10.0);
-    printf("Overlap: %f\n", ctx2.greatest_common_overlap);
+    set_car(out_cons, rational_lisp_value(ctx2.pt.x));
+    set_cdr(out_cons, rational_lisp_value(ctx2.pt.z));
+
   }
   return ctx.collision_detected ? t : nil;
 }
@@ -580,8 +782,8 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2){
   //println(floor_tile); printf("<<<\n");
   var size = vec3_new(lisp_value_as_rational(car(s1l)), 10.0, lisp_value_as_rational(cadr(s1l)));
   //vec3_print(size);printf("\n");
-  SDF_AABB a = {.pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
-  SDF_AABB b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
+  sdf_aabb a = {.pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
+  sdf_aabb b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
   cdf_ctx ctx = {
     .sdf1 = aabb_sdf,
     .sdf2 = aabb_sdf,
@@ -598,8 +800,8 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2){
 
 void test_sdf_col(){
   
-  SDF_SPHERE s1 = {.pos = vec3_new(-0.1, -0.1, 0), .radius = 1.0 };
-  SDF_SPHERE s2= {.pos = vec3_new(1.599, 0, 0), .radius = 1.0 };
+  sdf_sphere s1 = {.pos = vec3_new(-0.1, -0.1, 0), .radius = 1.0 };
+  sdf_sphere s2= {.pos = vec3_new(1.599, 0, 0), .radius = 1.0 };
   cdf_ctx ctx = {
     .sdf1 = sphere_sdf,
     .sdf2 = sphere_sdf,
@@ -619,8 +821,8 @@ void test_sdf_col(){
   //return;
   
   {
-  SDF_AABB a = {.pos = vec3_new(0, 0, 0), .size = vec3_new(0.5,0.5,0.5)};
-  SDF_AABB b = {.pos = vec3_new(0.9, 0, 0.), .size = vec3_new(0.5, 0.5, 0.5)};
+  sdf_aabb a = {.pos = vec3_new(0, 0, 0), .size = vec3_new(0.5,0.5,0.5)};
+  sdf_aabb b = {.pos = vec3_new(0.9, 0, 0.), .size = vec3_new(0.5, 0.5, 0.5)};
   cdf_ctx ctx = {
     .sdf1 = aabb_sdf,
     .sdf2 = aabb_sdf,
@@ -639,10 +841,57 @@ void test_sdf_col(){
   
 }
 
+void test_layered_sdf(){
+  {
+  mat4 t = mat4_translate(1.0, 0, 0);
+  mat4 s = mat4_scaled(0.2, 0.2, 0.2);
+  mat4 t_inv = mat4_invert(mat4_mul(t, s));
+  mat4_print(mat4_invert(t_inv));
+  sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_zero, .radius = 1.0};
+  sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv, .sub_model = &s1};
+
+  // a sphere size 0.1 centered at 1.0.
+  sdf_sphere s2 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(1.0, 0, 0), .radius = 0.2};
+  for(float x = -1; x < 3; x += 0.1){
+    for(float y = -1; y < 3; y += 0.1){
+      
+    var pt = vec3_new(x, 0.1, y);
+    var a = generic_sdf(&t1, pt);
+    var b = generic_sdf(&s2, pt);
+    printf("x: %f   : %f == %f: %f\n", x, a, b, a - b);
+    }
+  }
+  }
+  {
+    printf("AABB\n");
+    mat4 t = mat4_translate(1.0, 0, 0);
+    mat4 s = mat4_scaled(0.2, 0.2, 0.2);
+    mat4 t_inv = mat4_invert(mat4_mul(t, s));
+    mat4_print(mat4_invert(t_inv));
+    sdf_aabb s1 = {.type = SDF_TYPE_AABB, .pos = vec3_zero, .size = vec3_one};
+    sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv, .sub_model = &s1};
+    
+    // a sphere size 0.1 centered at 1.0.
+    sdf_aabb s2 = {.type = SDF_TYPE_AABB, .pos = vec3_new(1.0, 0, 0), .size = vec3_new(0.2, 0.2, 0.2)};
+    for(float x = -1; x < 3; x += 0.1){
+      for(float y = -1; y < 3; y += 0.1){
+        
+        var pt = vec3_new(x, 0.1, y);
+        var a = generic_sdf(&t1, pt);
+        var b = generic_sdf(&s2, pt);
+        printf("x: %f   : %f == %f: %f\n", x, a, b, a - b);
+      }
+    } 
+  }
+
+}
 
 
 
 void test_sdf(){
   test_sdf_col();
+  printf("test layered sdf\n");
+  test_layered_sdf();
   //sdf_poly(nil);
 }
+

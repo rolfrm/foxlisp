@@ -119,7 +119,8 @@
   (let ((s (foxgl:get-web-canvas-size)))
     (when (or (eq nil last-size)
               (> (+ (abs (-  (car s) (car last-size)))
-                    (abs (-  (cdr s) (cdr last-size)))) 4))
+                    (abs (-  (cdr s) (cdr last-size))))
+                 4))
       (foxgl:window-set-size win (car s) (cdr s)))
     (set! last-size s)
     
