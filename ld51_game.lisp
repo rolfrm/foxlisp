@@ -107,11 +107,11 @@
   )
 (defvar floor-tiles
   '(
-    ((0 0) (10 10))
-    ((-11 -2.5) (10 15))
-    ((-16 -20) (10 15))
-    ((-11 -12.5) (2 15))
-    ((-5 -0)(4 2))
+    ((0 0) (5 5))
+    ((-11 -2.5) (5 7.5))
+    ((-16 -20) (5 7.5))
+    ((-11 -12.5) (1 7.5))
+    ((-5 -0)(2 1))
     ))
 
 (defvar goals-list '(
@@ -220,7 +220,7 @@
 
 
 (defun drop-point-collision(px py)
-  (let ((player-object `((,px 0 ,py) ,ang player)))
+  (let ((player-object `((,px 0 ,py) ,ang model-player)))
     
     (let ((col nil)
           (colpt (cons nil nil)))
@@ -240,13 +240,15 @@
       col)))
 
 (defun player-floor-collision (px py)
-  (let ((player-object `((,px 0 ,py) ,ang player))
+  (let ((player-object `((,px 0 ,py) ,ang model-player))
         (collider nil))
     (for-each f floor-tiles
        (when
-          (foxgl:detect-collision-floor f player-object)
+           (foxgl:detect-collision-floor
+            f player-object
+            (get-physics-model-name (caddr player-object))
+            )
          (set! collider f)))
-    
     collider
     ))
 
@@ -1234,8 +1236,9 @@
            (for f (bind floor-tiles)
             (let ((p (car f)) (s (cadr f)))
               (translate ((bind (car p)) 0.5 (bind (cadr p)))
-                  (scale ((bind (car s)) 1 (bind (cadr s)))
-                                (ref tile-model-2)
+                         (scale ((bind (car s)) 1 (bind (cadr s)))
+                                (scale (2 1 2)
+                                       (ref tile-model-2))
               )))))
          
          (rgb (0 0 0)

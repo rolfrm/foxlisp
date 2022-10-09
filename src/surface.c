@@ -634,7 +634,7 @@ void describe_sdf(void * ptr){
   }
   case SDF_TYPE_AABB:{
     sdf_aabb * t = ptr;
-    printf("AABB ");vec3_print(t->size);printf("\n");
+    printf("AABB ");vec3_print(t->pos);vec3_print(t->size);printf("\n");
     break;
   }
    case SDF_TYPE_SPHERE:{
@@ -659,14 +659,29 @@ void describe_sdf(void * ptr){
     printf("EEERR\n");
   }
 }
-
-
-lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value physics1, lisp_value physics2, lisp_value out_cons){
-  if(is_nil(sdf_lookup)){
+void * get_physics_model_cached(lisp_value physics1){
+   if(is_nil(sdf_lookup)){
     sdf_lookup = lisp_make_hashtable();
     lisp_register_value("++sdf-lookup", sdf_lookup);
   }
+   if(!is_nil(physics1)){
+    var thing = lisp_hashtable_get(sdf_lookup, physics1);
+    if(is_nil(thing)){
+      void * sdf = get_physics_sdf(physics1);
+      if(sdf == NULL)
+        thing = integer_lisp_value(0);
+      else
+        thing = native_pointer_lisp_value(sdf);
+      lisp_hashtable_set(sdf_lookup, physics1, thing);
+    }
+    return thing.pointer;
+    
+  }
+   return NULL;
+}
 
+lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value physics1, lisp_value physics2, lisp_value out_cons){
+ 
   var p1 = lv_vec3(car(obj1));
   var p2 = lv_vec3(car(obj2));
   obj1 = cdr(obj1);
@@ -693,22 +708,7 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value ph
                                          -p1.x, -p1.y, -p1.z ),
     .sub_model = &a };
   
-  void * ptr1 = NULL;
-  if(!is_nil(physics1)){
-    var thing = lisp_hashtable_get(sdf_lookup, physics1);
-    if(is_nil(thing)){
-      void * sdf = get_physics_sdf(physics1);
-      if(sdf == NULL)
-        thing = integer_lisp_value(0);
-      else
-        thing = native_pointer_lisp_value(sdf);
-      lisp_hashtable_set(sdf_lookup, physics1, thing);
-      ptr1 = thing.pointer;
-    }else{
-      ptr1 = thing.pointer;
-    }
-    
-  }
+  void * ptr1 = get_physics_model_cached(physics1);
   if(ptr1 == NULL)
     ptr1 = &a;
   
@@ -721,23 +721,8 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value ph
                                          -p2.x,-p2.y,-p2.z ),
     .sub_model = &b
   };
-
-  void * ptr2 = NULL;
-  if(!is_nil(physics2)){
-    var thing = lisp_hashtable_get(sdf_lookup, physics2);
-    if(is_nil(thing)){
-      void * sdf = get_physics_sdf(physics2);
-      if(sdf == NULL)
-        thing = integer_lisp_value(0);
-      else
-        thing = native_pointer_lisp_value(sdf);
-      lisp_hashtable_set(sdf_lookup, physics2, thing);
-      ptr2 = thing.pointer;
-    }else{
-      ptr2 = thing.pointer;
-    } 
-  }
-  
+  void * ptr2 = get_physics_model_cached(physics2);
+    
   if(ptr2 == NULL)
     ptr2 = &b;
   
@@ -769,7 +754,7 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value ph
 }
 
 
-lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2){
+lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2, lisp_value model){
   var p1l = car(floor_tile);
   var p1 = vec3_new(lisp_value_as_rational(car(p1l)), 0, lisp_value_as_rational(cadr(p1l)));
   var p2 = lv_vec3(car(obj2));
@@ -779,17 +764,35 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2){
   obj2 = cdr(obj2);
   var o2 = car(obj2);
   var s1l = car(floor_tile);
+
+  void * ptr2 = get_physics_model_cached(model);
+  sdf_aabb b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
+  if(ptr2 == NULL)
+    ptr2 = &b;
+
+  sdf_transform b_t = {
+    .type = SDF_TYPE_TRANSFORM,
+    .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot2),
+                                         -p2.x, -p2.y, -p2.z ),
+    .sub_model = ptr2 };
+
+  
   //println(floor_tile); printf("<<<\n");
   var size = vec3_new(lisp_value_as_rational(car(s1l)), 10.0, lisp_value_as_rational(cadr(s1l)));
+  //vec3_print(p1);
   //vec3_print(size);printf("\n");
-  sdf_aabb a = {.pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
-  sdf_aabb b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
+  
+  //vec3_print(size);printf("\n");
+  sdf_aabb a = {
+    .type = SDF_TYPE_AABB,
+    .pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
   cdf_ctx ctx = {
     .sdf1 = aabb_sdf,
-    .sdf2 = aabb_sdf,
+    .sdf2 = transform_sdf,
     .userdata1 = &a,
-    .userdata2 = &b,
-    .threshold = 0.1
+    .userdata2 = &b_t,
+    .threshold = 0.01,
+    .greatest_common_overlap = 100.0
   };
 
   sdf_detect_collision(&ctx, p2, 10.0);
