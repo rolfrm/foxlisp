@@ -897,18 +897,21 @@ void marching_cubes_emit_point(void * userdata, vec3 a, vec3 b, vec3 c){
   ctx->emit_point(ctx->userdata, c, vec3_new(1, 0, 0));
 }
 
+
 f32 marching_cubes_sdff(void * userdata, vec3 pt){
   df_ctx * ctx = userdata;
   vec3 color;
   return ctx->sdf(ctx->sdf_userdata, pt, &color);
 }
-
+extern int cube_count;
 void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
-  
   f32 d;
   vec3 c;
   d = ctx->sdf(ctx->sdf_userdata, position, &c);
   if(d < size * sqrt_3 ){
+    
+
+    
     if(size <= ctx->threshold){
       //size = size * 0.5;
       sdf_model model = {
@@ -919,14 +922,34 @@ void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
       process_cube(&model, position, size, marching_cubes_emit_point, ctx);
     }
     else{
-      f32 s2 = size * 0.5;
-   
-      f32 o[] = {-s2, s2};
-      for(int i = 0; i < 8; i++){
-        vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
-        var p = vec3_add(offset, position);
-        marching_cubes_sdf(ctx, p, s2);
-      }      
+      /*{
+        vec3 corners[8];
+        f32 o[] = {-size, size};
+        f32 ds[8];
+        // faces: 0 1 2 4 (z=0) 4 5 6 7 (z = 1)
+        
+        for(int i = 0; i < 8; i++){
+          vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
+          var p = vec3_add(offset, position);
+          ds[i] = ctx->sdf(ctx->sdf_userdata, p, &c);
+        }
+
+        }*/
+
+        
+      
+
+      {
+        f32 s2 = size * 0.5;
+        f32 o[] = {-s2, s2};
+      
+
+        for(int i = 0; i < 8; i++){
+          vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
+          var p = vec3_add(offset, position);
+          marching_cubes_sdf(ctx, p, s2);
+        }
+      }
     }
   }
 }
@@ -980,28 +1003,31 @@ f32 sdf_model_sdf(void * userdata, vec3 pt, vec3 * color){
   return model->sdf(model->userdata, pt);
 
 }
+
 lisp_value sdf_marching_cubes(lisp_value model0){
   UNUSED(model0);
   vec3 center = vec3_new(0, 0.5, 0);
   f32 scale = 4.0; 
-  sdf_aabb a = {.pos = vec3_new(0, 0.0, 0), .size = vec3_new(1,1,1)};
+  sdf_aabb a = {.type = SDF_TYPE_AABB, .pos = vec3_new(0, 0.0, 0), .size = vec3_new(0.6,0.6,0.6)};
 
-  sdf_sphere s1 = {.pos = vec3_new(-0.1, -0.1, 0), .radius = 1.0 };
-  
+  sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(1.0, -0.1, 0), .radius = 1.0 };
+  void * models[] = {&a, &s1};
+  sdf_models ms = {.model_count = 2, .models = models};
   sdf_model model = {0};
   model.sdf = aabb_sdf;
   model.userdata = &a;
-  model.sdf = sphere_sdf;
-  model.userdata = &s1;
+  model.sdf = models_sdf;
+  model.userdata = &ms;
 
   size_t count = 0;
   df_ctx ctx2 = {
     .sdf = sdf_model_sdf,
     .sdf_userdata = &model,
-    .threshold = 0.25,
+    .threshold = 0.1,
     .emit_point = mc_count_vertexes,
     .userdata = &count
   };
+  cube_count = 0;
   
   marching_cubes_sdf(&ctx2, center, scale);
 
@@ -1018,6 +1044,8 @@ lisp_value sdf_marching_cubes(lisp_value model0){
   };
   ctx2.userdata = &builder;
   ctx2.emit_point = mc_take_vertex;
+
+  cube_count = 0;
   marching_cubes_sdf(&ctx2, center, scale);
   
   printf("POINTS: %i\n", count);
