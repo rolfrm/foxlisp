@@ -470,18 +470,8 @@
     (sdf
      (let ((r (hashtable-ref foxgl:polygon-cache :sdf)))
        (unless r
-         (let ((poly 
-                 (foxgl:sdf-poly
-                  (cons (lambda (v)
-                          (min
-                           (spherex (vec3 0.0 2.0 0.0) 1.0 v)
-                           (spherex (vec3 1.5 2.0 0.0) 0.5 v)
-                           (spherex (vec3 2.5 2.0 0.0) 0.5 v)
-                           (spherex (vec3 3.5 2.0 0.0) 0.5 v)
-
-                           ))
-                        (lambda (v) (vec3 1.0 (+ 0.5 (* 0.5 (sin (vec3-x v)))) 0.0 1.0))
-                  ))
+         (let ((poly
+                (foxgl:sdf-marching-cubes nil)
                 ;(foxgl:sdf-poly)
                  ))
            (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)

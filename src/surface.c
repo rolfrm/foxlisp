@@ -777,12 +777,7 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2, 
     .sub_model = ptr2 };
 
   
-  //println(floor_tile); printf("<<<\n");
   var size = vec3_new(lisp_value_as_rational(car(s1l)), 10.0, lisp_value_as_rational(cadr(s1l)));
-  //vec3_print(p1);
-  //vec3_print(size);printf("\n");
-  
-  //vec3_print(size);printf("\n");
   sdf_aabb a = {
     .type = SDF_TYPE_AABB,
     .pos = p1, .size = vec3_sub(size, vec3_new(0.5,0.5,0.5))};
@@ -886,15 +881,186 @@ void test_layered_sdf(){
       }
     } 
   }
+}
+
+#include "mc.h"
+
+void print_triangle(void * ud, vec3 v1, vec3 v2, vec3 v3){
 
 }
 
 
+void marching_cubes_emit_point(void * userdata, vec3 a, vec3 b, vec3 c){
+  df_ctx * ctx = userdata;
+  ctx->emit_point(ctx->userdata, a, vec3_new(1, 0, 0));
+  ctx->emit_point(ctx->userdata, b, vec3_new(1, 0, 0));
+  ctx->emit_point(ctx->userdata, c, vec3_new(1, 0, 0));
+}
+
+f32 marching_cubes_sdff(void * userdata, vec3 pt){
+  df_ctx * ctx = userdata;
+  vec3 color;
+  return ctx->sdf(ctx->sdf_userdata, pt, &color);
+}
+
+void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
+  
+  f32 d;
+  vec3 c;
+  d = ctx->sdf(ctx->sdf_userdata, position, &c);
+  if(d < size * sqrt_3 ){
+    if(size <= ctx->threshold){
+      //size = size * 0.5;
+      sdf_model model = {
+        .sdf = marching_cubes_sdff,
+        .userdata = ctx,
+        .threshold = 0.01
+      };
+      process_cube(&model, position, size, marching_cubes_emit_point, ctx);
+    }
+    else{
+      f32 s2 = size * 0.5;
+   
+      f32 o[] = {-s2, s2};
+      for(int i = 0; i < 8; i++){
+        vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
+        var p = vec3_add(offset, position);
+        marching_cubes_sdf(ctx, p, s2);
+      }      
+    }
+  }
+}
+
+void mc_count_vertexes(void * userdata, vec3 pt, vec3 color){
+  UNUSED(pt);
+  UNUSED(color);
+  size_t * c = userdata;
+  c[0] += 1;
+}
+
+typedef struct{
+  f32 * verts;
+  f32 * colors;
+  size_t count;
+  size_t offset;
+}mc_vertex_builder;
+void mc_take_vertex(void * userdata, vec3 pt, vec3 color){
+  static int color_counter = 0;
+  UNUSED(pt);
+  UNUSED(color);
+  switch(color_counter++ % 3){
+  case 0:color = vec3_new(1, 0, 0);break;
+  case 1:color = vec3_new(0, 1, 0);break;
+  case 2:color = vec3_new(0, 0, 1);break;
+    
+  }
+
+  mc_vertex_builder * b = userdata;
+  f32 * v = b->verts + b->offset * 3;
+  f32 * c = b->colors + b->offset * 3;
+  v[0] = pt.x;
+  v[1] = pt.y;
+  v[2] = pt.z;
+  c[0] = color.x;
+  c[1] = color.y;
+  c[2] = color.z;
+  b->offset += 1;
+}
+
+f32 sdf_model_sdf(void * userdata, vec3 pt, vec3 * color){
+  static int color_counter = 0;
+  switch(color_counter++ % 3){
+  case 0:*color = vec3_new(1, 0, 0);break;
+  case 1:*color = vec3_new(0, 1, 0);break;
+  case 2:*color = vec3_new(0, 0, 1);break;
+  
+  }
+  
+  sdf_model * model = userdata;
+  return model->sdf(model->userdata, pt);
+
+}
+lisp_value sdf_marching_cubes(lisp_value model0){
+  UNUSED(model0);
+  vec3 center = vec3_new(0, 0.5, 0);
+  f32 scale = 4.0; 
+  sdf_aabb a = {.pos = vec3_new(0, 0.0, 0), .size = vec3_new(1,1,1)};
+
+  sdf_sphere s1 = {.pos = vec3_new(-0.1, -0.1, 0), .radius = 1.0 };
+  
+  sdf_model model = {0};
+  model.sdf = aabb_sdf;
+  model.userdata = &a;
+  model.sdf = sphere_sdf;
+  model.userdata = &s1;
+
+  size_t count = 0;
+  df_ctx ctx2 = {
+    .sdf = sdf_model_sdf,
+    .sdf_userdata = &model,
+    .threshold = 0.25,
+    .emit_point = mc_count_vertexes,
+    .userdata = &count
+  };
+  
+  marching_cubes_sdf(&ctx2, center, scale);
+
+  
+  var vec = make_vector(integer(count * 3 * 3), float32(0.0));
+  f32 * verts = vec.vector->data;
+  var vec2 = make_vector(integer(count * 3 * 3), float32(0.0));
+  f32 * colors = vec2.vector->data;
+  mc_vertex_builder builder = {
+    .verts = verts,
+    .colors = colors,
+    .count = count,
+    .offset = 0
+  };
+  ctx2.userdata = &builder;
+  ctx2.emit_point = mc_take_vertex;
+  marching_cubes_sdf(&ctx2, center, scale);
+  
+  printf("POINTS: %i\n", count);
+  return new_cons(vec, vec2);
+}
+
+
+typedef struct{
+  int count;
+}triangles_builder;
+
+void test_marching_cubes_f(void * userdata, vec3 pt, vec3 color){
+  triangles_builder * b = userdata;
+  b->count += 1;
+  printf("Vertex: ");
+  vec3_print(pt);printf("\n");
+
+}
+void test_marching_cubes(){
+  sdf_aabb a = {.pos = vec3_new(0, 0, 0), .size = vec3_new(0.5,0.5,0.5)};
+  sdf_model model = {0};
+  model.sdf = aabb_sdf;
+  model.userdata = &a;
+  process_cube(&model, vec3_new(-0.5, -0.0, -0.0), 0.2, print_triangle, NULL);
+
+  triangles_builder b = {0};
+  df_ctx ctx2 = {
+    .sdf = sdf_model_sdf,
+    .sdf_userdata = &model,
+    .threshold = 0.001,
+    .emit_point = test_marching_cubes_f,
+    .userdata = &b
+  };
+  marching_cubes_sdf(&ctx2, vec3_new(0.1, 0.1, 0.1), 2.0);
+  printf("Vertex count: %i\n", b.count);
+}
 
 void test_sdf(){
   test_sdf_col();
   printf("test layered sdf\n");
   test_layered_sdf();
+  printf("Marching Cubes\n");
   //sdf_poly(nil);
+  test_marching_cubes();
 }
 

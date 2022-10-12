@@ -342,7 +342,11 @@
       (depth
        (translate ((bind +dt2+) (bind (+ +dt+ 0))  (bind (+ -20 zoom)))
         (rotate (0.3 0 0)
-        
+
+         (translate (0 5 0)
+          (rotate (0 (bind real-time) 0)
+           (sdf))
+          )
 
         (translate (0 0 -50)
          (rgb (1.0 1.0 0.5)
