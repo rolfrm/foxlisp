@@ -337,8 +337,8 @@ lisp_value sdf_poly(lisp_value f){
 
 
 typedef struct{
-  f32 (* sdf1)(void * userdata, vec3 v);
-  f32 (* sdf2)(void * userdata, vec3 v);
+  f32 (* sdf1)(void * userdata, vec3 v, vec3 * color);
+  f32 (* sdf2)(void * userdata, vec3 v, vec3 * color);
   f32 threshold;
   void * userdata1;
   void * userdata2;
@@ -352,8 +352,8 @@ const float sqrt_3 = 1.73205;
 
 void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
   if(ctx->collision_detected) return;
-  var d = ctx->sdf1(ctx->userdata1, position);
-  var d2 = ctx->sdf2(ctx->userdata2, position);
+  var d = ctx->sdf1(ctx->userdata1, position, NULL);
+  var d2 = ctx->sdf2(ctx->userdata2, position, NULL);
   //vec3_print(position);
   //printf("%f %f %f\n", d, d2, size);
   if(d < size * sqrt_3 && d2 < size * sqrt_3 ){
@@ -393,8 +393,8 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
   ctx->iterations += 1;
   
   if(size < ctx->threshold * 1.7){
-    var d = ctx->sdf1(ctx->userdata1, position);
-    var d2 = ctx->sdf2(ctx->userdata2, position);
+    var d = ctx->sdf1(ctx->userdata1, position, NULL);
+    var d2 = ctx->sdf2(ctx->userdata2, position, NULL);
     var min_d = d - size * 1.73 * 0.5;
     var min_d2 = d2 - size * 1.73 * 0.5;
   
@@ -415,8 +415,8 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
         vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
         
         var p = vec3_add(offset, position);
-        var d = ctx->sdf1(ctx->userdata1, p);
-        var d2 = ctx->sdf2(ctx->userdata2, p);
+        var d = ctx->sdf1(ctx->userdata1, p, NULL);
+        var d2 = ctx->sdf2(ctx->userdata2, p, NULL);
         var min_d = d ;
         var min_d2 = d2;
         candidates[i] = (fi_pair){
@@ -458,7 +458,8 @@ typedef enum{
   SDF_TYPE_AABB,
   SDF_TYPE_VERT_CAPSULE,
   SDF_TYPE_TRANSFORM,
-  SDF_TYPE_MODELS
+  SDF_TYPE_MODELS,
+  SDF_TYPE_COLOR
 }sdf_type;
 
 typedef struct{
@@ -477,6 +478,7 @@ typedef struct{
   sdf_type type;
   f32 radius;
   f32 height;
+  vec3 pos;
 
 }sdf_vert_capsule;
 //f32 d1 = vert_capsule(vec3_sub(v, vec3_new(0,0,0)), 3.0, 0.5);
@@ -488,19 +490,29 @@ typedef struct {
 }sdf_transform;
 
 typedef struct {
+  sdf_type type;
   void ** models;
   size_t model_count;
 }sdf_models;
 
+typedef struct {
+  sdf_type type;
+  void ** models;
+  size_t model_count;
+  vec3 color;
 
-f32 generic_sdf(void * ud, vec3 p);
+}sdf_color;
 
-f32 sphere_sdf(void * ud, vec3 p){
+f32 generic_sdf(void * ud, vec3 p, vec3 * c);
+
+f32 sphere_sdf(void * ud, vec3 p, vec3 * c){
+  UNUSED(c);
   sdf_sphere * a = ud;
   return vec3_len(vec3_sub(p, a->pos)) - a->radius;
 }
 
-f32 aabb_sdf(void * ud, vec3 p){
+f32 aabb_sdf(void * ud, vec3 p, vec3 * color){
+  UNUSED(color);
   sdf_aabb * a = ud;
 
   p = vec3_sub(p, a->pos);
@@ -509,52 +521,67 @@ f32 aabb_sdf(void * ud, vec3 p){
 }
 
 
-f32 vert_capsule_sdf(void * ud, vec3 p){
+f32 vert_capsule_sdf(void * ud, vec3 p, vec3 * c){
+  UNUSED(c);
   sdf_vert_capsule * a = ud;
-  return vert_capsule(p, a->height, a->radius);
+  return vert_capsule(vec3_sub(p, a->pos), a->height, a->radius);
 }
 
-
-
-f32 transform_sdf(void * ud, vec3 p){
+f32 transform_sdf(void * ud, vec3 p, vec3 * color){
   sdf_transform * a = ud;
   p = mat4_mul_vec3(a->inv_tform, p);
 
   vec3 x1 = mat4_mul_vec3(a->inv_tform, vec3_new(0,0,0));
   vec3 x2 = mat4_mul_vec3(a->inv_tform, vec3_new(1,1,1));
   f32 eig = vec3_len(vec3_sub(x2, x1)) / sqrtf(3);
-  return generic_sdf(a->sub_model, p) / eig;
+  return generic_sdf(a->sub_model, p, color) / eig;
 }
 
-f32 models_sdf(void * ud, vec3 p){
+f32 models_sdf(void * ud, vec3 p, vec3 * color){
   sdf_models * models = ud;
   f32 d = 100000;
+  vec3 c2 = color != NULL ? *color : vec3_zero;
+  vec3 * c2p = color != NULL ? &c2 : NULL;
   for(var i = 0; i < models->model_count; i++){
-    var d1 = generic_sdf(models->models[i], p);
-    d = MIN(d1, d);
+    var d1 = generic_sdf(models->models[i], p, c2p);
+    if(d1 < d){
+      d = d1;
+      if(color != NULL)
+        *color = c2;
+    }
   }
   return d;
 }
+f32 color_sdf(void * ud, vec3 p, vec3 * color){
+  sdf_color * color_elem = ud;
+  if(color != NULL){
+    *color = color_elem->color;
+  }
+  return models_sdf(ud, p, color);
+}
 
-f32 generic_sdf(void * ud, vec3 p){
+vec3 * color_out = NULL;
+f32 generic_sdf(void * ud, vec3 p, vec3 * c){
   sdf_type * tp = ud;
   switch(tp[0]){
   case SDF_TYPE_TRANSFORM:
-    return transform_sdf(ud, p);
+    return transform_sdf(ud, p, c);
   case SDF_TYPE_AABB:
-    return aabb_sdf(ud, p);
+    return aabb_sdf(ud, p, c);
   case SDF_TYPE_SPHERE:
-    return sphere_sdf(ud, p);
+    return sphere_sdf(ud, p, c);
   case SDF_TYPE_VERT_CAPSULE:
-    return vert_capsule_sdf(ud, p);
+    return vert_capsule_sdf(ud, p,c);
   case SDF_TYPE_MODELS:
-    return models_sdf(ud, p);
+    return models_sdf(ud, p, c);
+  case SDF_TYPE_COLOR:
+    return color_sdf(ud, p, c);
   default:
   }
   printf("Unrecognized SDF type\n");
   return 1000000.0;
-
 }
+
 
 lisp_value sdf_lookup;
 static void * get_physics_sdf(lisp_value value){
@@ -651,6 +678,14 @@ void describe_sdf(void * ptr){
     
     sdf_models * m = ptr;
     printf("Models: %i\n", m->model_count);
+    for(size_t i = 0; i < m->model_count; i++)
+      describe_sdf(m->models[i]);
+    break;
+  }
+  case SDF_TYPE_COLOR:{
+    
+    sdf_color * m = ptr;
+    printf("COLOR: %i\n", m->model_count);
     for(size_t i = 0; i < m->model_count; i++)
       describe_sdf(m->models[i]);
     break;
@@ -854,8 +889,8 @@ void test_layered_sdf(){
     for(float y = -1; y < 3; y += 0.1){
       
     var pt = vec3_new(x, 0.1, y);
-    var a = generic_sdf(&t1, pt);
-    var b = generic_sdf(&s2, pt);
+    var a = generic_sdf(&t1, pt, NULL);
+    var b = generic_sdf(&s2, pt, NULL);
     printf("x: %f   : %f == %f: %f\n", x, a, b, a - b);
     }
   }
@@ -875,8 +910,8 @@ void test_layered_sdf(){
       for(float y = -1; y < 3; y += 0.1){
         
         var pt = vec3_new(x, 0.1, y);
-        var a = generic_sdf(&t1, pt);
-        var b = generic_sdf(&s2, pt);
+        var a = generic_sdf(&t1, pt, NULL);
+        var b = generic_sdf(&s2, pt, NULL);
         printf("x: %f   : %f == %f: %f\n", x, a, b, a - b);
       }
     } 
@@ -892,18 +927,23 @@ void print_triangle(void * ud, vec3 v1, vec3 v2, vec3 v3){
 
 void marching_cubes_emit_point(void * userdata, vec3 a, vec3 b, vec3 c){
   df_ctx * ctx = userdata;
-  ctx->emit_point(ctx->userdata, a, vec3_new(1, 0, 0));
-  ctx->emit_point(ctx->userdata, b, vec3_new(1, 0, 0));
-  ctx->emit_point(ctx->userdata, c, vec3_new(1, 0, 0));
+  vec3 color = vec3_new(0,0,1);
+  ctx->sdf(ctx->sdf_userdata, a, &color);
+  ctx->emit_point(ctx->userdata, a, color);
+  
+  ctx->sdf(ctx->sdf_userdata, b, &color);
+  ctx->emit_point(ctx->userdata, b, color);
+  
+  ctx->sdf(ctx->sdf_userdata, c, &color);
+  ctx->emit_point(ctx->userdata, c, color);
 }
 
 
-f32 marching_cubes_sdff(void * userdata, vec3 pt){
+f32 marching_cubes_sdff(void * userdata, vec3 pt, vec3 * color){
   df_ctx * ctx = userdata;
-  vec3 color;
-  return ctx->sdf(ctx->sdf_userdata, pt, &color);
+  return ctx->sdf(ctx->sdf_userdata, pt, color);
 }
-extern int cube_count;
+
 void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
   f32 d;
   vec3 c;
@@ -968,15 +1008,8 @@ typedef struct{
   size_t offset;
 }mc_vertex_builder;
 void mc_take_vertex(void * userdata, vec3 pt, vec3 color){
-  static int color_counter = 0;
   UNUSED(pt);
   UNUSED(color);
-  switch(color_counter++ % 3){
-  case 0:color = vec3_new(1, 0, 0);break;
-  case 1:color = vec3_new(0, 1, 0);break;
-  case 2:color = vec3_new(0, 0, 1);break;
-    
-  }
 
   mc_vertex_builder * b = userdata;
   f32 * v = b->verts + b->offset * 3;
@@ -991,32 +1024,36 @@ void mc_take_vertex(void * userdata, vec3 pt, vec3 color){
 }
 
 f32 sdf_model_sdf(void * userdata, vec3 pt, vec3 * color){
-  static int color_counter = 0;
-  switch(color_counter++ % 3){
-  case 0:*color = vec3_new(1, 0, 0);break;
-  case 1:*color = vec3_new(0, 1, 0);break;
-  case 2:*color = vec3_new(0, 0, 1);break;
-  
-  }
   
   sdf_model * model = userdata;
-  return model->sdf(model->userdata, pt);
+  
+  return model->sdf(model->userdata, pt, color);
 
 }
 
 lisp_value sdf_marching_cubes(lisp_value model0){
   UNUSED(model0);
   vec3 center = vec3_new(0, 0.5, 0);
-  f32 scale = 4.0; 
+  f32 scale = 4.0;
+  sdf_color c1 = {.type = SDF_TYPE_COLOR, .color = vec3_new(0.5, 0.9, 0.4), .model_count = 3};
+  sdf_color c2 = {.type = SDF_TYPE_COLOR, .color = vec3_new(0.5, 0.4, 0.2), .model_count = 1};
   sdf_aabb a = {.type = SDF_TYPE_AABB, .pos = vec3_new(0, 0.0, 0), .size = vec3_new(0.6,0.6,0.6)};
+  sdf_aabb a2 = {.type = SDF_TYPE_AABB, .pos = vec3_new(2, 0.0, 0), .size = vec3_new(0.6,0.6,0.6)};
+  sdf_vert_capsule cap1 = {.type = SDF_TYPE_VERT_CAPSULE, .height = 3.0, .radius = 0.5, .pos = vec3_new(0,-1,0)}; 
 
-  sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(1.0, -0.1, 0), .radius = 1.0 };
-  void * models[] = {&a, &s1};
-  sdf_models ms = {.model_count = 2, .models = models};
+  sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(0.0, 3, 0), .radius = 1.5 };
+  sdf_sphere s2 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(1.0, 2.0, 0), .radius = 1.0 };
+  sdf_sphere s3 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(-1.0, 2.0, 0), .radius = 1.0 };
+  void * models3[] = {&s1, &s2, &s3};
+  c1.models = models3;
+  void * models2[] = {&cap1};
+  c2.models = models2;
+  void * models[] = {&c1, &c2};
+  sdf_models ms = {.type = SDF_TYPE_MODELS, .model_count = 2, .models = models};
   sdf_model model = {0};
-  model.sdf = aabb_sdf;
+  model.sdf = generic_sdf;
   model.userdata = &a;
-  model.sdf = models_sdf;
+  model.sdf = generic_sdf;
   model.userdata = &ms;
 
   size_t count = 0;
@@ -1027,7 +1064,6 @@ lisp_value sdf_marching_cubes(lisp_value model0){
     .emit_point = mc_count_vertexes,
     .userdata = &count
   };
-  cube_count = 0;
   
   marching_cubes_sdf(&ctx2, center, scale);
 
@@ -1045,10 +1081,10 @@ lisp_value sdf_marching_cubes(lisp_value model0){
   ctx2.userdata = &builder;
   ctx2.emit_point = mc_take_vertex;
 
-  cube_count = 0;
   marching_cubes_sdf(&ctx2, center, scale);
   
   printf("POINTS: %i\n", count);
+
   return new_cons(vec, vec2);
 }
 

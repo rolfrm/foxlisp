@@ -315,30 +315,18 @@ vec3 VertexInterp(f32 isolevel,vec3 p1,vec3 p2,f32 valp1, f32 valp2)
    return p;
 }
 
-int cube_count = 0;
+
+
 
 int process_cube(sdf_model * model, vec3 pt, f32 size, void (* f)(void * userdata, vec3 v1, vec3 v2, vec3 v3), void * f_userdata) {
   var userdata = model->userdata;
   int cubeindex = 0;
-
-  cube_count += 1;
   
-  //if(fabs(pt.y - 1) > 0.4)
-  //  return 0;
-  //if(fabs(pt.x) > 0.5)
-  //  return 0;
-  //if(fabs(pt.z) > 0.5)
-  //return 0;
-  //printf("center %i: %f ", cube_count, size); vec3_print(pt); printf("\n");
-  //if(cube_count != 205){
-  //  return 0;
-  // }
-  var cd = model->sdf(userdata, pt);
-  f32 isolevel = 0;//cd;
+  f32 isolevel = 0;
       
   f32 s2 = size * 0.5;
   f32 o[] = {s2, -s2};
-  //f32 o2[] = {-size , size };
+
   vec3 points[8];
   f32 ds[8];
   int intorder[] = {0,1,3,2,4,5,7,6};
@@ -347,22 +335,15 @@ int process_cube(sdf_model * model, vec3 pt, f32 size, void (* f)(void * userdat
     vec3 offset = vec3_new(o[i&1],  o[(i>>1)&1],o[(i>>2)&1]);
     vec3 offset2 = vec3_scale(offset, 2.0);
     int cell_index = 1 << i2;
-    var p = vec3_add(offset, pt);
     var p2 = vec3_add(offset2, pt);
     points[i2] = vec3_add(vec3_scale(offset2,1.0), pt);
-    var d = model->sdf(userdata, p2);
+    var d = model->sdf(userdata, p2, NULL);
     if(d > 0.0 ){
-      ds[i2] = 0.5;
-      //printf("Yes1 %i %f \n", i, d);
       cubeindex |= cell_index;
       
-    }else{
-      //printf("no %i %f \n", i, d);
-      ds[i2] = 0.5;
     }
     ds[i2] = d;
   }
-  //printf("Cube index: %i\n", cubeindex);
   // Cube is entirely in/out of the surface
   if (edgeTable[cubeindex] == 0){
     return(0);
@@ -412,8 +393,8 @@ int process_cube(sdf_model * model, vec3 pt, f32 size, void (* f)(void * userdat
     var p1 = vertlist[triTable[cubeindex][i  ]];
     var p2 = vertlist[triTable[cubeindex][i+1]];
     var p3 = vertlist[triTable[cubeindex][i+2]];
+    
     f(f_userdata, p1, p2, p3);
-    //vec3_print(p1);vec3_print(p2);vec3_print(p3); printf("\n");
   }
   
   return 0;

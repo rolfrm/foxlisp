@@ -405,26 +405,6 @@
              (ref square-model)))))
          )
           
-         (translate ((bind (* 7.0 (cos guy-move))) 0 (bind (* 7.0 (sin guy-move))))
-          (rotate (0 (bind guy-move) 0)
-           (ref guy)))
-         (for i (0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0 5.5 6.0)
-          (let ((fox-move (- guy-move i -0.15)))
-            (translate 
-             ((bind (* 7.0 (cos fox-move))) 1.5 (bind (* 7.0 (sin fox-move))))
-                      (rotate (0 (bind fox-move) 0)
-                              (ref fox-guy))))
-         
-          )
-         (for i (bind chair-items 8)
-          (rotate (0 (bind i) 0)
-         
-           (translate (0.5 1 4)
-            (rotate (0 3.14 0)
-             (scale 1.4
-              (ref chair)))))
-        
-         )
         
 
          )))))
