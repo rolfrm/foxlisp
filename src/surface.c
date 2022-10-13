@@ -425,7 +425,7 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
           .i = i};
         
       }
-      qsort(candidates, 8, sizeof(fi_pair), (__compar_fn_t) sort_pairs);
+      qsort(candidates, 8, sizeof(fi_pair), (void *) sort_pairs);
       for(int i = 0; i < 8; i++){
         var d = candidates[i].d;
       }
@@ -576,7 +576,7 @@ f32 generic_sdf(void * ud, vec3 p, vec3 * c){
     return models_sdf(ud, p, c);
   case SDF_TYPE_COLOR:
     return color_sdf(ud, p, c);
-  default:
+  default:;
   }
   printf("Unrecognized SDF type\n");
   return 1000000.0;
