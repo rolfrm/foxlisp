@@ -824,17 +824,21 @@ lisp_value lisp_eval_loop(lisp_scope * scope, lisp_value condition, lisp_value b
 lisp_value lisp_eval_symbol_value(lisp_scope * scope, lisp_value sym_expr, lisp_value root_scope_only){
   var sym = lisp_eval(scope, sym_expr);
   lisp_value result = nil;
-  if(!is_symbol(sym)){
-    println(sym);
-    printf("Not a symbol\n");
-    return nil;
-  }
+  TYPE_ASSERT(sym, LISP_SYMBOL);
   
+  var root_scope_type = lisp_value_type(root_scope_only);
   //if looking for a symbol at root scope, iterate through the scopes. 
-  if(!is_nil(root_scope_only))
-    while(scope->super != NULL)
-      scope = scope->super;
-
+  if(root_scope_type != LISP_NIL){
+    if(root_scope_type != LISP_T)
+      root_scope_only = lisp_eval(scope, root_scope_only);
+    
+    if(lisp_value_type(root_scope_only) == LISP_SCOPE){
+      scope = lisp_value_scope(root_scope_only);
+    }else{
+      while(scope->super != NULL)
+        scope = scope->super;
+    }
+  }
   if(lisp_scope_try_get_value(scope, sym, &result))
     return result;
   return nil;
@@ -1124,10 +1128,11 @@ static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * 
     for(ssize_t i = 0; i < (ssize_t)(argcnt - 1); i++)
       args0[i].cdr = cons_lisp_value(args0 + i + 1);
           
-    if(argcnt > 0)
+    if(argcnt > 0){
       args0[argcnt -1].cdr = nil;
-          
-    things = cons_lisp_value(args0);
+      things = cons_lisp_value(args0);
+    }else
+      things = nil;
   }
   
   cons args3[argcnt];
@@ -1160,8 +1165,8 @@ static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * 
         scope->sub_scope = prev_scope;
         return nil;
       }
-            
-      lisp_scope_create_value(function_scope, arg, copy_cons(args2));
+      
+      lisp_scope_create_value(function_scope, arg,  copy_cons(args2));
       break;
     }
     var argv = car(args2);
@@ -2616,7 +2621,7 @@ int main(int argc, char ** argv){
 #endif
 
 #ifdef WASM
-  lisp_eval_file("ld51.lisp");
+  lisp_eval_file("foxday2.lisp");
 
   emscripten_set_main_loop(web_update, 0, 1);
   
