@@ -856,7 +856,7 @@ void foxgl_register(){
   lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
   lrn("foxgl:blit-mode", 1, blit_set_mode);
   lrn("foxgl:sdf-poly", 1, sdf_poly);
-  lrn("foxgl:sdf-marching-cubes", 1, sdf_marching_cubes);
+  lrn("foxgl:sdf-marching-cubes", 3, sdf_marching_cubes);
   lrn("foxgl:bake", 2, foxgl_bake_polygons);
   lrn("foxgl:detect-collision", 5, foxgl_detect_collision);
   lrn("foxgl:detect-collision-floor", 3, foxgl_detect_collision_floor);

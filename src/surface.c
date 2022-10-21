@@ -459,7 +459,8 @@ typedef enum{
   SDF_TYPE_VERT_CAPSULE,
   SDF_TYPE_TRANSFORM,
   SDF_TYPE_MODELS,
-  SDF_TYPE_COLOR
+  SDF_TYPE_COLOR,
+  SDF_TYPE_SDFBM
 }sdf_type;
 
 typedef struct{
@@ -485,8 +486,9 @@ typedef struct{
 
 typedef struct {
   sdf_type type;
+  void ** models;
+  size_t model_count;
   mat4 inv_tform;
-  void * sub_model;
 }sdf_transform;
 
 typedef struct {
@@ -502,6 +504,13 @@ typedef struct {
   vec3 color;
 
 }sdf_color;
+
+typedef struct{
+  int seed;
+  int octaves;
+  vec3 offset;
+}sdf_noisefield;
+
 
 f32 generic_sdf(void * ud, vec3 p, vec3 * c);
 
@@ -526,7 +535,7 @@ f32 vert_capsule_sdf(void * ud, vec3 p, vec3 * c){
   sdf_vert_capsule * a = ud;
   return vert_capsule(vec3_sub(p, a->pos), a->height, a->radius);
 }
-
+f32 models_sdf(void * ud, vec3 p, vec3 * color);
 f32 transform_sdf(void * ud, vec3 p, vec3 * color){
   sdf_transform * a = ud;
   p = mat4_mul_vec3(a->inv_tform, p);
@@ -534,7 +543,7 @@ f32 transform_sdf(void * ud, vec3 p, vec3 * color){
   vec3 x1 = mat4_mul_vec3(a->inv_tform, vec3_new(0,0,0));
   vec3 x2 = mat4_mul_vec3(a->inv_tform, vec3_new(1,1,1));
   f32 eig = vec3_len(vec3_sub(x2, x1)) / sqrtf(3);
-  return generic_sdf(a->sub_model, p, color) / eig;
+  return models_sdf(ud, p, color) / eig;
 }
 
 f32 models_sdf(void * ud, vec3 p, vec3 * color){
@@ -595,7 +604,8 @@ static void * get_physics_sdf(lisp_value value){
     sdf_transform a_t = {
       .type = SDF_TYPE_TRANSFORM,
       .inv_tform = mat4_invert(*m),
-      .sub_model = NULL
+      .models = alloc0(sizeof(void *)),
+      .model_count = 0
     };
     
     var model_type = cdar(value);
@@ -608,7 +618,9 @@ static void * get_physics_sdf(lisp_value value){
       aabb->pos = vec3_zero;
       aabb->size = s;
       vec3_print(s);printf("<--\n");
-      a_t.sub_model = aabb;
+      a_t.models[0] = aabb;
+      a_t.model_count = 1;
+        
     }
     if(lisp_value_eq(car(model_type), get_symbol("sphere"))){
       f32 s = lisp_value_rational(cadr(model_type));
@@ -618,7 +630,8 @@ static void * get_physics_sdf(lisp_value value){
       sphere->type = SDF_TYPE_SPHERE;
       sphere->pos = vec3_zero;
       sphere->radius = s;
-      a_t.sub_model = sphere;
+      a_t.models[0] = sphere;
+      a_t.model_count = 1;
     }
     if(lisp_value_eq(car(model_type), get_symbol("capsule"))){
       f32 h = lisp_value_rational(cadr(model_type));
@@ -629,10 +642,11 @@ static void * get_physics_sdf(lisp_value value){
       capsule->type = SDF_TYPE_VERT_CAPSULE;
       capsule->radius = r;
       capsule->height = h;
-      a_t.sub_model = capsule;
+      a_t.models[0] = capsule;
+      a_t.model_count = 1;
     }
         
-    if(a_t.sub_model != NULL){
+    if(a_t.model_count > 0){
       models = realloc(models, sizeof(void *) * ++model_count);
       models[model_count-1] = iron_clone(&a_t, sizeof(a_t));
     }
@@ -647,6 +661,87 @@ static void * get_physics_sdf(lisp_value value){
   return models;
 }
 
+static void * get_physics_sdf2(lisp_value value){
+  var model_type = car(value);
+  if(lisp_value_eq(model_type, get_symbol("transform"))){
+    
+    sdf_transform * transform = alloc(sizeof(*transform));
+    transform->type = SDF_TYPE_TRANSFORM;
+    mat4 * m = lisp_value_vector(cadr(value))->data;
+    transform->inv_tform = mat4_invert(*m);
+    value = cddr(value);
+    transform->model_count = lisp_length(value).integer;
+    transform->models = alloc0(sizeof(void *) * transform->model_count);
+    for(size_t i = 0; i < transform->model_count; i++){
+      transform->models[i] = get_physics_sdf2(car(value));
+      value = cdr(value);
+    }
+    return transform;
+  }
+  if(lisp_value_eq(model_type, get_symbol("rgb"))){
+    
+    
+    sdf_color * rgb = alloc(sizeof(*rgb));
+    rgb->type = SDF_TYPE_COLOR;
+    rgb->color = lv_vec3(cadr(value));
+    value = cddr(value);
+    
+    rgb->model_count = lisp_length(value).integer;
+    rgb->models = alloc0(sizeof(void *) * rgb->model_count);
+    for(size_t i = 0; i < rgb->model_count; i++){
+      rgb->models[i] = get_physics_sdf2(car(value));
+      value = cdr(value);
+    }
+    return rgb;
+  }
+  
+  if(lisp_value_eq(model_type, get_symbol("aabb"))){
+    vec3 s = lv_vec3(cdr(value));
+
+    sdf_aabb * aabb = alloc(sizeof(*aabb));
+    aabb->type = SDF_TYPE_AABB;
+    aabb->pos = vec3_zero;
+    aabb->size = s;
+    return aabb;
+  }
+  if(lisp_value_eq(model_type, get_symbol("sphere"))){
+    f32 s = lisp_value_rational(cadr(value));
+    
+    sdf_sphere * sphere = alloc(sizeof(*sphere));
+    
+    sphere->type = SDF_TYPE_SPHERE;
+    sphere->pos = vec3_zero;
+    sphere->radius = s;
+    return sphere;
+  }
+  if(lisp_value_eq(model_type, get_symbol("capsule"))){
+    f32 h = lisp_value_rational(cadr(model_type));
+    f32 r = lisp_value_rational(caddr(model_type));
+    
+    sdf_vert_capsule * capsule = alloc(sizeof(*capsule));
+    
+    capsule->type = SDF_TYPE_VERT_CAPSULE;
+    capsule->radius = r;
+    capsule->height = h;
+    return capsule;
+  }
+  
+  size_t count = lisp_length(cdr(value)).integer;
+  if(count == 0)
+    return NULL;
+  if(count == 1)
+    return get_physics_sdf2(cadr(value));
+  sdf_models * mod = alloc0(sizeof(*mod));
+  mod->type = SDF_TYPE_MODELS;
+  mod->model_count = count;
+  mod->models = alloc0(sizeof(void *) * mod->model_count);
+  for(size_t i = 0; i < mod->model_count; i++){
+    mod->models[i] = get_physics_sdf2(car(value));
+    value = cdr(value);
+  }
+  return mod;
+}
+
 
 void describe_sdf(void * ptr){
   static int level = 0;
@@ -656,7 +751,8 @@ void describe_sdf(void * ptr){
     sdf_transform * t = ptr;
     printf("Transform: ");
     mat4_print(t->inv_tform);
-    describe_sdf(t->sub_model);
+    for(size_t i = 0; i < t->model_count; i++)
+      describe_sdf(t->models[i]);
     break;
   }
   case SDF_TYPE_AABB:{
@@ -714,6 +810,27 @@ void * get_physics_model_cached(lisp_value physics1){
   }
    return NULL;
 }
+void * get_physics_model_cached2(lisp_value physics1){
+   if(is_nil(sdf_lookup)){
+    sdf_lookup = lisp_make_hashtable();
+    lisp_register_value("++sdf-lookup", sdf_lookup);
+  }
+   if(!is_nil(physics1)){
+    var thing = lisp_hashtable_get(sdf_lookup, physics1);
+    if(is_nil(thing)){
+      void * sdf = get_physics_sdf2(physics1);
+      printf("Physics model: %p\n", sdf);
+      if(sdf == NULL)
+        thing = integer_lisp_value(0);
+      else
+        thing = native_pointer_lisp_value(sdf);
+      lisp_hashtable_set(sdf_lookup, physics1, thing);
+    }
+    return thing.pointer;
+    
+  }
+   return NULL;
+}
 
 lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value physics1, lisp_value physics2, lisp_value out_cons){
  
@@ -737,32 +854,35 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value ph
     .pos = vec3_zero,
     .size = vec3_new(0.25,0.5,0.25)
   };
+  void * m1[] = {&a};
   sdf_transform a_t = {
     .type = SDF_TYPE_TRANSFORM,
     .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot1),
                                          -p1.x, -p1.y, -p1.z ),
-    .sub_model = &a };
+    .models = m1,
+    .model_count = 1};
   
   void * ptr1 = get_physics_model_cached(physics1);
   if(ptr1 == NULL)
     ptr1 = &a;
-  
-  a_t.sub_model = ptr1;
 
+  m1[0] = ptr1;
+  
+  void * m2[] = {&b};
   
   sdf_transform b_t = {
     .type = SDF_TYPE_TRANSFORM,
     .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot2),
                                          -p2.x,-p2.y,-p2.z ),
-    .sub_model = &b
+    .models = m2,
+    .model_count = 1
   };
   void * ptr2 = get_physics_model_cached(physics2);
     
   if(ptr2 == NULL)
     ptr2 = &b;
+  m2[0] = ptr2;
   
-  b_t.sub_model = ptr2;
-   
   cdf_ctx ctx = {
     .sdf1 = transform_sdf,
     .sdf2 = transform_sdf,
@@ -804,12 +924,14 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2, 
   sdf_aabb b = {.pos = p2, .size = vec3_new(0.1, 0.1, 0.1)};
   if(ptr2 == NULL)
     ptr2 = &b;
-
+  void * m1[] = {ptr2};
   sdf_transform b_t = {
     .type = SDF_TYPE_TRANSFORM,
     .inv_tform = mat4_translate_in_place(mat4_rotate_Y(mat4_identity(), -rot2),
                                          -p2.x, -p2.y, -p2.z ),
-    .sub_model = ptr2 };
+    .models = m1,
+    .model_count = 1
+  };
 
   
   var size = vec3_new(lisp_value_as_rational(car(s1l)), 10.0, lisp_value_as_rational(cadr(s1l)));
@@ -881,7 +1003,10 @@ void test_layered_sdf(){
   mat4 t_inv = mat4_invert(mat4_mul(t, s));
   mat4_print(mat4_invert(t_inv));
   sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_zero, .radius = 1.0};
-  sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv, .sub_model = &s1};
+  
+  void * m1[] = {&s1};
+  sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv,
+    .models = m1, .model_count = 1};
 
   // a sphere size 0.1 centered at 1.0.
   sdf_sphere s2 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(1.0, 0, 0), .radius = 0.2};
@@ -902,7 +1027,10 @@ void test_layered_sdf(){
     mat4 t_inv = mat4_invert(mat4_mul(t, s));
     mat4_print(mat4_invert(t_inv));
     sdf_aabb s1 = {.type = SDF_TYPE_AABB, .pos = vec3_zero, .size = vec3_one};
-    sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv, .sub_model = &s1};
+    void * m1[] = {&s1};
+  
+    sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv,
+      .models = m1, .model_count = 1};
     
     // a sphere size 0.1 centered at 1.0.
     sdf_aabb s2 = {.type = SDF_TYPE_AABB, .pos = vec3_new(1.0, 0, 0), .size = vec3_new(0.2, 0.2, 0.2)};
@@ -1031,25 +1159,64 @@ f32 sdf_model_sdf(void * userdata, vec3 pt, vec3 * color){
 
 }
 
-lisp_value sdf_marching_cubes(lisp_value model0){
-  UNUSED(model0);
+lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value model0){
+  if(!is_nil(model0)){
+    void * model = get_physics_model_cached2(model0);
+    describe_sdf(model);
+    if(model == NULL) return nil;
+    var center = vec3_zero;
+    var scale = lisp_value_as_rational(scale_v);
+    var res = lisp_value_as_rational(res);
+    size_t count = 0;
+    df_ctx ctx2 = {
+      .sdf = generic_sdf,
+      .sdf_userdata = model,
+      .threshold = res,
+      .emit_point = mc_count_vertexes,
+      .userdata = &count
+    };
+  
+    marching_cubes_sdf(&ctx2, center, scale);
+
+  
+    var vec = make_vector(integer(count * 3 * 3), float32(0.0));
+    f32 * verts = vec.vector->data;
+    var vec2 = make_vector(integer(count * 3 * 3), float32(0.0));
+    f32 * colors = vec2.vector->data;
+    mc_vertex_builder builder = {
+      .verts = verts,
+      .colors = colors,
+      .count = count,
+      .offset = 0
+    };
+    ctx2.userdata = &builder;
+    ctx2.emit_point = mc_take_vertex;
+
+    marching_cubes_sdf(&ctx2, center, scale);
+  
+    printf("POINTS: %i\n", count);
+
+    return new_cons(vec, vec2);
+  }
   vec3 center = vec3_new(0, 0.5, 0);
   f32 scale = 4.0;
-  sdf_color c1 = {.type = SDF_TYPE_COLOR, .color = vec3_new(0.5, 0.9, 0.4), .model_count = 3};
+  sdf_color c1 = {.type = SDF_TYPE_COLOR, .color = vec3_new(0.5, 0.9, 0.4), .model_count = 2};
   sdf_color c2 = {.type = SDF_TYPE_COLOR, .color = vec3_new(0.5, 0.4, 0.2), .model_count = 1};
-  sdf_aabb a = {.type = SDF_TYPE_AABB, .pos = vec3_new(0, 0.0, 0), .size = vec3_new(0.6,0.6,0.6)};
+  sdf_aabb a = {.type = SDF_TYPE_AABB, .pos = vec3_new(0, -10.5, 0), .size = vec3_new(100,10,100)};
   sdf_aabb a2 = {.type = SDF_TYPE_AABB, .pos = vec3_new(2, 0.0, 0), .size = vec3_new(0.6,0.6,0.6)};
   sdf_vert_capsule cap1 = {.type = SDF_TYPE_VERT_CAPSULE, .height = 3.0, .radius = 0.5, .pos = vec3_new(0,-1,0)}; 
 
   sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(0.0, 3, 0), .radius = 1.5 };
   sdf_sphere s2 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(1.0, 2.0, 0), .radius = 1.0 };
   sdf_sphere s3 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(-1.0, 2.0, 0), .radius = 1.0 };
+  sdf_sphere s4 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(0, -50, 0), .radius = 50};
+
   void * models3[] = {&s1, &s2, &s3};
   c1.models = models3;
   void * models2[] = {&cap1};
   c2.models = models2;
-  void * models[] = {&c1, &c2};
-  sdf_models ms = {.type = SDF_TYPE_MODELS, .model_count = 2, .models = models};
+  void * models[] = {&c1, &c2, &s4};
+  sdf_models ms = {.type = SDF_TYPE_MODELS, .model_count = 3, .models = models};
   sdf_model model = {0};
   model.sdf = generic_sdf;
   model.userdata = &a;

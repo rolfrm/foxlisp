@@ -107,6 +107,8 @@
 (define foxgl:square-buffers nil)
 (define foxgl:baking nil)
 (define foxgl:baking-stack nil)
+(define foxgl:building-sdf nil)
+(define foxgl:sdf-stack nil)
 (defun foxgl:render-sub-models (model)
   (plist-rest model foxgl:render-model2))
 (define foxgl:test-tex nil)
@@ -468,12 +470,16 @@
      (set! model nil)
      )
     (sdf
+     (let ((size (plookup (cdr model) :size))
+           (resolution (plookup (cdr model) :resolution))
+           (model2 (foxgl:build-sdf (cdr model) foxgl:current-scope)) 
+           )
+       (set! foxgl:sdf-stack nil)
      (let ((r (hashtable-ref foxgl:polygon-cache :sdf)))
        (unless r
-         (let ((poly
-                (foxgl:sdf-marching-cubes nil)
-                ;(foxgl:sdf-poly)
-                 ))
+         (let* ((poly
+                (foxgl:sdf-marching-cubes size resolution model2)
+                  ))
            (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)
                                      (foxgl:load-polygon (cdr poly) 3 nil nil :triangles-color)
                                      )))
@@ -487,7 +493,7 @@
        (foxgl:blit-polygon (cdr r))
        (foxgl:blit-mode nil)
        
-       ))
+       )))
     (bake
      (let ((r (hashtable-ref foxgl:polygon-cache (cdr model))))
        (unless r
@@ -558,6 +564,9 @@
     (plist-rest (cdr model) foxgl:render-model2))  
   )
 
+(defun clone-mat4(mat)
+  (math:* (mat4-identity) mat))
+
 (defun foxgl:build-sub-models (model)
   (plist-rest model foxgl:build-physics))
 
@@ -570,9 +579,6 @@
     (set! foxgl:current-scope cscope)
     (swap physics-out nil)
     ))
-
-(defun clone-mat4(mat)
-  (math:* (mat4-identity) mat))
 
 (defun foxgl:build-physics (model)
   (case (car model)
@@ -763,6 +769,8 @@
     (plist-rest (cdr model) foxgl:build-physics))  
   )
 
+(load "sdf.lisp")
+
 (let ((m1 (mat4-translation 4 0 0))
       (m2 (mat4-translation 3 2 1)))
   (mat4:print m1)
@@ -853,3 +861,4 @@
 
 ;(render-model2 nil)
 ;(lisp:exit 0)
+;(load "sdf.lisp")

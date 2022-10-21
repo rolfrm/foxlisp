@@ -85,7 +85,7 @@
   (load "swank.lisp"))
 
 
-(unless lisp:*web-environment*
+(unless (or lisp:*web-environment*)
   (set! swnk (swank-server-new 8810))
 
   (ld50:initialize)
@@ -135,3 +135,25 @@
       ))
   
   )
+
+(println 'sdf:)
+(let ((a 10))
+  (println (swap a 20))
+  (println a))
+
+(println (list 1 2))
+
+(println (foxgl:build-sdf
+          '(sdf
+            (rgb (1 1 1 1)
+             (scale (2 1 1)
+              (for i (1 2 3 4)
+               
+               (translate ((bind i) 0 0)
+                (sphere (bind i))))
+              (aabb (1 2 1))
+
+              )
+             )
+            )))
+

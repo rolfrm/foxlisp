@@ -118,7 +118,7 @@
       (rgb (0.3 0.3 0.3) 
        (translate (-0.5 0.0 -0.1)
         (scale (1.0 1.0 0.5)
-         (rgb (0.6 0.4 0.4)
+>         (rgb (0.6 0.4 0.4)
         (ref cube-model)))) ;upper body
        (rgb (0.4 0.4 0.6)
        
@@ -340,13 +340,23 @@
 (define model
     '(view :perspective (1.0 (bind foxgl:aspect-ratio) 0.01 1000.0)
       (depth
-       (translate ((bind +dt2+) (bind (+ +dt+ 0))  (bind (+ -20 zoom)))
+       (translate ((bind +dt2+) (bind (+ +dt+ -2))  (bind (+ -20 zoom)))
         (rotate (0.3 0 0)
 
          (translate (0 5 0)
           (rotate (0 (bind real-time) 0)
-           (sdf))
-          )
+           (sdf :size 10 :resolution 0.02
+            (translate (0 0 0)
+             (rgb (0 1 1)
+              (translate (0 1 0)
+               (sphere 0.5))
+              (translate (1 1 0)
+               (rgb (1 0 0)
+                (sphere 0.7)))
+              (sphere 0.7)
+            )
+           )
+          )))
 
         (translate (0 0 -50)
          (rgb (1.0 1.0 0.5)

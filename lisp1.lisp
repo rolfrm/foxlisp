@@ -162,6 +162,11 @@
 (defmacro push! (lst v)
   `(set! ,lst (cons ,v ,lst)))
 
+(defun push-back! (lst v)
+  (loop (cdr lst)
+     (set! lst (cdr lst)))
+  (set-cdr! lst (cons v nil)))
+
 (defmacro match (var lookup &rest body)
   `(let ((,var ,lookup))
      (when ,var ,@body)))

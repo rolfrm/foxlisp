@@ -467,5 +467,12 @@
   )
 (println (test1-lib-test))
 
+(defvar scope1 (let ((rec2 1234)
+                     (asd 123))
+                 (set! rec2 (cons 1 2))
+                 (lisp:get-current-scope)))
+(println scope1)
+(println (symbol-value 'asd scope1))
+
 
 (println "Tests Passed")
