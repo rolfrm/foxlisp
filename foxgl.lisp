@@ -472,18 +472,20 @@
     (sdf
      (let ((size (plookup (cdr model) :size))
            (resolution (plookup (cdr model) :resolution))
-           (model2 (foxgl:build-sdf (cdr model) foxgl:current-scope)) 
            )
        (set! foxgl:sdf-stack nil)
-     (let ((r (hashtable-ref foxgl:polygon-cache :sdf)))
+     (let ((r (hashtable-ref foxgl:polygon-cache model)))
        (unless r
-         (let* ((poly
-                (foxgl:sdf-marching-cubes size resolution model2)
+
+         (let* ((model2 (foxgl:build-sdf (cdr model) foxgl:current-scope)) 
+           
+                (poly
+                  (foxgl:sdf-marching-cubes size resolution model2)
                   ))
            (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)
                                      (foxgl:load-polygon (cdr poly) 3 nil nil :triangles-color)
                                      )))
-         (hashtable-set foxgl:polygon-cache :sdf r)
+         (hashtable-set foxgl:polygon-cache model r)
          
          ))
        

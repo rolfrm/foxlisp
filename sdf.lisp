@@ -15,6 +15,7 @@
 (defun foxgl:build-sdf0 (model)
   (case (car model)
     (aabb
+     (println 'aabb)
      (push-back! sdf-out model)
      )
     (sphere
@@ -23,6 +24,17 @@
     (capsule
      (push-back! sdf-out model)
      )
+    (soft
+     (let* ((soft (unbind (cadr model)))
+            (prev-sdf sdf-out)
+            )
+       (set! sdf-out (list 'soft soft))
+       (foxgl:build-sub-sdf (cddr model))
+       (set! model nil)
+       (let ((m sdf-out))
+         (set! sdf-out prev-sdf)
+         (push-back! sdf-out m))))
+    (color )
     (rgb
      (let* ((color (unbind (cadr model)))
             (r (unbind (car color)))
@@ -78,7 +90,6 @@
      (let ((prev-tform foxgl:current-transform)
            (new-transform (get-matrix))
            (rot (unbind (cadr model))))
-       (math:*! new-transform new-transform foxgl:current-transform)
        (if (cons? rot)
            (math:rotate!  new-transform
                           (unbind (car rot))
@@ -89,11 +100,15 @@
                           0.0
                           (unbind rot))
            )
-       (set! foxgl:current-transform new-transform)
-       (foxgl:build-sub-sdf (cddr model))
-       (set! model nil)
-       (set! foxgl:current-transform prev-tform)
-       (release-matrix new-transform)
+       (let ((prev-sdf (swap sdf-out (list 'transform (clone-mat4 new-transform) )))) 
+
+         (foxgl:build-sub-sdf (cddr model))
+         (let ((new (swap sdf-out prev-sdf)))
+           
+           (push-back! sdf-out new)
+           (set! model nil)
+           (release-matrix new-transform)
+           ))
        ))
     (translate
      (let ((prev-tform foxgl:current-transform)

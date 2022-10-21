@@ -460,7 +460,8 @@ typedef enum{
   SDF_TYPE_TRANSFORM,
   SDF_TYPE_MODELS,
   SDF_TYPE_COLOR,
-  SDF_TYPE_SDFBM
+  SDF_TYPE_SDFBM,
+  SDF_TYPE_SOFT
 }sdf_type;
 
 typedef struct{
@@ -505,6 +506,15 @@ typedef struct {
 
 }sdf_color;
 
+typedef struct {
+  sdf_type type;
+  void ** models;
+  size_t model_count;
+  f32 soft;
+
+}sdf_soft;
+
+
 typedef struct{
   int seed;
   int octaves;
@@ -529,21 +539,21 @@ f32 aabb_sdf(void * ud, vec3 p, vec3 * color){
   return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x,MAX(q.y,q.z)),0.0);
 }
 
-
 f32 vert_capsule_sdf(void * ud, vec3 p, vec3 * c){
   UNUSED(c);
   sdf_vert_capsule * a = ud;
   return vert_capsule(vec3_sub(p, a->pos), a->height, a->radius);
 }
+
 f32 models_sdf(void * ud, vec3 p, vec3 * color);
 f32 transform_sdf(void * ud, vec3 p, vec3 * color){
   sdf_transform * a = ud;
   p = mat4_mul_vec3(a->inv_tform, p);
 
-  vec3 x1 = mat4_mul_vec3(a->inv_tform, vec3_new(0,0,0));
-  vec3 x2 = mat4_mul_vec3(a->inv_tform, vec3_new(1,1,1));
-  f32 eig = vec3_len(vec3_sub(x2, x1)) / sqrtf(3);
-  return models_sdf(ud, p, color) / eig;
+  //vec3 x1 = mat4_mul_vec3(a->inv_tform, vec3_new(0,0,0));
+  //vec3 x2 = mat4_mul_vec3(a->inv_tform, vec3_new(1,1,1));
+  //f32 eig = vec3_len(vec3_sub(x2, x1)) / sqrtf(3);
+  return models_sdf(ud, p, color);// / eig;
 }
 
 f32 models_sdf(void * ud, vec3 p, vec3 * color){
@@ -569,6 +579,13 @@ f32 color_sdf(void * ud, vec3 p, vec3 * color){
   return models_sdf(ud, p, color);
 }
 
+f32 soft_sdf(void * ud, vec3 p, vec3 * color){
+  sdf_soft * soft = ud;
+  
+  return models_sdf(ud, p, color) - soft->soft;
+}
+
+
 vec3 * color_out = NULL;
 f32 generic_sdf(void * ud, vec3 p, vec3 * c){
   sdf_type * tp = ud;
@@ -585,6 +602,8 @@ f32 generic_sdf(void * ud, vec3 p, vec3 * c){
     return models_sdf(ud, p, c);
   case SDF_TYPE_COLOR:
     return color_sdf(ud, p, c);
+  case SDF_TYPE_SOFT:
+    return soft_sdf(ud, p, c);
   default:;
   }
   printf("Unrecognized SDF type\n");
@@ -680,7 +699,6 @@ static void * get_physics_sdf2(lisp_value value){
   }
   if(lisp_value_eq(model_type, get_symbol("rgb"))){
     
-    
     sdf_color * rgb = alloc(sizeof(*rgb));
     rgb->type = SDF_TYPE_COLOR;
     rgb->color = lv_vec3(cadr(value));
@@ -693,6 +711,21 @@ static void * get_physics_sdf2(lisp_value value){
       value = cdr(value);
     }
     return rgb;
+  }
+  if(lisp_value_eq(model_type, get_symbol("soft"))){
+    
+    sdf_soft * soft = alloc(sizeof(*soft));
+    soft->type = SDF_TYPE_SOFT;
+    soft->soft = lisp_value_as_rational(cadr(value));
+    value = cddr(value);
+    
+    soft->model_count = lisp_length(value).integer;
+    soft->models = alloc0(sizeof(void *) * soft->model_count);
+    for(size_t i = 0; i < soft->model_count; i++){
+      soft->models[i] = get_physics_sdf2(car(value));
+      value = cdr(value);
+    }
+    return soft;
   }
   
   if(lisp_value_eq(model_type, get_symbol("aabb"))){
@@ -782,6 +815,14 @@ void describe_sdf(void * ptr){
     
     sdf_color * m = ptr;
     printf("COLOR: %i\n", m->model_count);
+    for(size_t i = 0; i < m->model_count; i++)
+      describe_sdf(m->models[i]);
+    break;
+  }
+    case SDF_TYPE_SOFT:{
+    
+    sdf_soft * m = ptr;
+    printf("SOFT: %f\n", m->soft);
     for(size_t i = 0; i < m->model_count; i++)
       describe_sdf(m->models[i]);
     break;

@@ -345,17 +345,27 @@
 
          (translate (0 5 0)
           (rotate (0 (bind real-time) 0)
-           (sdf :size 10 :resolution 0.02
+           (sdf :size 10 :resolution 0.2
             (translate (0 0 0)
-             (rgb (0 1 1)
-              (translate (0 1 0)
-               (sphere 0.5))
-              (translate (1 1 0)
-               (rgb (1 0 0)
-                (sphere 0.7)))
-              (sphere 0.7)
+             (for j (-1.0 0.0 1.0)
+              (rgb (0.9 0.9 0.9)
+              
+              (translate (0 (bind j) 0)
+               (for i (0.0 1.0 2.0)
+                (rotate (0 (bind i) (bind (* 0.5 j)))
+                 (soft 0.1
+                  (aabb 4 0.2 0.2))
+                 (rgb (0.8 0.8 0.8)
+                  (translate (4 0 0)
+                   (sphere 0.7))
+                  (translate (-4 0 0)
+                   (sphere 0.7))
+                 
+                  ))))
+              (rgb (0.5 0.5 0.5)
+               (sphere 1.4))
             )
-           )
+           ))
           )))
 
         (translate (0 0 -50)
