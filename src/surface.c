@@ -183,8 +183,11 @@ vec3 sdf_gradient(df_ctx * ctx, vec3 pt, f32 size){
   var dx2 = ctx->sdf(ctx->sdf_userdata, ptx, &c);
   var dy2 = ctx->sdf(ctx->sdf_userdata, pty, &c);
   var dz2 = ctx->sdf(ctx->sdf_userdata, ptz, &c);
-
-  var x = vec3_normalize(vec3_new(dx1 - dx2, dy1 - dy2, dz1 - dz2));
+  var dv = vec3_new(dx1 - dx2, dy1 - dy2, dz1 - dz2);
+  var l = vec3_len(dv);
+  if(fabs(l) < 0.00001)
+    return vec3_zero;
+  var x = vec3_scale(dv, 1.0 / l);
   return x;
 }
 
@@ -455,13 +458,15 @@ static vec3 lv_vec3(lisp_value v){
 typedef enum{
   SDF_TYPE_UNRECOGNIZED,
   SDF_TYPE_SPHERE,
+  SDF_TYPE_SPHERE_BOUNDS,
   SDF_TYPE_AABB,
   SDF_TYPE_VERT_CAPSULE,
   SDF_TYPE_TRANSFORM,
   SDF_TYPE_MODELS,
   SDF_TYPE_COLOR,
   SDF_TYPE_SDFBM,
-  SDF_TYPE_SOFT
+  SDF_TYPE_SOFT,
+  SDF_TYPE_SUBTRACT
 }sdf_type;
 
 typedef struct{
@@ -516,6 +521,26 @@ typedef struct {
 
 
 typedef struct{
+  sdf_type type;
+  void ** models;
+  size_t model_count;
+  vec3 pos;
+  f32 radius;
+  
+}sdf_sphere_bounds;
+
+
+
+typedef struct {
+  sdf_type type;
+  void ** models;
+  size_t model_count;
+  f32 k;
+
+}sdf_subtract;
+
+
+typedef struct{
   int seed;
   int octaves;
   vec3 offset;
@@ -523,12 +548,27 @@ typedef struct{
 
 
 f32 generic_sdf(void * ud, vec3 p, vec3 * c);
+f32 models_sdf(void * ud, vec3 p, vec3 * color);
 
 f32 sphere_sdf(void * ud, vec3 p, vec3 * c){
   UNUSED(c);
   sdf_sphere * a = ud;
   return vec3_len(vec3_sub(p, a->pos)) - a->radius;
 }
+
+
+f32 sphere_bounds_sdf(void * ud, vec3 p, vec3 * c){
+  UNUSED(c);
+  sdf_sphere_bounds * a = ud;
+  var d = vec3_len(vec3_sub(p, a->pos)) - a->radius * 1.5;
+  if(d < 0){
+  
+    return models_sdf(ud, p, c);
+  }
+  //return models_sdf(ud, p, c);
+  return d + a->radius * 0.5;
+}
+
 
 f32 aabb_sdf(void * ud, vec3 p, vec3 * color){
   UNUSED(color);
@@ -545,7 +585,6 @@ f32 vert_capsule_sdf(void * ud, vec3 p, vec3 * c){
   return vert_capsule(vec3_sub(p, a->pos), a->height, a->radius);
 }
 
-f32 models_sdf(void * ud, vec3 p, vec3 * color);
 f32 transform_sdf(void * ud, vec3 p, vec3 * color){
   sdf_transform * a = ud;
   p = mat4_mul_vec3(a->inv_tform, p);
@@ -584,6 +623,27 @@ f32 soft_sdf(void * ud, vec3 p, vec3 * color){
   
   return models_sdf(ud, p, color) - soft->soft;
 }
+//x×(1−a)+y×a. 
+f32 mixf(f32 x, f32 y, f32 a){
+  return x * (1 - a) + y * a;
+}
+//float opSmoothSubtraction( float d1, float d2, float k ) {
+//    float h = clamp( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
+//    return mix( d2, -d1, h ) + k*h*(1.0-h); }
+
+f32 subtract_sdf(void * ud, vec3 p, vec3 * color){
+  sdf_subtract * soft = ud;
+  var k = soft->k;
+  if(soft->model_count == 0) return 1000000;
+  var d1 = generic_sdf(soft->models[0],p, color);
+  for(int i = 1; i < soft->model_count; i++){
+    var d2 = generic_sdf(soft->models[i],p, NULL);
+    float h = CLAMP( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
+    d1 = mixf( d2, -d1, h ) + k*h*(1.0-h); 
+  }
+
+  return d1;
+}
 
 
 vec3 * color_out = NULL;
@@ -604,6 +664,10 @@ f32 generic_sdf(void * ud, vec3 p, vec3 * c){
     return color_sdf(ud, p, c);
   case SDF_TYPE_SOFT:
     return soft_sdf(ud, p, c);
+  case SDF_TYPE_SUBTRACT:
+    return subtract_sdf(ud, p, c);
+  case SDF_TYPE_SPHERE_BOUNDS:
+    return sphere_bounds_sdf(ud, p, c);
   default:;
   }
   printf("Unrecognized SDF type\n");
@@ -638,8 +702,7 @@ static void * get_physics_sdf(lisp_value value){
       aabb->size = s;
       vec3_print(s);printf("<--\n");
       a_t.models[0] = aabb;
-      a_t.model_count = 1;
-        
+      a_t.model_count = 1;   
     }
     if(lisp_value_eq(car(model_type), get_symbol("sphere"))){
       f32 s = lisp_value_rational(cadr(model_type));
@@ -728,6 +791,21 @@ static void * get_physics_sdf2(lisp_value value){
     return soft;
   }
   
+  if(lisp_value_eq(model_type, get_symbol("subtract"))){
+    
+    sdf_subtract * subtract = alloc(sizeof(*subtract));
+    subtract->type = SDF_TYPE_SUBTRACT;
+    subtract->k = lisp_value_as_rational(cadr(value));
+    value = cddr(value);
+    
+    subtract->model_count = lisp_length(value).integer;
+    subtract->models = alloc0(sizeof(void *) * subtract->model_count);
+    for(size_t i = 0; i < subtract->model_count; i++){
+      subtract->models[i] = get_physics_sdf2(car(value));
+      value = cdr(value);
+    }
+    return subtract;
+  }
   if(lisp_value_eq(model_type, get_symbol("aabb"))){
     vec3 s = lv_vec3(cdr(value));
 
@@ -747,6 +825,67 @@ static void * get_physics_sdf2(lisp_value value){
     sphere->radius = s;
     return sphere;
   }
+  
+  if(lisp_value_eq(model_type, get_symbol("sphere-bounds"))){
+    
+    sdf_sphere_bounds * sphere = alloc(sizeof(*sphere));
+    
+    sphere->type = SDF_TYPE_SPHERE_BOUNDS;
+    sphere->pos = vec3_zero;
+    sphere->radius = 0.0;
+
+    value = cdr(value);
+    sphere->model_count = lisp_length(value).integer;
+    sphere->models = alloc0(sizeof(void *) * sphere->model_count);
+    for(size_t i = 0; i < sphere->model_count; i++){
+      sphere->models[i] = get_physics_sdf2(car(value));
+      value = cdr(value);
+    }
+
+    
+    vec3 check_points[] = {
+      vec3_new(1,1,1),
+      vec3_new(-1,1,1),
+      vec3_new(1,-1,1),
+      vec3_new(-1,-1,1),
+      vec3_new(1,1,-1),
+      vec3_new(-1,1,1),
+      vec3_new(1,-1,-1),
+      vec3_new(-1,-1,-1)
+
+    };
+    f32 d[8];
+    vec3 c;
+    vec3 center = vec3_zero;
+    for(int i = 0; i < 8; i++)
+      check_points[i] = vec3_scale(check_points[i], 5000);
+      
+    printf("???\n");
+    
+    for(int i = 0; i < 8; i++){
+      vec3 dir = vec3_normalize(vec3_sub(center, check_points[i]));
+      f32 maxd = 100000.0;
+      for(size_t j = 0; j < sphere->model_count; j++){
+        f32 d2 = generic_sdf(sphere->models[j], check_points[i], &c);
+        if(d2 < maxd)
+          maxd = d2;
+      }
+      d[i] = maxd;
+      check_points[i] = vec3_add(check_points[i], vec3_scale(dir, d[i] ));
+      vec3_print(check_points[i]);
+      center = vec3_add(center, vec3_scale(check_points[i], 1.0 / 8.0));
+    }
+    printf("???\n");
+    //center = vec3_scale(center, 1.0 / 8.0);
+    sphere->pos = center;
+    sphere->radius = 0.0;
+    for(int i = 0; i < 8; i++)
+      sphere->radius = fmax(sphere->radius, vec3_len(vec3_sub(check_points[i], center)));
+    vec3_print(center);
+    printf("%f\n", sphere->radius);
+    return sphere;
+  }
+
   if(lisp_value_eq(model_type, get_symbol("capsule"))){
     f32 h = lisp_value_rational(cadr(model_type));
     f32 r = lisp_value_rational(caddr(model_type));
@@ -798,6 +937,12 @@ void describe_sdf(void * ptr){
      printf("SPHERE %f\n", t->radius);
      break;
    }
+  case SDF_TYPE_SPHERE_BOUNDS:{
+     sdf_sphere_bounds * t = ptr;
+     printf("SPHERE Bounds %f  ", t->radius); vec3_print(t->pos);
+     printf("\n");
+     break;
+   }
   case SDF_TYPE_VERT_CAPSULE:{
      sdf_vert_capsule * t = ptr;
      printf("CAPSULE r=%f h=%f\n", t->radius, t->height);
@@ -826,7 +971,15 @@ void describe_sdf(void * ptr){
     for(size_t i = 0; i < m->model_count; i++)
       describe_sdf(m->models[i]);
     break;
-  }
+    }
+    case SDF_TYPE_SUBTRACT:{
+    
+      sdf_subtract * m = ptr;
+      printf("SUBTRACT: %f\n", m->k);
+      for(size_t i = 0; i < m->model_count; i++)
+        describe_sdf(m->models[i]);
+      break;
+    }
   default:
     printf("EEERR\n");
   }
@@ -1097,7 +1250,13 @@ void print_triangle(void * ud, vec3 v1, vec3 v2, vec3 v3){
 void marching_cubes_emit_point(void * userdata, vec3 a, vec3 b, vec3 c){
   df_ctx * ctx = userdata;
   vec3 color = vec3_new(0,0,1);
+  /*for(int i = 0; i < 1; i++){
+    a = trace_point(ctx, a, 0.001);
+    b = trace_point(ctx, b, 0.001);
+    c = trace_point(ctx, c, 0.001);
+    }*/
   ctx->sdf(ctx->sdf_userdata, a, &color);
+  
   ctx->emit_point(ctx->userdata, a, color);
   
   ctx->sdf(ctx->sdf_userdata, b, &color);
@@ -1118,9 +1277,7 @@ void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
   vec3 c;
   d = ctx->sdf(ctx->sdf_userdata, position, &c);
   if(d < size * sqrt_3 ){
-    
-
-    
+        
     if(size <= ctx->threshold){
       //size = size * 0.5;
       sdf_model model = {
@@ -1175,7 +1332,23 @@ typedef struct{
   f32 * colors;
   size_t count;
   size_t offset;
+  int dupcnt;
+  df_ctx * sdf;
+
+  f32 * out_verts;
+  f32 * out_colors;
+  size_t out_count;
+  
 }mc_vertex_builder;
+
+int vec3_hash(const void * _key_data, void * userdata){
+  const vec3 * key_data = _key_data;
+  int x = (int)round((f64)key_data->x * 100.0);
+  int y = (int)round((f64)key_data->y * 100.0);
+  int z = (int)round((f64)key_data->z * 100.0);
+  return (int)(x * 32143217381823L + y * 8302183104737121L + z * 6721943213739218932L + 739213217321L);
+}
+
 void mc_take_vertex(void * userdata, vec3 pt, vec3 color){
   UNUSED(pt);
   UNUSED(color);
@@ -1197,15 +1370,366 @@ f32 sdf_model_sdf(void * userdata, vec3 pt, vec3 * color){
   sdf_model * model = userdata;
   
   return model->sdf(model->userdata, pt, color);
+}
+typedef struct{
+  int verts[3];
+  int edges[3];
+}trig_face;
+typedef struct{
+  int v1, v2;
+}face_edge;
 
+typedef struct{
+  int t1, t2;
+}face_trg;
+
+void improve_mesh(mc_vertex_builder * bld){
+  hash_table * vertex_lookup;
+  vec3 * vertexes = NULL;
+  
+  int vertex_count = 0;
+  hash_table * edge_lookup;
+  face_edge * edges = NULL;
+  face_trg * edge_triangles = NULL;
+  int edge_count = 0;
+
+  trig_face * triangles = NULL;
+  bool * skip_triangles = NULL;
+  int triangle_count = 0;
+
+  hash_table * vert_tri_lookup = lisp_malloc(sizeof(vert_tri_lookup[0]));
+  ht_create3(vert_tri_lookup, 1, sizeof(int) * 2, sizeof(int));
+  
+  
+  vertex_lookup = lisp_malloc(sizeof(*vertex_lookup));
+  ht_create3(vertex_lookup, 1, sizeof(vec3), sizeof(int));
+  vertex_lookup->hash = (void *)vec3_hash;
+  
+  edge_lookup = lisp_malloc(sizeof(*edge_lookup));
+  ht_create3(edge_lookup, 1, sizeof(face_edge), sizeof(int));
+  
+
+
+  int dupcnt = 0;
+  int id = 0;
+  for(int trg = 0; trg < bld->count / 3; trg++){
+
+    int ids[3];
+    
+    for(int i = 0; i < 3; i++){
+      if(!ht_get(vertex_lookup, bld->verts + trg * 9 + i * 3, &id)){
+        id = vertex_count;
+        ht_set(vertex_lookup, bld->verts + trg * 9 + i * 3, &id);
+        vertex_count += 1;
+        vertexes = realloc(vertexes, vertex_count * sizeof(vertexes[0]));
+        vertexes[vertex_count - 1] = ((vec3 *)&bld->verts[trg * 9 + i * 3])[0];
+        
+      } else{
+        //printf("removed dup %i %i\n", ++dupcnt, sizeof(vec3) );
+      }
+      for(int j = 0; j < 32; j++){
+        int id2[] = {id, j};
+        int trg2 = 0;
+        if(!ht_get(vert_tri_lookup, id2, &trg2)){
+          ht_set(vert_tri_lookup, id2, &trg);
+          break;
+        }else if(trg2 == trg){
+          // already added.
+        }
+      }
+      ids[i] = id;
+    }
+    face_edge e1[] = {{.v1 = ids[0], .v2 = ids[1]},
+                      {.v1 = ids[1], .v2 = ids[2]},
+                      {.v1 = ids[2], .v2 = ids[0]}};
+    int edge_ids[3];
+    for(int i = 0; i < 3; i++){
+      if(e1[i].v1 > e1[i].v2)
+        SWAP(e1[i].v1, e1[i].v2);
+      int eid;
+      if(!ht_get(edge_lookup, &e1[i], &eid)){
+        eid = edge_count;
+        ht_set(edge_lookup, &e1[i], &eid );
+        edge_count += 1;
+        edges = realloc(edges, edge_count * sizeof(edges[0]));
+        edges[edge_count - 1] = e1[i];
+        
+        edge_triangles = realloc(edge_triangles, edge_count * sizeof(edge_triangles[0]));
+        edge_triangles[edge_count - 1] = (face_trg){0};
+        edge_triangles[edge_count - 1].t1 = trg;
+      }else{
+        //printf("Reuse edge %i %i %i %i\n", eid, trg, edge_triangles[eid].t1,  edge_triangles[eid].t2);
+        edge_triangles[eid].t2 = trg;
+      }
+      edge_ids[i] = eid;
+    }
+    triangle_count += 1;
+    triangles = realloc(triangles, triangle_count * sizeof(triangles[0]));
+    for(int i = 0; i < 3; i++){
+      triangles[triangle_count - 1].verts[i] = ids[i];
+      triangles[triangle_count - 1].edges[i] = edge_ids[i];
+    }
+  }
+  var sdf = bld->sdf->sdf;
+  var sdf_userdata = bld->sdf->sdf_userdata;
+  vec3 c;
+  
+ for(int i = 0; i < vertex_count; i++){
+   vec3 v = vertexes[i];
+   for(int j = 0; j < 10; j++){
+     var v2 = trace_point(bld->sdf, v, 0.0001);
+     
+     v = v2;
+     if(vec3_len(vec3_sub(v,v2)) < 0.0001)
+       break;
+   }
+   vertexes[i] = v;
+ }
+ if(false){
+  // optimize vertex positions.
+  for(int i = 0; i < vertex_count; i++){
+    vec3 v= vertexes[i];
+    vec3 connected[32] = {0};
+    int j = 0;
+    for(; j < 32; j++){
+      int id2[] = {i, j};
+      int trg;
+      if(!ht_get(vert_tri_lookup, id2, &trg)){
+        break;
+      }
+      var tri = triangles[trg];
+      int con = -1;
+      for(int k = 0; k < 3; k++){
+        if(edges[tri.edges[k]].v1 == i){
+          con = edges[tri.edges[k]].v2;
+        }else if(edges[tri.edges[k]].v2 == i){
+          con = edges[tri.edges[k]].v1;
+        }
+      }
+      if(con != -1)
+        connected[j] = vertexes[con];
+      var d2 = sdf(sdf_userdata, connected[j], &c);
+        
+    }
+
+
+    int cnt = j;
+    vec3 u[] = {vec3_new(0,0,0),vec3_new(1,0,0), vec3_new(-1,0,0),
+      vec3_new(0,1,0), vec3_new(0,-1,0),
+      vec3_new(0,0,1), vec3_new(0,0,-1)};
+    f32 ers[7];
+    f32 di = 0.5;
+    for(int k = 0; k < 400; k++){
+      //printf("K: %i\n", k);
+    //vec3_print(v), vec3_print(connected[0]);
+    for(int j = 0; j < 7; j++){
+      vec3 u2 = vec3_scale(u[j], di); 
+      f32 e = 0;
+      
+      for(int i = 0; i < cnt; i++){
+        vec3 mid = vec3_scale(vec3_add(connected[i], vec3_add(v, u2)), 0.5);
+        var d2 = sdf(sdf_userdata, mid, &c);
+        e += d2 * d2;
+      }
+      e = sqrtf(e);
+      ers[j] = e;
+    }
+    //for(int i = 0; i < 7; i++)
+    //  printf(" %f ", ers[i]);
+    vec3 vd = vec3_zero;
+    int min_i = 0;
+    for(int j = 0; j < 7; j++){
+      if(ers[j] < ers[min_i])
+        min_i = j;
+    }
+    //printf("E: %f\n", ers[min_i]);
+    if(min_i == 0)
+      di *= 0.5;
+    else
+      v = vec3_add(v, vec3_scale(u[min_i], di));
+    if(di < 0.0001)
+      break;
+    //vec3_print(vd);
+    //v = vec3_sub(v, vec3_scale(vd, 1.0));
+    }
+    vertexes[i] = v;
+      
+    //printf("Count :%i \n", cnt);
+  
+  }
+ }
+ 
+  skip_triangles = alloc0(sizeof(skip_triangles[0]) * triangle_count);
+  int new_vertexes = 0;
+  int edge_count2 = 0;//edge_count;
+  if(false){
+  for(int i = 0; i < edge_count2; i++){
+    var e = edges[i];
+    var et = edge_triangles[i];
+    var f1 = triangles[et.t1];
+    var f2 = triangles[et.t2];
+    if(skip_triangles[et.t1]) continue;
+    if(skip_triangles[et.t2]) continue;
+    // only edges with two triangles connected can be split
+    if(et.t1 == 0 || et.t2 == 0)
+      continue;
+
+    vec3 v1 = vertexes[e.v1];
+    vec3 v2 = vertexes[e.v2];
+    vec3 mid = vec3_scale(vec3_add(v1, v2), 0.5);
+    vec3 c;
+    var d = sdf(sdf_userdata, mid, &c);
+    //vec3 asd = vec3_new(0.5432, -0.3234, 0.7783);
+    //vec3 cross = vec3_normalize(vec3_mul_cross(vec3_sub(v2, v1), asd));
+    if(fabs(d) > 100.5){
+      var m2 = mid;
+      //var m2 = trace_point(bld->sdf, mid, 0.01);
+      for(int i = 0; i < 0; i++)
+        m2 = trace_point(bld->sdf, m2, 0.01);
+      var d2 = sdf(sdf_userdata, m2, &c);
+      //if(d2 > 0.01) continue;
+      //vec3_print(v1);vec3_print(m2); vec3_print(v2);
+      //printf("\n");
+      //printf(" %f %f >>%f<<\n", d, d2, vec3_len(vec3_sub(v1, v2)));
+      new_vertexes++;
+      int id;
+      if(!ht_get(vertex_lookup, &m2.x, &id)){
+        id = vertex_count;
+        ht_set(vertex_lookup, &m2.x , &id);
+        vertex_count += 1;
+        vertexes = realloc(vertexes, vertex_count * sizeof(vertexes[0]));
+        vertexes[vertex_count - 1] = m2;
+        
+      } else{
+        //printf("(new vert) removed dup %i %i\n", ++dupcnt, sizeof(vec3) );
+      }
+      
+      
+      skip_triangles[et.t1] = true;
+      skip_triangles[et.t2] = true;
+      //one edge gets removed.
+      // all other edges still exist, but are connected with the new vertex.
+      if(true){
+      int e1 = -1, e2 = -1, e3 = -1, e4 = -1;
+      for(int j = 0; j < 3; j++){
+        if(f1.edges[j] != i){
+          if(e1 == -1)
+            e1 = f1.edges[j];
+          else
+            e2 = f1.edges[j];
+        }
+        if(f2.edges[j] != i){
+          if(e3 == -1)
+            e3 = f2.edges[j];
+          else
+            e4 = f2.edges[j];
+        }
+      }
+     
+      // these 4 edges, along with the center vertex form 4 new triangles.
+      int new_edges[] = {e1, e2, e3, e4};
+      for(int j = 0; j < 4; j++){
+        if(new_edges[j] == -1)
+          ASSERT(false);
+        //printf("new triangle\n");
+        face_edge e0 = edges[new_edges[j]];
+        int ids[] = {e0.v1, e0.v2, id};
+        int edge_ids[3];
+        face_edge e1[] = {{.v1 = ids[0], .v2 = ids[1]},
+                          {.v1 = ids[1], .v2 = ids[2]},
+                          {.v1 = ids[2], .v2 = ids[0]}};
+        for(int i = 0; i < 3; i++){
+          if(e1[i].v1 > e1[i].v2)
+            SWAP(e1[i].v1, e1[i].v2);
+          int eid;
+          if(!ht_get(edge_lookup, &e1[i], &eid)){
+            eid = edge_count;
+            ht_set(edge_lookup, &e1[i], &eid );
+            edge_count += 1;
+            edges = realloc(edges, edge_count * sizeof(edges[0]));
+            edges[edge_count - 1] = e1[i];
+            
+            edge_triangles = realloc(edge_triangles, edge_count * sizeof(edge_triangles[0]));
+            edge_triangles[edge_count - 1] = (face_trg){0};
+            edge_triangles[edge_count - 1].t1 = triangle_count;
+            printf("new_edge\n");
+          }else{
+            printf(" edge %i %i %i %i\n", eid, triangle_count, edge_triangles[eid].t1,  edge_triangles[eid].t2);
+            edge_triangles[eid].t2 = triangle_count;
+          }
+          edge_ids[i] = eid;
+        }
+        triangle_count += 1;
+        triangles = realloc(triangles, triangle_count * sizeof(triangles[0]));
+        skip_triangles = realloc(skip_triangles, triangle_count * sizeof(skip_triangles[0]));
+        skip_triangles[triangle_count - 1] = false;
+        //printf("new triangle: ");
+        for(int i = 0; i < 3; i++){
+          triangles[triangle_count - 1].verts[i] = ids[i];
+          triangles[triangle_count - 1].edges[i] = edge_ids[i];
+          //vec3_print(vertexes[ids[i]]);
+        }
+        //printf("\n");
+      }
+      //printf("EDGE: %i %i %i %i\n", e1, e2, e3, e4);
+      }
+    }
+  }
+  }
+
+  u8 * vertex_hits = alloc0(vertex_count);;
+  int skip = 0;
+  for(int i = 0; i < triangle_count; i++){
+    var trig = triangles[i];
+    if(skip_triangles[i])
+      skip += 1;
+    for(int j = 0; j < 3; j++){
+      vertex_hits[trig.verts[j]]++;
+    }
+  }
+        
+  
+  {
+    bld->out_verts = alloc0((triangle_count - skip) * 9 * sizeof(float));
+    bld->out_colors = alloc0((triangle_count - skip) * 9 * sizeof(float));
+    // each triangle has 3 vertes, each verts has 3 dimensions.
+    f32 * vp = bld->out_verts;
+    f32 * cp = bld->out_colors;
+    bld->out_count = triangle_count * 3;
+    for(int i = 0; i < triangle_count; i++){
+      if(skip_triangles[i]){
+        //printf("SKIP\n");
+        continue;
+      }
+      var trig = triangles[i];
+      for(int j = 0; j < 3; j++){
+        var vx = vertexes[trig.verts[j]];
+        vec3 vx_c;
+        sdf(sdf_userdata, vx, &vx_c);
+        //vec3_print(vx); printf("\n");
+        for(int k = 0; k < 3; k++){
+          vp[0] = vx.data[k];
+          cp[0] = vx_c.data[k];
+          vp++;
+          cp++;
+        }
+      }
+      
+    }
+  }
+
+
+  printf("vert count: %i, edge count: %i, new_vertexes: %i\n", vertex_count, edge_count, new_vertexes);
+  
 }
 
-lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value model0){
+lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value model0, lisp_value offset){
   if(!is_nil(model0)){
     void * model = get_physics_model_cached2(model0);
     describe_sdf(model);
     if(model == NULL) return nil;
-    var center = vec3_zero;
+    var center = is_nil(offset) ? vec3_zero : lv_vec3(offset);
+    
     var scale = lisp_value_as_rational(scale_v);
     var res = lisp_value_as_rational(res);
     size_t count = 0;
@@ -1218,7 +1742,7 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
     };
   
     marching_cubes_sdf(&ctx2, center, scale);
-
+    
   
     var vec = make_vector(integer(count * 3 * 3), float32(0.0));
     f32 * verts = vec.vector->data;
@@ -1228,16 +1752,26 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
       .verts = verts,
       .colors = colors,
       .count = count,
-      .offset = 0
+      .offset = 0,
+      .sdf = &ctx2
     };
     ctx2.userdata = &builder;
     ctx2.emit_point = mc_take_vertex;
-
+    printf("Marching cubes...\n");
+    var timestamp = timestampf();
     marching_cubes_sdf(&ctx2, center, scale);
-  
-    printf("POINTS: %i\n", count);
+    improve_mesh(&builder);
 
-    return new_cons(vec, vec2);
+    var vec3 = make_vector(integer(builder.out_count * 3), float32(0.0));
+    f32 * verts2 = vec3.vector->data;
+    var vec4 = make_vector(integer(builder.out_count * 3), float32(0.0));
+    f32 * colors2 = vec4.vector->data;
+    memcpy(verts2, builder.out_verts, sizeof(float) * 3 * builder.out_count);
+    memcpy(colors2, builder.out_colors, sizeof(float) * 3 * builder.out_count);
+    //println(vec3);
+    printf("POINTS: %i: %f\n", count, (float)(timestampf() - timestamp));
+    
+    return new_cons(vec3, vec4);
   }
   vec3 center = vec3_new(0, 0.5, 0);
   f32 scale = 4.0;
@@ -1296,7 +1830,21 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
   return new_cons(vec, vec2);
 }
 
-
+lisp_value lisp_sdf_distance(lisp_value model, lisp_value p){
+  if(is_nil(model))
+    return nil;
+  void * modelp = get_physics_model_cached2(model);
+  if(modelp == NULL){
+    return nil;
+  }
+  vec3 c;
+  vec3 p2 = lv_vec3(p);
+  return rational_lisp_value(generic_sdf(modelp, p2, &c));
+}
+void lrn(const char * l, int args, void * f);
+void sdf_register(){
+  lrn("sdf:dist", 2, lisp_sdf_distance);
+}
 typedef struct{
   int count;
 }triangles_builder;

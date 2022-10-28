@@ -109,6 +109,21 @@
 (define foxgl:baking-stack nil)
 (define foxgl:building-sdf nil)
 (define foxgl:sdf-stack nil)
+(define foxgl:sdf-clip (make-hashtable))
+
+(defun -compare-clip (now-clip prev-clip size)
+  (when prev-clip
+    (and (<  (abs (- (car now-clip) (car prev-clip))) (/ size 2.0))
+        (< (abs (- (cadr now-clip) (cadr prev-clip))) (/ size 2))
+        (< (abs (- (caddr now-clip) (caddr prev-clip))) (/ size 2)))))
+
+(defun calc-clip (now-clip size)
+  (let ((s2 (* size 0.5)))
+    (list (* (math:round (/ (car now-clip) s2)) s2)
+          (* (math:round (/ (cadr now-clip) s2)) s2)
+          (* (math:round (/ (caddr now-clip) s2)) s2))))
+
+          
 (defun foxgl:render-sub-models (model)
   (plist-rest model foxgl:render-model2))
 (define foxgl:test-tex nil)
@@ -472,15 +487,27 @@
     (sdf
      (let ((size (plookup (cdr model) :size))
            (resolution (plookup (cdr model) :resolution))
+           (clip (unbind (plookup (cdr model) :clip)))
+           (position (unbind (plookup (cdr model) :position)))
            )
+       (when clip
+         (let ((prev-clip (hashtable-ref foxgl:sdf-clip model)))
+           (unless (-compare-clip clip prev-clip size)
+             (println (list 'new-clip (calc-clip clip  size) prev-clip))
+             (hashtable-set foxgl:polygon-cache model nil)
+             (hashtable-set foxgl:sdf-clip model (calc-clip clip size))
+             (set! position (calc-clip clip size))
+             )
+           
+         ))
        (set! foxgl:sdf-stack nil)
      (let ((r (hashtable-ref foxgl:polygon-cache model)))
        (unless r
-
-         (let* ((model2 (foxgl:build-sdf (cdr model) foxgl:current-scope)) 
-           
+         (println (list 'position position))
+         (let* ((model2 (println (foxgl:build-sdf (cdr model) foxgl:current-scope)) )
+                
                 (poly
-                  (foxgl:sdf-marching-cubes size resolution model2)
+                  (foxgl:sdf-marching-cubes size resolution model2 (println position))
                   ))
            (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)
                                      (foxgl:load-polygon (cdr poly) 3 nil nil :triangles-color)

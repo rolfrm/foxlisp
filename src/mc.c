@@ -315,9 +315,6 @@ vec3 VertexInterp(f32 isolevel,vec3 p1,vec3 p2,f32 valp1, f32 valp2)
    return p;
 }
 
-
-
-
 int process_cube(sdf_model * model, vec3 pt, f32 size, void (* f)(void * userdata, vec3 v1, vec3 v2, vec3 v3), void * f_userdata) {
   var userdata = model->userdata;
   int cubeindex = 0;
@@ -339,8 +336,7 @@ int process_cube(sdf_model * model, vec3 pt, f32 size, void (* f)(void * userdat
     points[i2] = vec3_add(vec3_scale(offset2,1.0), pt);
     var d = model->sdf(userdata, p2, NULL);
     if(d > 0.0 ){
-      cubeindex |= cell_index;
-      
+      cubeindex |= cell_index;      
     }
     ds[i2] = d;
   }

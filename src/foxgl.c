@@ -779,7 +779,7 @@ lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform){
 void lrn(const char * l, int args, void * f){
   lisp_register_native(l, args, f);
 }
-
+ 
 lisp_value foxgl_web_canvas_size(){
   int w = 0, h = 0;
   gl_canvas_get_size(&w, &h);
@@ -793,6 +793,7 @@ lisp_value sdf_marching_cubes(lisp_value model);
 lisp_value sdf_poly(lisp_value f);
 void tcp_register();
 void foxal_register();
+void sdf_register();
 void foxgl_register(){
   lrn("math:pow", 2, math_pow);
   lrn("math:sqrt", 1, math_sqrt);
@@ -856,10 +857,11 @@ void foxgl_register(){
   lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
   lrn("foxgl:blit-mode", 1, blit_set_mode);
   lrn("foxgl:sdf-poly", 1, sdf_poly);
-  lrn("foxgl:sdf-marching-cubes", 3, sdf_marching_cubes);
+  lrn("foxgl:sdf-marching-cubes", 4, sdf_marching_cubes);
   lrn("foxgl:bake", 2, foxgl_bake_polygons);
   lrn("foxgl:detect-collision", 5, foxgl_detect_collision);
   lrn("foxgl:detect-collision-floor", 3, foxgl_detect_collision_floor);
   tcp_register();
   foxal_register();
+  sdf_register();
 }

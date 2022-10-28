@@ -9,7 +9,10 @@
 (defvar time2 0.0)
 (defvar real-time 0.0)
 (defvar guy-move 2.0)
+(defvar move-x 0.0)
+(defvar move-y 0.0)
 ;(defvar sdf1 (test:poly))
+(define ball-position (list 0 -50 0))
 
 (defvar game-update
   (let ((mx nil) (my nil))
@@ -17,6 +20,9 @@
       (incf time2 (+ 0.0005 (* (+ 1.0 (sin time2)) 0.0025)))
       (incf real-time 0.016)
       (set! guy-move (* 1.0 real-time))
+      (set-car! ball-position (+ move-x (car ball-position)))
+      (set-car! (cddr ball-position) (+ (- 0 move-y) (car (cddr ball-position))))
+      (update-ball-position)
       (push-event (list 'frame time2))
       (when (> +dt+ 0.01)
         (set! +dt+ 0.01))
@@ -45,6 +51,34 @@
                     (set! my my2)
                  
                     ))
+                (when (eq (car x) 'key-down)
+                  (when (eq (caddr x) foxgl:key-w)
+                    (incf move-y 1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-s)
+                    (decf move-y 1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-a)
+                    (decf move-x 1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-d)
+                    (incf move-x 1.0)
+                    )
+                  )
+                (when (eq (car x) 'key-up)
+                  (when (eq (caddr x) foxgl:key-w)
+                    (incf move-y -1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-s)
+                    (decf move-y -1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-a)
+                    (decf move-x -1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-d)
+                    (incf move-x -1.0)
+                    )
+                  )
       ))))
 
 (define start-time (foxgl:timestamp))
@@ -335,38 +369,115 @@
     l))
       
 (defvar chair-items (gen-chair-items 7))
-      
+(defvar world-model-sdf '(translate (0 0 100)
+       (soft 0.0
+        (rgb (0.3 0.8 0.3)
+         (translate (0 -1000  0)
+          (subtract 0.0
+           (translate (50.0 1000.0 -50.0)
+            (sphere 30.0))
+           (sphere 1000.0)))
+              (translate (50 -48 -50)
+               (aabb 40.0 40.0 40.0))
+         (sphere-bounds
+        
+              (rgb (0.25 0.75 0.25)
+               (translate (0 -99 -100)
+                (sphere 100.0))
+               (translate (50 -99 -200)
+                (sphere 100.0))
+               (translate (-50 -99 -190)
+                
+                (sphere 110.0))
+               (sphere-bounds
+        
+               (translate (0 -40 -250)
+                (rgb (0.4 0.4 0.4)
+                 (rotate (0 0.5 1)
+                  (aabb 40 40 40))))
+               (translate (65 -55 -250)
+                (rotate (0 0.5 1)
+                 (aabb 40 40 40))))
+               
+               )))
+        
+        (sphere-bounds
+         (rgb (0.4 0.4 0.4)
+          (translate (0 0 -50)
+           (aabb 10 10 10))
+          (translate (6 15 -53)
+           (aabb 10 12 8))
+          (translate (-10 15 -53)
+           (aabb 5 5 5))
+         
+          ))
+         
+         )))
+(defvar world-model-sdf2
+  '(rgb (1 0 0)
+    (rotate (0.9 0.9 0.9)
+     (aabb 10.0 10.0 10.0))
+       ))
+(defvar world-model
+  '(sdf :size 200 :resolution 5 :clip (bind ball-position)
+    (bind world-model-sdf)
+    ))
+(defvar sphere-model
+  '(sdf :size 5 :resolution 0.2
+    (rgb (1 1 1)
+     (sphere 1.0))))
+(defvar test-sdf (foxgl:build-sdf world-model-sdf (lisp:get-current-scope!!)))
+(defun update-ball-position()
+  ;;(println ball-position)
+  (let ((d (sdf:dist test-sdf ball-position)))
+    
+    (let ((y2 (- (cadr ball-position) (min 1 d))))
+      (set-car! (cdr ball-position) y2))) 
+  
+  )
+(set! ball-position (list 0 50 0))
 
 (define model
     '(view :perspective (1.0 (bind foxgl:aspect-ratio) 0.01 1000.0)
       (depth
-       (translate ((bind +dt2+) (bind (+ +dt+ -2))  (bind (+ -20 zoom)))
-        (rotate (0.3 0 0)
+       (translate (0 0  (bind (+ -20 zoom)))
+        
+        (rotate (0.9 (bind real-time) 0)
+         (translate ((bind (- 0 (car ball-position))) (bind (- 0 (cadr ball-position)))  (bind (- 0 (caddr ball-position))))
+          (bind world-model)
 
+          (translate (65 -55 -150)
+           (rotate (0 0.5 1)
+            (scale (40 40 40)
+             (scale 2
+              (blend
+               (rgb (1 1 1 0.5)
+                ;(ref cube-2)
+                )))
+
+             )))
+
+          
+          (sea;blend
+           (rgb (0.4 0.4 0.9 1)
+            (translate (50 -8 50)
+             (scale (60 1 60)
+              (bind upcube)))))
+         (rgb (0 0 0)
+          (translate (bind ball-position)
+           (translate (0 1 0)
+            (translate (0 -2 0)
+             (blend
+              (rgb (0 0 0 0.5)
+               (ref sphere-model)
+
+               )))
+            (ref sphere-model)
+            )))
          (translate (0 5 0)
-          (rotate (0 (bind real-time) 0)
-           (sdf :size 10 :resolution 0.2
-            (translate (0 0 0)
-             (for j (-1.0 0.0 1.0)
-              (rgb (0.9 0.9 0.9)
-              
-              (translate (0 (bind j) 0)
-               (for i (0.0 1.0 2.0)
-                (rotate (0 (bind i) (bind (* 0.5 j)))
-                 (soft 0.1
-                  (aabb 4 0.2 0.2))
-                 (rgb (0.8 0.8 0.8)
-                  (translate (4 0 0)
-                   (sphere 0.7))
-                  (translate (-4 0 0)
-                   (sphere 0.7))
-                 
-                  ))))
-              (rgb (0.5 0.5 0.5)
-               (sphere 1.4))
-            )
-           ))
-          )))
+           (translate (0 0 -100)
+          (rotate (0 0 0)
+           )))
 
         (translate (0 0 -50)
          (rgb (1.0 1.0 0.5)
@@ -396,27 +507,6 @@
           ))
           )
          
-        (rgb (0.5 0.9 0.5)
-         (translate (0 0.0 -100.0)
-          (scale (10 10 10)
-          (rotate (0.5 0.5 0.5)
-           (ref cube-model)))
-         )
-         )
-        (rgb (0.3 0.7 0.3)
-         (translate (-0 -70.0 -400.0) 
-          (scale (100 100 100)
-          (rotate (1.0 1.0 1.2)
-           (ref cube-model)))
-         )
-        )
-        (translate (0 0.0 -100.0)
-         (rgb (0.2 0.7 0.2)
-          (rotate ((bind (* 1.0 pi_2)) 0.0 0.0)
-           (scale (2000.0 2000.0 1.0)
-            (translate (-0.5 -0.5)
-             (ref square-model)))))
-         )
         (translate (0 0.0 -500.0)
          (rgb (0.9 0.9 1.0)
           (rotate (0.0 0.0 0.0)
@@ -424,7 +514,10 @@
             (translate (-0.5 -0.5)
              (ref square-model)))))
          )
+
+
+          
           
         
 
-         )))))
+         ))))))
