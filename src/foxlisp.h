@@ -352,6 +352,7 @@ lisp_value lisp_hashtable_count(lisp_value ht);
 //void * lisp_realloc(void * p, size_t v);
 
 lisp_value get_symbol(const char * s);
+lisp_value get_symbol_cached(lisp_value * v, const char * s);
 bool eq(lisp_value a, lisp_value b);
 const char * symbol_name(int64_t id);
 

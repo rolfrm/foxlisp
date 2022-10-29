@@ -476,3 +476,23 @@
 
 
 (println "Tests Passed")
+
+
+
+(let ((a1 '(1 2 3))
+      (a2 '(1 2 3))
+      (ht (make-hashtable :deep-equality))
+      )
+  (dotimes! i 5
+            (dotimes! j 5
+                      (hashtable-set ht (list i j 0) (* i j ))))
+  (dotimes! i 5
+            (dotimes! j 5
+                      (hashtable-set ht (list i j 0) (* i j))))
+  (hashtable-set ht a1 1)
+  (println (hashtable-ref ht a2))
+  (println (hashtable-ref ht '(3 4 0)))
+  )
+
+(println (equal? (cons 1 2) (cons 1 2)))
+  

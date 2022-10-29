@@ -427,6 +427,12 @@ lisp_value get_symbol(const char * s){
   return symbol_lisp_value(get_symbol_id(s));
 }
 
+lisp_value get_symbol_cached(lisp_value * v, const char * s){
+  if(!is_nil(*v))
+    return *v;
+  return *v = get_symbol(s);
+}
+
 const char * symbol_name(int64_t id){
   char * out;
   if(ht_get(current_context->symbols_reverse, &id, &out))
@@ -1186,6 +1192,10 @@ static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * 
   scope->sub_scope = prev_scope;
   return ret;
 
+}
+
+bool eq(lisp_value a, lisp_value b){
+  return lisp_value_eq(a, b);
 }
 
 lisp_value lisp_eval_eqn(lisp_scope * scope, lisp_value values){
@@ -2070,6 +2080,35 @@ lisp_value lisp_greatereqn(lisp_value * values, int count){
   return lisp_binn(values, count, greatereqf, greatereqi);
 }
 
+bool equals(lisp_value v1, lisp_value v2){
+  var t1 = lisp_value_type(v1);
+  var t2 = lisp_value_type(v2);
+  if(t1 != t2) return false;
+  if(memcmp(&v1, &v2, sizeof(lisp_value)) == 0) return true;
+  switch(t1)
+    {
+    case LISP_CONS:
+      {
+        var c1 = lisp_value_cons(v1);
+        var c2 = lisp_value_cons(v2);
+        return equals(c1->car, c2->car) && equals(c1->cdr, c2->cdr);
+      }
+    case LISP_STRING:
+      return strcmp(lisp_value_string(v1), lisp_value_string(v2));
+    default:
+      return v1.integer == v2.integer;
+    }
+}
+
+lisp_value lisp_equals(lisp_value * values, int n){
+  if(n == 0) return nil;
+  for(int i = 1; i < n; i++){
+    if(!equals(values[i - 1], values[i]))
+      return nil;
+  }
+  return t;
+}
+
 
 lisp_value lisp_value_eqn(lisp_value * values, int count){
   for(int i = 1; i < count; i++)
@@ -2395,12 +2434,58 @@ lisp_value lisp_signature(lisp_value func){
     return new_cons(get_symbol("func"), func.function->args);
   return nil;
 }
+int lisp_value_hash(lisp_value v){
+  switch(lisp_value_type(v)){
+  case LISP_CONS:
+    {
+      cons * c = lisp_value_cons(v);
+      int hash = lisp_value_hash(c->car);
+      hash = hash ^ lisp_value_hash(c->cdr);
+      hash *= 16777619;
+      return hash;
+    }
+  default:
+    
+  }
+  int hash = 2166136261;
+  hash = hash ^ v.type;
+  hash *= 16777619;
+  hash = hash ^ v.integer;
+  hash *= 16777619;
+  return hash;
+}
+static int lisp_value_full_hash(const void * _key_data, void * userdata){
+  UNUSED(userdata);
+  const lisp_value * key_data = _key_data;
+  int h = lisp_value_hash(*key_data);
+  return h;
+}
 
-lisp_value lisp_make_hashtable(){
+static bool lisp_value_full_compare(const void * _k1, const void * _k2, void * userdata){
+  UNUSED(userdata);
+  const lisp_value * k1 = _k1, * k2 = _k2 ;
+  return equals(*k1, *k2);
+}
+
+
+lisp_value lisp_make_hashtable(lisp_value * args, int n){
+  static lisp_value full_keyword;
+  bool full = false;
+  for(int i = 0; i < n; i++){
+    lisp_value arg = args[i];
+    if(eq(arg, get_symbol_cached(&full_keyword, ":deep-equality"))){
+      full = true;
+    }
+  }
+  
   hash_table * ht = lisp_malloc(sizeof(*ht));
   ht_create3(ht, 1, sizeof(lisp_value), sizeof(lisp_value));
   ht_set_alloc(ht, lisp_malloc, lisp_free);
-  
+  if(full){
+    printf("HT FULL!\n");
+    ht->hash = lisp_value_full_hash;
+    ht->compare = lisp_value_full_compare;
+  }
   return hashtable_lisp_value(ht);
 }
 
@@ -2737,6 +2822,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("copy-list-deep", 1, copy_cons_deep);
   //lisp_register_native("plookup", 2, lisp_plookup);
 
+  lisp_register_native("equal?", -1, lisp_equals);
   //lisp_register_native("=", -1, lisp_value_eqn);
   lisp_register_native("/=", -1, lisp_neqn);
   lisp_register_native("string=", 2, string_eq);
@@ -2771,7 +2857,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("string->symbol", 1, string_to_symbol);
   lisp_register_native("all-symbols", 0, lisp_all_symbols);
 
-  lisp_register_native("make-hashtable", 0, lisp_make_hashtable);
+  lisp_register_native("make-hashtable", -1, lisp_make_hashtable);
   lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
   lisp_register_native("hashtable-set", 3, lisp_hashtable_set);
   lisp_register_native("hashtable-remove", 2, lisp_hashtable_remove);

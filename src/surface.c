@@ -1255,14 +1255,15 @@ void marching_cubes_emit_point(void * userdata, vec3 a, vec3 b, vec3 c){
     b = trace_point(ctx, b, 0.001);
     c = trace_point(ctx, c, 0.001);
     }*/
-  ctx->sdf(ctx->sdf_userdata, a, &color);
+  
+  //ctx->sdf(ctx->sdf_userdata, a, &color);
   
   ctx->emit_point(ctx->userdata, a, color);
   
-  ctx->sdf(ctx->sdf_userdata, b, &color);
+  //ctx->sdf(ctx->sdf_userdata, b, &color);
   ctx->emit_point(ctx->userdata, b, color);
   
-  ctx->sdf(ctx->sdf_userdata, c, &color);
+  //ctx->sdf(ctx->sdf_userdata, c, &color);
   ctx->emit_point(ctx->userdata, c, color);
 }
 
@@ -1277,9 +1278,7 @@ void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
   vec3 c;
   d = ctx->sdf(ctx->sdf_userdata, position, &c);
   if(d < size * sqrt_3 ){
-        
     if(size <= ctx->threshold){
-      //size = size * 0.5;
       sdf_model model = {
         .sdf = marching_cubes_sdff,
         .userdata = ctx,
@@ -1288,33 +1287,13 @@ void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
       process_cube(&model, position, size, marching_cubes_emit_point, ctx);
     }
     else{
-      /*{
-        vec3 corners[8];
-        f32 o[] = {-size, size};
-        f32 ds[8];
-        // faces: 0 1 2 4 (z=0) 4 5 6 7 (z = 1)
-        
-        for(int i = 0; i < 8; i++){
-          vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
-          var p = vec3_add(offset, position);
-          ds[i] = ctx->sdf(ctx->sdf_userdata, p, &c);
-        }
-
-        }*/
-
-        
       
-
-      {
-        f32 s2 = size * 0.5;
-        f32 o[] = {-s2, s2};
-      
-
-        for(int i = 0; i < 8; i++){
-          vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
-          var p = vec3_add(offset, position);
-          marching_cubes_sdf(ctx, p, s2);
-        }
+      f32 s2 = size * 0.5;
+      f32 o[] = {-s2, s2};
+      for(int i = 0; i < 8; i++){
+        vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
+        var p = vec3_add(offset, position);
+        marching_cubes_sdf(ctx, p, s2);
       }
     }
   }
@@ -1343,10 +1322,10 @@ typedef struct{
 
 int vec3_hash(const void * _key_data, void * userdata){
   const vec3 * key_data = _key_data;
-  int x = (int)round((f64)key_data->x * 100.0);
-  int y = (int)round((f64)key_data->y * 100.0);
-  int z = (int)round((f64)key_data->z * 100.0);
-  return (int)(x * 32143217381823L + y * 8302183104737121L + z * 6721943213739218932L + 739213217321L);
+  int x = (int)round((f64)key_data->x * 10000.0);
+  int y = (int)round((f64)key_data->y * 10000.0);
+  int z = (int)round((f64)key_data->z * 10000.0);
+  return (int)(((x * 32143217381823L + y) * 8302183104737121L + z) * 6721943213739218932L + 739213217321L);
 }
 
 void mc_take_vertex(void * userdata, vec3 pt, vec3 color){
@@ -1354,15 +1333,16 @@ void mc_take_vertex(void * userdata, vec3 pt, vec3 color){
   UNUSED(color);
 
   mc_vertex_builder * b = userdata;
+  if(b->count == b->offset){
+    b->count = MAX(16, b->count * 2);
+    b->verts = realloc(b->verts, b->count * sizeof(f32) * 3);
+  }
   f32 * v = b->verts + b->offset * 3;
-  f32 * c = b->colors + b->offset * 3;
   v[0] = pt.x;
   v[1] = pt.y;
   v[2] = pt.z;
-  c[0] = color.x;
-  c[1] = color.y;
-  c[2] = color.z;
   b->offset += 1;
+  //printf("?? %i\n", b->offset)
 }
 
 f32 sdf_model_sdf(void * userdata, vec3 pt, vec3 * color){
@@ -1719,49 +1699,94 @@ void improve_mesh(mc_vertex_builder * bld){
   }
 
 
-  printf("vert count: %i, edge count: %i, new_vertexes: %i\n", vertex_count, edge_count, new_vertexes);
-  
+  printf("vert count: %i, edge count: %i, new_vertexes: %i\n", vertex_count, edge_count, new_vertexes);  
 }
 
+hash_table * vertex_lookup2 = NULL;
+int reuse1 = 0;
+int reuse2 = 0;
+
+f32 generic_sdf2(void * ud, vec3 p, vec3 * c){
+  //return generic_sdf(ud, p, c);
+  if(false && vertex_lookup2 != NULL){
+    f32 r[4];
+    if(!ht_get(vertex_lookup2, &p.x, r)){
+      vec3 c2;
+      r[0] = generic_sdf(ud, p, &c2.x);
+      r[1] = c2.x;
+      r[2] = c2.z;
+      r[3] = c2.y;
+      ht_set(vertex_lookup2, &p.x, r);
+      reuse1 += 1;
+    }else{
+      reuse2 += 1;
+      //printf("reuse! %i %i\n", reuse1, reuse2);
+    }
+    if(c != NULL){
+      c->x = r[1];
+      c->y = r[2];
+      c->z = r[3];
+    }
+
+    return r[0];
+  }
+  //vec3_print(p);printf("\n");
+  return generic_sdf(ud, p, c);
+
+}
+void ht_empty(hash_table *ht);
 lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value model0, lisp_value offset){
   if(!is_nil(model0)){
     void * model = get_physics_model_cached2(model0);
-    describe_sdf(model);
     if(model == NULL) return nil;
+    var timestamp0 = timestampf();
+    describe_sdf(model);
+    
     var center = is_nil(offset) ? vec3_zero : lv_vec3(offset);
     
     var scale = lisp_value_as_rational(scale_v);
     var res = lisp_value_as_rational(res);
-    size_t count = 0;
     df_ctx ctx2 = {
-      .sdf = generic_sdf,
+      .sdf = generic_sdf2,
       .sdf_userdata = model,
-      .threshold = res,
-      .emit_point = mc_count_vertexes,
-      .userdata = &count
-    };
-  
-    marching_cubes_sdf(&ctx2, center, scale);
+      .threshold = res
+     };
     
-  
-    var vec = make_vector(integer(count * 3 * 3), float32(0.0));
-    f32 * verts = vec.vector->data;
-    var vec2 = make_vector(integer(count * 3 * 3), float32(0.0));
-    f32 * colors = vec2.vector->data;
     mc_vertex_builder builder = {
-      .verts = verts,
-      .colors = colors,
-      .count = count,
+      .verts = NULL,
+      .colors = NULL,
+      .count = 0,
       .offset = 0,
       .sdf = &ctx2
     };
     ctx2.userdata = &builder;
     ctx2.emit_point = mc_take_vertex;
+
+
+    if(vertex_lookup2 != NULL){
+      ht_empty(vertex_lookup2);
+      dealloc(vertex_lookup2);
+      vertex_lookup2 = NULL;
+    }
+    
+    vertex_lookup2 = alloc(sizeof(*vertex_lookup2));
+    ht_create3(vertex_lookup2, 1, sizeof(vec3), sizeof(f32) * 4);
+    vertex_lookup2->hash = (void *)vec3_hash;
+    
     printf("Marching cubes...\n");
     var timestamp = timestampf();
-    marching_cubes_sdf(&ctx2, center, scale);
+    //for(int i = 0; i < 1000; i++){
+      marching_cubes_sdf(&ctx2, center, scale);
+      //builder.offset = 0;
+      //}
+    
+    printf("Done! %f\n", (f32)(timestampf() - timestamp));
+    builder.count = builder.offset;
+    timestamp = timestampf();
     improve_mesh(&builder);
-
+    dealloc(builder.verts);
+    printf("improve mesh! %f\n", (f32)(timestampf() - timestamp));
+    
     var vec3 = make_vector(integer(builder.out_count * 3), float32(0.0));
     f32 * verts2 = vec3.vector->data;
     var vec4 = make_vector(integer(builder.out_count * 3), float32(0.0));
@@ -1769,7 +1794,8 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
     memcpy(verts2, builder.out_verts, sizeof(float) * 3 * builder.out_count);
     memcpy(colors2, builder.out_colors, sizeof(float) * 3 * builder.out_count);
     //println(vec3);
-    printf("POINTS: %i: %f\n", count, (float)(timestampf() - timestamp));
+    printf("POINTS: %i: %f %i\n", builder.out_count, (float)(timestampf() - timestamp), vertex_lookup2->count);
+    printf("finished: %f\n",  (float)(timestampf() - timestamp0));
     
     return new_cons(vec3, vec4);
   }
@@ -1822,7 +1848,7 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
   };
   ctx2.userdata = &builder;
   ctx2.emit_point = mc_take_vertex;
-
+  
   marching_cubes_sdf(&ctx2, center, scale);
   
   printf("POINTS: %i\n", count);

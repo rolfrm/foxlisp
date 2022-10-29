@@ -489,6 +489,7 @@
            (resolution (plookup (cdr model) :resolution))
            (clip (unbind (plookup (cdr model) :clip)))
            (position (unbind (plookup (cdr model) :position)))
+           (positions nil)
            )
        (when clip
          (let ((prev-clip (hashtable-ref foxgl:sdf-clip model)))
@@ -497,6 +498,9 @@
              (hashtable-set foxgl:polygon-cache model nil)
              (hashtable-set foxgl:sdf-clip model (calc-clip clip size))
              (set! position (calc-clip clip size))
+             (dotimes! i 3
+                       (dotimes! j 3
+                                 (println (i j))))
              )
            
          ))

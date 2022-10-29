@@ -377,29 +377,28 @@
            (translate (50.0 1000.0 -50.0)
             (sphere 30.0))
            (sphere 1000.0)))
-              (translate (50 -48 -50)
-               (aabb 40.0 40.0 40.0))
+
+         ;(translate (50 -48 -50)
+         ; (aabb 40.0 40.0 40.0))
          (sphere-bounds
-        
-              (rgb (0.25 0.75 0.25)
+          (rgb (0.25 0.75 0.25)
                (translate (0 -99 -100)
                 (sphere 100.0))
                (translate (50 -99 -200)
                 (sphere 100.0))
                (translate (-50 -99 -190)
-                
-                (sphere 110.0))
-               (sphere-bounds
-        
-               (translate (0 -40 -250)
-                (rgb (0.4 0.4 0.4)
-                 (rotate (0 0.5 1)
-                  (aabb 40 40 40))))
-               (translate (65 -55 -250)
-                (rotate (0 0.5 1)
-                 (aabb 40 40 40))))
+                (sphere 110.0))))
+         (sphere-bounds
+         (rgb (1.4 0.4 0.4)
                
-               )))
+          (translate (0 -40 -250)
+           (rotate (0 0.5 1)
+            (aabb 40 40 40)))
+         (translate (65 -55 -250)
+          (rotate (0 0.5 1)
+           (aabb 40 40 40)))))
+         
+         
         
         (sphere-bounds
          (rgb (0.4 0.4 0.4)
@@ -412,14 +411,14 @@
          
           ))
          
-         )))
+         ))))
 (defvar world-model-sdf2
   '(rgb (1 0 0)
     (rotate (0.9 0.9 0.9)
      (aabb 10.0 10.0 10.0))
        ))
 (defvar world-model
-  '(sdf :size 200 :resolution 5 :clip (bind ball-position)
+  '(sdf :size 25 :resolution 2 :clip (bind ball-position)
     (bind world-model-sdf)
     ))
 (defvar sphere-model

@@ -5,13 +5,13 @@ CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 BCOBJECTS =$(LIB_SOURCES:.c=.bc)
-LDFLAGS= -L. $(OPT)#  -flto
+LDFLAGS= -L. $(OPT) -ffast-math	#  -flto
 LIBS= libmicroio.a -lm -lGL -lglfw3 -lX11 -lopenal
 BCLIBS = -s USE_GLFW=3 -s WASM=1 -s USE_WEBGL2=1 -lm -lglfw3 -lGL -lopenal
 BCFLAGS = -DWASM  
 BCLDFLAGS= -s ALLOW_MEMORY_GROWTH=1
 ALL= $(TARGET)
-CFLAGS = -Isrc/  -I. -Iinclude/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall 
+CFLAGS = -Isrc/  -I. -Iinclude/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -Werror=maybe-uninitialized -DUSE_VALGRIND -DDEBUG -Wall -ffast-math
 
 all: libmicroio.a
 all: $(TARGET)
