@@ -87,7 +87,7 @@ lisp_value tcp_accept(lisp_value l)
   int sockfd = get_fd(l);
   if(sockfd == -1) return nil;
   struct sockaddr_in client = {0};
-  int len = sizeof(client);
+  u32 len = sizeof(client);
   int connfd = accept(sockfd, (struct sockaddr *)&client, &len);
 
   if (connfd < 0)

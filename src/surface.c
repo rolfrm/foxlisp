@@ -429,9 +429,7 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
         
       }
       qsort(candidates, 8, sizeof(fi_pair), (void *) sort_pairs);
-      for(int i = 0; i < 8; i++){
-        var d = candidates[i].d;
-      }
+      
       for(int _i = 0; _i < 8; _i++){
         int i = candidates[_i].i;
         var d = candidates[i].d;
@@ -860,7 +858,6 @@ static void * get_physics_sdf2(lisp_value value){
     for(int i = 0; i < 8; i++)
       check_points[i] = vec3_scale(check_points[i], 5000);
       
-    printf("???\n");
     
     for(int i = 0; i < 8; i++){
       vec3 dir = vec3_normalize(vec3_sub(center, check_points[i]));
@@ -872,18 +869,13 @@ static void * get_physics_sdf2(lisp_value value){
       }
       d[i] = maxd;
       check_points[i] = vec3_add(check_points[i], vec3_scale(dir, d[i] ));
-      vec3_print(check_points[i]);
       center = vec3_add(center, vec3_scale(check_points[i], 1.0 / 8.0));
     }
-    printf("???\n");
-    //center = vec3_scale(center, 1.0 / 8.0);
     sphere->pos = center;
     sphere->radius = 0.0;
     for(int i = 0; i < 8; i++)
       sphere->radius = fmax(sphere->radius, vec3_len(vec3_sub(check_points[i], center)));
-    vec3_print(center);
-    printf("%f\n", sphere->radius);
-    return sphere;
+        return sphere;
   }
 
   if(lisp_value_eq(model_type, get_symbol("capsule"))){
@@ -916,7 +908,6 @@ static void * get_physics_sdf2(lisp_value value){
 
 
 void describe_sdf(void * ptr){
-  static int level = 0;
   sdf_type * tp = ptr;
   switch(tp[0]){
   case SDF_TYPE_TRANSFORM:{
@@ -951,7 +942,7 @@ void describe_sdf(void * ptr){
   case SDF_TYPE_MODELS:{
     
     sdf_models * m = ptr;
-    printf("Models: %i\n", m->model_count);
+    printf("Models: %i\n", (i32)m->model_count);
     for(size_t i = 0; i < m->model_count; i++)
       describe_sdf(m->models[i]);
     break;
@@ -959,7 +950,7 @@ void describe_sdf(void * ptr){
   case SDF_TYPE_COLOR:{
     
     sdf_color * m = ptr;
-    printf("COLOR: %i\n", m->model_count);
+    printf("COLOR: %i\n", (i32)m->model_count);
     for(size_t i = 0; i < m->model_count; i++)
       describe_sdf(m->models[i]);
     break;
@@ -986,8 +977,8 @@ void describe_sdf(void * ptr){
 }
 void * get_physics_model_cached(lisp_value physics1){
    if(is_nil(sdf_lookup)){
-    sdf_lookup = lisp_make_hashtable();
-    lisp_register_value("++sdf-lookup", sdf_lookup);
+     sdf_lookup = lisp_make_hashtable(NULL, 0);
+     lisp_register_value("++sdf-lookup", sdf_lookup);
   }
    if(!is_nil(physics1)){
     var thing = lisp_hashtable_get(sdf_lookup, physics1);
@@ -1006,9 +997,9 @@ void * get_physics_model_cached(lisp_value physics1){
 }
 void * get_physics_model_cached2(lisp_value physics1){
    if(is_nil(sdf_lookup)){
-    sdf_lookup = lisp_make_hashtable();
-    lisp_register_value("++sdf-lookup", sdf_lookup);
-  }
+     sdf_lookup = lisp_make_hashtable(NULL, 0);
+     lisp_register_value("++sdf-lookup", sdf_lookup);
+   }
    if(!is_nil(physics1)){
     var thing = lisp_hashtable_get(sdf_lookup, physics1);
     if(is_nil(thing)){
@@ -1036,8 +1027,6 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value ph
   var rot2 = lisp_value_as_rational(car(obj2));
   obj1 = cdr(obj1);
   obj2 = cdr(obj2);
-  var o1 = car(obj1);
-  var o2 = car(obj2);
   sdf_aabb a = {
     .type = SDF_TYPE_AABB,
     .pos = vec3_zero,
@@ -1111,7 +1100,6 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2, 
   obj2 = cdr(obj2);
   var rot2 = lisp_value_as_rational(car(obj2));
   obj2 = cdr(obj2);
-  var o2 = car(obj2);
   var s1l = car(floor_tile);
 
   void * ptr2 = get_physics_model_cached(model);
@@ -1388,9 +1376,6 @@ void improve_mesh(mc_vertex_builder * bld){
   edge_lookup = lisp_malloc(sizeof(*edge_lookup));
   ht_create3(edge_lookup, 1, sizeof(face_edge), sizeof(int));
   
-
-
-  int dupcnt = 0;
   int id = 0;
   for(int trg = 0; trg < bld->count / 3; trg++){
 
@@ -1487,9 +1472,7 @@ void improve_mesh(mc_vertex_builder * bld){
         }
       }
       if(con != -1)
-        connected[j] = vertexes[con];
-      var d2 = sdf(sdf_userdata, connected[j], &c);
-        
+        connected[j] = vertexes[con];   
     }
 
 
@@ -1516,7 +1499,6 @@ void improve_mesh(mc_vertex_builder * bld){
     }
     //for(int i = 0; i < 7; i++)
     //  printf(" %f ", ers[i]);
-    vec3 vd = vec3_zero;
     int min_i = 0;
     for(int j = 0; j < 7; j++){
       if(ers[j] < ers[min_i])
@@ -1566,11 +1548,6 @@ void improve_mesh(mc_vertex_builder * bld){
       //var m2 = trace_point(bld->sdf, mid, 0.01);
       for(int i = 0; i < 0; i++)
         m2 = trace_point(bld->sdf, m2, 0.01);
-      var d2 = sdf(sdf_userdata, m2, &c);
-      //if(d2 > 0.01) continue;
-      //vec3_print(v1);vec3_print(m2); vec3_print(v2);
-      //printf("\n");
-      //printf(" %f %f >>%f<<\n", d, d2, vec3_len(vec3_sub(v1, v2)));
       new_vertexes++;
       int id;
       if(!ht_get(vertex_lookup, &m2.x, &id)){
@@ -1580,11 +1557,7 @@ void improve_mesh(mc_vertex_builder * bld){
         vertexes = realloc(vertexes, vertex_count * sizeof(vertexes[0]));
         vertexes[vertex_count - 1] = m2;
         
-      } else{
-        //printf("(new vert) removed dup %i %i\n", ++dupcnt, sizeof(vec3) );
       }
-      
-      
       skip_triangles[et.t1] = true;
       skip_triangles[et.t2] = true;
       //one edge gets removed.
@@ -1712,7 +1685,7 @@ f32 generic_sdf2(void * ud, vec3 p, vec3 * c){
     f32 r[4];
     if(!ht_get(vertex_lookup2, &p.x, r)){
       vec3 c2;
-      r[0] = generic_sdf(ud, p, &c2.x);
+      r[0] = generic_sdf(ud, p, &c2);
       r[1] = c2.x;
       r[2] = c2.z;
       r[3] = c2.y;
@@ -1735,17 +1708,17 @@ f32 generic_sdf2(void * ud, vec3 p, vec3 * c){
 
 }
 void ht_empty(hash_table *ht);
-lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value model0, lisp_value offset){
+lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res, lisp_value model0, lisp_value offset){
   if(!is_nil(model0)){
     void * model = get_physics_model_cached2(model0);
     if(model == NULL) return nil;
-    var timestamp0 = timestampf();
-    describe_sdf(model);
+    //var timestamp0 = timestampf();
+    //describe_sdf(model);
     
     var center = is_nil(offset) ? vec3_zero : lv_vec3(offset);
     
     var scale = lisp_value_as_rational(scale_v);
-    var res = lisp_value_as_rational(res);
+    f64 res = lisp_value_as_rational(_res);
     df_ctx ctx2 = {
       .sdf = generic_sdf2,
       .sdf_userdata = model,
@@ -1773,19 +1746,19 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
     ht_create3(vertex_lookup2, 1, sizeof(vec3), sizeof(f32) * 4);
     vertex_lookup2->hash = (void *)vec3_hash;
     
-    printf("Marching cubes...\n");
-    var timestamp = timestampf();
+    //printf("Marching cubes...\n");
+    //var timestamp = timestampf();
     //for(int i = 0; i < 1000; i++){
       marching_cubes_sdf(&ctx2, center, scale);
       //builder.offset = 0;
       //}
     
-    printf("Done! %f\n", (f32)(timestampf() - timestamp));
+      //printf("Done! %f\n", (f32)(timestampf() - timestamp));
     builder.count = builder.offset;
-    timestamp = timestampf();
+    //timestamp = timestampf();
     improve_mesh(&builder);
     dealloc(builder.verts);
-    printf("improve mesh! %f\n", (f32)(timestampf() - timestamp));
+    //printf("improve mesh! %f\n", (f32)(timestampf() - timestamp));
     
     var vec3 = make_vector(integer(builder.out_count * 3), float32(0.0));
     f32 * verts2 = vec3.vector->data;
@@ -1794,8 +1767,8 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
     memcpy(verts2, builder.out_verts, sizeof(float) * 3 * builder.out_count);
     memcpy(colors2, builder.out_colors, sizeof(float) * 3 * builder.out_count);
     //println(vec3);
-    printf("POINTS: %i: %f %i\n", builder.out_count, (float)(timestampf() - timestamp), vertex_lookup2->count);
-    printf("finished: %f\n",  (float)(timestampf() - timestamp0));
+    //printf("POINTS: %i: %f %i\n", (int)builder.out_count, (float)(timestampf() - timestamp), (int)vertex_lookup2->count);
+    //printf("finished: %f\n",  (float)(timestampf() - timestamp0));
     
     return new_cons(vec3, vec4);
   }
@@ -1804,7 +1777,6 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
   sdf_color c1 = {.type = SDF_TYPE_COLOR, .color = vec3_new(0.5, 0.9, 0.4), .model_count = 2};
   sdf_color c2 = {.type = SDF_TYPE_COLOR, .color = vec3_new(0.5, 0.4, 0.2), .model_count = 1};
   sdf_aabb a = {.type = SDF_TYPE_AABB, .pos = vec3_new(0, -10.5, 0), .size = vec3_new(100,10,100)};
-  sdf_aabb a2 = {.type = SDF_TYPE_AABB, .pos = vec3_new(2, 0.0, 0), .size = vec3_new(0.6,0.6,0.6)};
   sdf_vert_capsule cap1 = {.type = SDF_TYPE_VERT_CAPSULE, .height = 3.0, .radius = 0.5, .pos = vec3_new(0,-1,0)}; 
 
   sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(0.0, 3, 0), .radius = 1.5 };
@@ -1851,7 +1823,7 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value res, lisp_value mod
   
   marching_cubes_sdf(&ctx2, center, scale);
   
-  printf("POINTS: %i\n", count);
+  printf("POINTS: %i\n", (int)count);
 
   return new_cons(vec, vec2);
 }

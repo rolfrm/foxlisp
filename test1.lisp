@@ -491,8 +491,8 @@
                       (hashtable-set ht (list i j 0) (* i j))))
   (hashtable-set ht a1 1)
   (println (hashtable-ref ht a2))
-  (println (hashtable-ref ht '(3 4 0)))
+  (assert (eq (hashtable-ref ht '(3 4 0)) (* 3 4)))
   )
 
-(println (equal? (cons 1 2) (cons 1 2)))
-  
+(defvar ht0 (make-hashtable :deep-equality))
+(hashtable-set ht0 '(1 2 3) '(4 5 6))

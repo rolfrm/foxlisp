@@ -40,7 +40,7 @@
   (let ((events (poll-events2)))
     (for-each evt events
               (when (eq (car evt) 'char)
-                (print evt)
+                ;(print evt)
                 (when (eq (cadr evt) 'd)
                   (lisp:debug (swap foxday-debug-state (not foxday-debug-state))))
                 (when (eq (cadr evt) 'q)

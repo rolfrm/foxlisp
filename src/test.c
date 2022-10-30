@@ -61,7 +61,7 @@ void test_gc(){
       ASSERT(!vector_is_marked(ctx->gc, x));
       
       var ptr = allocated_pointer_lisp_value(x);
-      printf("ptr: %p\n", ptr);
+      printf("ptr: %p\n", ptr.native_pointer);
       lisp_scope_create_value(ctx->globals, s2, ptr);
       gc_clear(current_context->gc);
       gc_mark(current_context);
@@ -120,7 +120,7 @@ void test_gc(){
     var t2 = lisp_value_hashtable(ht);
     printf("??\n");
     var t1 = lisp_malloc(sizeof(*t2));
-    printf("%p %p %i \n", t1, t2, sizeof(*t2));
+    printf("%p %p %i \n", t1, t2, (i32)sizeof(*t2));
     printf("%p %p %p\n", t2->keys, t2->elems, t2->occupied);
     ASSERT(t1 != t2);
     gc_collect_garbage(ctx);
@@ -129,7 +129,7 @@ void test_gc(){
       char buf[10] = {0};
       sprintf(buf, "S%i", i);
       lisp_hashtable_set(ht, get_symbol(buf), nil);
-      printf(" %i\n", lisp_value_integer(lisp_hashtable_count(ht)));
+      printf(" %i\n", (i32)lisp_value_integer(lisp_hashtable_count(ht)));
       gc_collect_garbage(ctx);
 
     }

@@ -552,7 +552,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
         pool_size *= 4;
         parent = &(*parent)->next;
       }
-      printf("new pool %i\n", pool_size);
+      printf("new pool %i\n", (int)pool_size);
       
       cons_buffer * new_pool = _alloc0(sizeof(*pool));
       new_pool->buffer = _alloc0(sizeof(cons) * pool_size);

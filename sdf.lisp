@@ -15,7 +15,6 @@
 (defun foxgl:build-sdf0 (model)
   (case (car model)
     (aabb
-     (println 'aabb)
      (push-back! sdf-out model)
      )
     (sphere

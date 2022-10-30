@@ -28,6 +28,25 @@ lisp_value math_mod(lisp_value a, lisp_value b){
   return rational_lisp_value(fmod(lisp_value_as_rational(a), lisp_value_as_rational(b)));
 }
 
+lisp_value math_floor(lisp_value a, lisp_value dec){
+  if(is_integer(a)) return a;
+  if(is_float(a)){
+    var v = lisp_value_as_rational(a);
+    if(is_nil(dec)){
+      v = floor(v);
+    }else{
+      var decimals = lisp_value_integer(dec);
+      var amount = pow(10, decimals);
+      
+      v = floor(v * amount) / amount;
+    }
+    if(is_float32(a)) return float32_lisp_value(v);
+    return rational_lisp_value(v);
+  }
+  raise_string("Not roundable");
+  return nil;
+}
+
 lisp_value math_round(lisp_value a, lisp_value dec){
   if(is_integer(a)) return a;
   if(is_float(a)){
@@ -803,6 +822,7 @@ void foxgl_register(){
   lrn("math:tan", 1, math_tan);
   lrn("math:atan", 2, math_atan);
   lrn("math:round", 2, math_round);
+  lrn("math:floor", 2, math_floor);
   lrn("foxgl:load-font", 2, foxgl_load_font);
   lrn("foxgl:load-texture-from-path", 1, foxgl_load_texture_from_path);
   lrn("foxgl:create-window", 2, foxgl_create_window);

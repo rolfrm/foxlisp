@@ -1700,7 +1700,7 @@ int print2(char * buffer, int l2, lisp_value v){
     return snprintf(buffer, LEN1, "t");
   case LISP_INTEGER:
   case LISP_INTEGER32:
-    return snprintf(buffer, LEN1, "%lli", v.integer);
+    return snprintf(buffer, LEN1, "%lli", (long long)v.integer);
   case LISP_BYTE:
     return snprintf(buffer, LEN1, "%i", (u8)v.integer);
   case LISP_VECTOR:
@@ -1721,7 +1721,7 @@ int print2(char * buffer, int l2, lisp_value v){
     if(v.integer == 0)
       return snprintf(buffer, LEN1, "NULL");
     else
-      return snprintf(buffer, LEN1, "%p", v.integer);
+      return snprintf(buffer, LEN1, "%p", v.native_pointer);
   case LISP_FLOAT32:
   case LISP_RATIONAL:
     return snprintf(buffer, LEN1, "%g", v.rational);
@@ -1738,9 +1738,9 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_MACRO_BUILTIN:
     return snprintf(buffer, LEN1, "MacroBuiltin");
   case LISP_HASHTABLE:
-    return snprintf(buffer, LEN1, "HashTable(%i)", lisp_value_hashtable(v)->count);
+    return snprintf(buffer, LEN1, "HashTable(%i)", (int)lisp_value_hashtable(v)->count);
   case LISP_SCOPE:
-    return snprintf(buffer, LEN1, "Scope (%i)", lisp_value_scope(v)->argcnt);
+    return snprintf(buffer, LEN1, "Scope (%i)", (int)lisp_value_scope(v)->argcnt);
   case LISP_GLOBAL_INDEX:
     {
       var sym = current_context->globals->value_symbol[v.integer];
@@ -2414,11 +2414,11 @@ lisp_value parse_hex(lisp_value str){
 lisp_value hex_string(lisp_value i, lisp_value dec){
   var v = lisp_value_integer(i);
   var l = lisp_value_integer(dec);
-  int cnt = snprintf(NULL, 0, "%x", v);
+  int cnt = snprintf(NULL, 0, "%x", (u32)v);
   if(is_nil(dec))
     l = cnt;
   char * buf = lisp_malloc(l + 1);
-  snprintf(buf + MAX(0, l - cnt), MIN(cnt, l) + 1, "%x", v);
+  snprintf(buf + MAX(0, l - cnt), MIN(cnt, l) + 1, "%x", (u32)v);
   buf[l] = 0;
   for(int i = 0; i < MAX(0, l - cnt); i++)
     buf[i] = '0';
@@ -2444,10 +2444,10 @@ int lisp_value_hash(lisp_value v){
       hash *= 16777619;
       return hash;
     }
-  default:
+  default:;
     
   }
-  int hash = 2166136261;
+  int hash = (i32)2166136261;
   hash = hash ^ v.type;
   hash *= 16777619;
   hash = hash ^ v.integer;
@@ -2470,21 +2470,27 @@ static bool lisp_value_full_compare(const void * _k1, const void * _k2, void * u
 
 lisp_value lisp_make_hashtable(lisp_value * args, int n){
   static lisp_value full_keyword;
+  static lisp_value weak_keyword;
   bool full = false;
+  bool weak = false;
   for(int i = 0; i < n; i++){
     lisp_value arg = args[i];
-    if(eq(arg, get_symbol_cached(&full_keyword, ":deep-equality"))){
+    if(eq(arg, get_symbol_cached(&full_keyword, ":deep-equality")))
       full = true;
-    }
+    
+    if(eq(arg, get_symbol_cached(&weak_keyword, ":weak")))
+      weak = true;
   }
   
   hash_table * ht = lisp_malloc(sizeof(*ht));
   ht_create3(ht, 1, sizeof(lisp_value), sizeof(lisp_value));
   ht_set_alloc(ht, lisp_malloc, lisp_free);
   if(full){
-    printf("HT FULL!\n");
     ht->hash = lisp_value_full_hash;
     ht->compare = lisp_value_full_compare;
+  }
+  if(weak){
+    ((void **) &ht->userdata)[0] = (void *) (size_t)LISP_HASHTABLE_WEAK_KEYS;  
   }
   return hashtable_lisp_value(ht);
 }
@@ -2493,7 +2499,7 @@ lisp_value lisp_make_hashtable_weak_keys(){
   hash_table * ht = lisp_malloc(sizeof(*ht));
   ht_create3(ht, 8, sizeof(lisp_value), sizeof(lisp_value));
   ht_set_alloc(ht, lisp_malloc, lisp_free);
-  ((size_t*)&ht->userdata)[0] = LISP_HASHTABLE_WEAK_KEYS;
+  ((void **) &ht->userdata)[0] = (void *) (size_t)LISP_HASHTABLE_WEAK_KEYS;  
   return hashtable_lisp_value(ht);
 }
 

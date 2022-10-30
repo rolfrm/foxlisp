@@ -27,8 +27,8 @@
       (when (> +dt+ 0.01)
         (set! +dt+ 0.01))
       (for-each x events
-                (unless (eq (car x) 'frame)
-                  (println x))
+                ;(unless (eq (car x) 'frame)
+                 ; (println x))
                 (when (eq (car x) 'mouse-leave)
                   (set! mx nil)
                   (set! my nil))
