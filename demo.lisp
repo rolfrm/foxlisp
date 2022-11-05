@@ -11,14 +11,18 @@
 (defvar guy-move 2.0)
 (defvar move-x 0.0)
 (defvar move-y 0.0)
+(defvar turn 0.0)
+(defvar turned 0.0)
 ;(defvar sdf1 (test:poly))
-(define ball-position (list 0 -50 0))
+(define ball-position (list 0 0 0))
 
 (defvar game-update
   (let ((mx nil) (my nil))
     (lambda (events)
+      (println ball-position)
       (incf time2 (+ 0.0005 (* (+ 1.0 (sin time2)) 0.0025)))
       (incf real-time 0.016)
+      (incf turned (* 0.16 turn 0.1))
       (set! guy-move (* 1.0 real-time))
       (set-car! ball-position (+ move-x (car ball-position)))
       (set-car! (cddr ball-position) (+ (- 0 move-y) (car (cddr ball-position))))
@@ -27,8 +31,8 @@
       (when (> +dt+ 0.01)
         (set! +dt+ 0.01))
       (for-each x events
-                ;(unless (eq (car x) 'frame)
-                 ; (println x))
+                (unless (eq (car x) 'frame)
+                  (println x))
                 (when (eq (car x) 'mouse-leave)
                   (set! mx nil)
                   (set! my nil))
@@ -64,6 +68,12 @@
                   (when (eq (caddr x) foxgl:key-d)
                     (incf move-x 1.0)
                     )
+                  (when (eq (caddr x) foxgl:key-left)
+                    (incf turn -1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-right)
+                    (decf turn -1.0)
+                    )
                   )
                 (when (eq (car x) 'key-up)
                   (when (eq (caddr x) foxgl:key-w)
@@ -77,6 +87,12 @@
                     )
                   (when (eq (caddr x) foxgl:key-d)
                     (incf move-x -1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-left)
+                    (decf turn -1.0)
+                    )
+                  (when (eq (caddr x) foxgl:key-right)
+                    (incf turn -1.0)
                     )
                   )
       ))))
@@ -372,12 +388,21 @@
 (defvar world-model-sdf '(translate (0 0 100)
        (soft 0.0
         (rgb (0.3 0.8 0.3)
+         (subtract 0.0
+          (rgb (0.3 0.8 0.3)
+          
+         
          (translate (0 -1000  0)
           (subtract 0.0
-           (translate (50.0 1000.0 -50.0)
-            (sphere 30.0))
-           (sphere 1000.0)))
-
+           (rgb (0.3 0.8 0.3)
+            (sphere 1000.0))
+           
+           ;(translate (50.0 1000.0 -50.0)
+           ; (sphere 30.0))
+           
+           
+           ))
+         
          ;(translate (50 -48 -50)
          ; (aabb 40.0 40.0 40.0))
          (sphere-bounds
@@ -388,8 +413,9 @@
                 (sphere 100.0))
                (translate (-50 -99 -190)
                 (sphere 110.0))))
-         (sphere-bounds
-         (rgb (1.4 0.4 0.4)
+
+          (sphere-bounds
+         (rgb (3.14 0.4 0.4)
                
           (translate (0 -40 -250)
            (rotate (0 0.5 1)
@@ -397,6 +423,18 @@
          (translate (65 -55 -250)
           (rotate (0 0.5 1)
            (aabb 40 40 40)))))
+         
+          )
+          
+          
+          (translate (58.0 0.0 -100.0)
+           (rotate (1.4 0.0 0.0)
+            (translate (0 -500 0)
+             (aabb 5.0 1000.0 5.0)))
+           )
+          )
+
+            ;)
          
          
         
@@ -418,7 +456,7 @@
      (aabb 10.0 10.0 10.0))
        ))
 (defvar world-model
-  '(sdf :size 25 :resolution 2 :clip (bind ball-position)
+  '(sdf :size 25  :resolution 2 :clip (bind ball-position)
     (bind world-model-sdf)
     ))
 (defvar sphere-model
@@ -434,14 +472,14 @@
       (set-car! (cdr ball-position) y2))) 
   
   )
-(set! ball-position (list 0 50 0))
+(set! ball-position (list 0 0 0))
 
 (define model
     '(view :perspective (1.0 (bind foxgl:aspect-ratio) 0.01 1000.0)
       (depth
        (translate (0 0  (bind (+ -20 zoom)))
         
-        (rotate (0.9 (bind real-time) 0)
+        (rotate (0.4 (bind turned) 0)
          (translate ((bind (- 0 (car ball-position))) (bind (- 0 (cadr ball-position)))  (bind (- 0 (caddr ball-position))))
           (bind world-model)
 
@@ -462,7 +500,7 @@
             (translate (50 -8 50)
              (scale (60 1 60)
               (bind upcube)))))
-         (rgb (0 0 0)
+         (rgb (1 1 1)
           (translate (bind ball-position)
            (translate (0 1 0)
             (translate (0 -2 0)

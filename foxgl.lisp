@@ -110,6 +110,7 @@
 (define foxgl:building-sdf nil)
 (define foxgl:sdf-stack nil)
 (define foxgl:sdf-clip (make-hashtable))
+(define foxgl:sdf-build-lookup (make-hashtable))
 
 (defun -compare-clip (now-clip prev-clip size)
   (when prev-clip
@@ -134,14 +135,14 @@
       (incf sdf-chunk-model-id-c)
       (set! model-id sdf-chunk-model-id-c)
       (hashtable-set sdf-chunk-lookup-model-id model model-id))
-    (dotimes! o 1
+    (dotimes! o 2
         (let* ((s2 (integer (* (math:pow 2.0 (rational o)) size)))
                (p (calc-clip clip s2 ))
                )
   (dotimes! i 6
      (dotimes! j 6
         (dotimes! k 6
-                  (when (and (< o 3) (or (eq 0 o) (not (and (or (= j 1) (= j 2))
+                  (when (and (< o 2) (< o 3) (or (eq 0 o) (not (and (or (= j 2) (= j 3))
                                                             (or (= i 2) (= i 3))
                                                             (or (= k 2) (= k 3))))))
             (let ((x (+ (* s2 (- i 2)) (* s2 1 (math:round (/ (car p) (* s2 1))))))
@@ -162,12 +163,14 @@
                                             )))
                     (println (list 'recalc sdf-chunk-lookup))
                   (hashtable-set sdf-chunk-lookup key r)
-                  ))
-                (foxgl:color foxgl:current-color)
-                (foxgl:transform foxgl:current-transform)
-                (foxgl:blit-mode :triangles-color)
-                (foxgl:blit-polygon (cdr r))
-                (foxgl:blit-mode nil)         
+                    ))
+      
+                  (foxgl:color foxgl:current-color)
+                  (foxgl:transform foxgl:current-transform)
+                  
+                  (foxgl:blit-mode :triangles-color)
+                  (foxgl:blit-polygon (cdr r))
+                  (foxgl:blit-mode nil)
               )
             )
         )
@@ -544,8 +547,13 @@
            (positions nil)
            )
        (when clip
-         (render-sdf-clip model size resolution clip)
-         )
+         (let ((sdf-build (hashtable-ref foxgl:sdf-build-lookup (cdr model))))
+           (unless sdf-build
+             (set! sdf-build (foxgl:build-sdf (cdr model) foxgl:current-scope)))
+           (hashtable-set foxgl:sdf-build-lookup (cdr model) sdf-build)
+         ;(render-sdf-clip model size resolution clip)
+           (sdf:render sdf-build foxgl:current-transform clip)
+         ))
        (unless clip
        (set! foxgl:sdf-stack nil)
      (let ((r (hashtable-ref foxgl:polygon-cache model)))
@@ -923,6 +931,8 @@
 
 
 (define foxgl:key-up 264)
+(define foxgl:key-left 263)
+(define foxgl:key-right 262)
 (define foxgl:key-w 87)
 (define foxgl:key-a 65)
 (define foxgl:key-s 83)

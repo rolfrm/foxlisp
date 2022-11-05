@@ -1,4 +1,5 @@
 #include <iron/full.h>
+#include <iron/gl.h>
 #include "foxlisp.h"
 
 
@@ -92,9 +93,8 @@ float vert_capsule( vec3 p, float h, float r )
 f32 sphere(vec3 v, vec3 center, float radius){
   vec3 p = center;
   return vec3_len(vec3_sub(v, p)) - radius;
-  
-  
 }
+
 f32 d0(vec3 v, vec3 * c, vec3 center, float radius){
   *c = vec3_new(1, 0, 1);
   vec3 p = center;
@@ -453,6 +453,11 @@ static vec3 lv_vec3(lisp_value v){
                   
 }
 
+static mat4 lisp_value_mat4(lisp_value v){
+  mat4 * m = lisp_value_vector(v)->data;
+  return *m;
+}
+
 typedef enum{
   SDF_TYPE_UNRECOGNIZED,
   SDF_TYPE_SPHERE,
@@ -637,7 +642,7 @@ f32 subtract_sdf(void * ud, vec3 p, vec3 * color){
   for(int i = 1; i < soft->model_count; i++){
     var d2 = generic_sdf(soft->models[i],p, NULL);
     float h = CLAMP( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
-    d1 = mixf( d2, -d1, h ) + k*h*(1.0-h); 
+    d1 = mixf( d1, -d2, h ) + k*h*(1.0-h); 
   }
 
   return d1;
@@ -1179,53 +1184,7 @@ void test_sdf_col(){
 }
 
 void test_layered_sdf(){
-  {
-  mat4 t = mat4_translate(1.0, 0, 0);
-  mat4 s = mat4_scaled(0.2, 0.2, 0.2);
-  mat4 t_inv = mat4_invert(mat4_mul(t, s));
-  mat4_print(mat4_invert(t_inv));
-  sdf_sphere s1 = {.type = SDF_TYPE_SPHERE, .pos = vec3_zero, .radius = 1.0};
-  
-  void * m1[] = {&s1};
-  sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv,
-    .models = m1, .model_count = 1};
 
-  // a sphere size 0.1 centered at 1.0.
-  sdf_sphere s2 = {.type = SDF_TYPE_SPHERE, .pos = vec3_new(1.0, 0, 0), .radius = 0.2};
-  for(float x = -1; x < 3; x += 0.1){
-    for(float y = -1; y < 3; y += 0.1){
-      
-    var pt = vec3_new(x, 0.1, y);
-    var a = generic_sdf(&t1, pt, NULL);
-    var b = generic_sdf(&s2, pt, NULL);
-    printf("x: %f   : %f == %f: %f\n", x, a, b, a - b);
-    }
-  }
-  }
-  {
-    printf("AABB\n");
-    mat4 t = mat4_translate(1.0, 0, 0);
-    mat4 s = mat4_scaled(0.2, 0.2, 0.2);
-    mat4 t_inv = mat4_invert(mat4_mul(t, s));
-    mat4_print(mat4_invert(t_inv));
-    sdf_aabb s1 = {.type = SDF_TYPE_AABB, .pos = vec3_zero, .size = vec3_one};
-    void * m1[] = {&s1};
-  
-    sdf_transform t1 = {.type = SDF_TYPE_TRANSFORM, .inv_tform = t_inv,
-      .models = m1, .model_count = 1};
-    
-    // a sphere size 0.1 centered at 1.0.
-    sdf_aabb s2 = {.type = SDF_TYPE_AABB, .pos = vec3_new(1.0, 0, 0), .size = vec3_new(0.2, 0.2, 0.2)};
-    for(float x = -1; x < 3; x += 0.1){
-      for(float y = -1; y < 3; y += 0.1){
-        
-        var pt = vec3_new(x, 0.1, y);
-        var a = generic_sdf(&t1, pt, NULL);
-        var b = generic_sdf(&s2, pt, NULL);
-        printf("x: %f   : %f == %f: %f\n", x, a, b, a - b);
-      }
-    } 
-  }
 }
 
 #include "mc.h"
@@ -1238,20 +1197,8 @@ void print_triangle(void * ud, vec3 v1, vec3 v2, vec3 v3){
 void marching_cubes_emit_point(void * userdata, vec3 a, vec3 b, vec3 c){
   df_ctx * ctx = userdata;
   vec3 color = vec3_new(0,0,1);
-  /*for(int i = 0; i < 1; i++){
-    a = trace_point(ctx, a, 0.001);
-    b = trace_point(ctx, b, 0.001);
-    c = trace_point(ctx, c, 0.001);
-    }*/
-  
-  //ctx->sdf(ctx->sdf_userdata, a, &color);
-  
   ctx->emit_point(ctx->userdata, a, color);
-  
-  //ctx->sdf(ctx->sdf_userdata, b, &color);
   ctx->emit_point(ctx->userdata, b, color);
-  
-  //ctx->sdf(ctx->sdf_userdata, c, &color);
   ctx->emit_point(ctx->userdata, c, color);
 }
 
@@ -1655,10 +1602,20 @@ void improve_mesh(mc_vertex_builder * bld){
         continue;
       }
       var trig = triangles[i];
+      vec3 _c2;
       for(int j = 0; j < 3; j++){
         var vx = vertexes[trig.verts[j]];
         vec3 vx_c;
         sdf(sdf_userdata, vx, &vx_c);
+        var vxup = vec3_add(vx, vec3_new(0,0.3,0));
+        sdf(sdf_userdata, vx, &vx_c);
+        for(int i = 0; i < 20; i++){
+          float dup = sdf(sdf_userdata, vxup, &_c2);
+          vxup = vec3_add(vxup, vec3_new(0,dup,0));
+        }
+        if(vec3_len(vec3_sub(vxup, vx)) < 50.0){
+          vx_c = vec3_scale(vx_c, 0.9);
+        }
         //vec3_print(vx); printf("\n");
         for(int k = 0; k < 3; k++){
           vp[0] = vx.data[k];
@@ -1749,7 +1706,7 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res, lisp_value mo
     //printf("Marching cubes...\n");
     //var timestamp = timestampf();
     //for(int i = 0; i < 1000; i++){
-      marching_cubes_sdf(&ctx2, center, scale);
+    marching_cubes_sdf(&ctx2, center, scale);
       //builder.offset = 0;
       //}
     
@@ -1828,6 +1785,116 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res, lisp_value mo
   return new_cons(vec, vec2);
 }
 
+typedef struct {
+  blit3d_polygon * vert;
+  blit3d_polygon * color;
+  int count;
+}sdf_poly_t;
+
+extern blit3d_context * blit3d_current_context;
+int render_sdf_lods2(df_ctx * model, mat4 tform, vec3 center, vec3 offset, f32 scale, int level){
+  static hash_table * poly_lookup;
+  if(poly_lookup == NULL){
+    poly_lookup = alloc(sizeof(*poly_lookup));
+    ht_create3(poly_lookup, 1, sizeof(vec4), sizeof(sdf_poly_t));
+  }
+  int verts = 0;
+  var center2 = vec3_scale(vec3_round(vec3_scale(offset, 1.0 / scale)), scale);
+  //vec3_print(center2);printf("%f \n", scale);
+  for(int i = -1; i < 2; i++){
+    for(int j = -1; j < 2; j++){
+      for(int k = -1; k < 2; k++){
+        vec3 p = vec3_add(center2, vec3_scale(vec3_new(i,j,k), scale));
+        vec3 c;
+        f32 d = model->sdf(model->sdf_userdata, p, &c);
+        if(d > scale * 0.5 * sqrt_3)
+          continue;
+        
+        //vec3_print(p);printf(">> \n");
+        if(vec3_len(vec3_sub(center, p)) < scale && level > 0){
+          
+          verts += render_sdf_lods2(model, tform, center, p, scale * 0.5 , level - 1);
+        }else if(level == 1){
+          
+          vec4 key = vec4_new(p.x, p.y, p.z, scale);
+          sdf_poly_t poly = {0};
+          if(ht_get(poly_lookup, &key, &poly) == false){
+            //vec3_print(p); printf("%f   <--- \n", scale);
+            
+            mc_vertex_builder builder = {
+              .verts = NULL,
+              .colors = NULL,
+              .count = 0,
+              .offset = 0,
+              .sdf = model
+            };
+            model->userdata = &builder;
+            model->emit_point = mc_take_vertex;
+            model->threshold = 4.0 * pow(2.0, level);
+            
+            marching_cubes_sdf(model, p, scale * 0.5 * 0.95);
+            builder.count = builder.offset;
+            if(builder.count > 0){
+              
+              //timestamp = timestampf();
+              improve_mesh(&builder);
+              dealloc(builder.verts);
+              
+              var poly_v = blit3d_polygon_new();
+              blit3d_polygon_load_data(poly_v, builder.out_verts,  sizeof(float) * 3 * builder.out_count);
+              blit3d_polygon_configure(poly_v, 3);
+              
+              
+              var poly_c = blit3d_polygon_new();
+              blit3d_polygon_load_data(poly_c, builder.out_colors,  sizeof(float) * 3 * builder.out_count);
+              blit3d_polygon_configure(poly_c, 3);
+              poly.vert = poly_v;
+              poly.color = poly_c;
+            }
+            poly.count = builder.count;
+            ht_set(poly_lookup, &key, &poly);
+
+          }
+          if(poly.vert != NULL){
+            blit3d_view(blit3d_current_context, tform);
+            blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES_COLOR);
+   
+            blit3d_polygon_blit2(blit3d_current_context, &poly.vert, 2);
+            verts += poly.count;
+          }
+        }
+      }
+
+    }  
+
+  }
+  return verts;
+
+}
+
+lisp_value lisp_render_sdf_lods(lisp_value model, lisp_value transform, lisp_value center){
+  // lets say we render 4 levels of detail, with a 10x10x10 chunk being the lowest level
+  // of detail and 2^4 = 16 * 10 160x160x160 chunk being the biggest
+  printf("Render SDF\n");
+  int maxLevel = 2;
+
+  f32 max_scale = powf(2.0, maxLevel);
+  vec3 center_pos = lv_vec3(center);
+  void * modelp = get_physics_model_cached2(model);
+  df_ctx ctx2 = {
+    .sdf = generic_sdf2,
+    .sdf_userdata = modelp
+  };
+  
+  // then subdivide the space into 27 chunks, whichever of those chunks includes the
+  // center or is right next to it, gets subdivided recursively 
+  int count = render_sdf_lods2(&ctx2, lisp_value_mat4(transform), center_pos, center_pos, max_scale * 20, maxLevel);
+  printf("Render SDF Vertexes: %i\n", count);
+  
+  return nil;
+  
+}
+
 lisp_value lisp_sdf_distance(lisp_value model, lisp_value p){
   if(is_nil(model))
     return nil;
@@ -1842,6 +1909,7 @@ lisp_value lisp_sdf_distance(lisp_value model, lisp_value p){
 void lrn(const char * l, int args, void * f);
 void sdf_register(){
   lrn("sdf:dist", 2, lisp_sdf_distance);
+  lrn("sdf:render", 3, lisp_render_sdf_lods);
 }
 typedef struct{
   int count;
