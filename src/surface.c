@@ -1798,85 +1798,86 @@ int render_sdf_lods2(df_ctx * model, mat4 tform, vec3 center, vec3 offset, f32 s
     poly_lookup = alloc(sizeof(*poly_lookup));
     ht_create3(poly_lookup, 1, sizeof(vec4), sizeof(sdf_poly_t));
   }
+  var offset2 = offset;
+  var d2 = vec3_len(vec3_sub(offset2, center));
+  int lod = floor(powf(d2 / 20, 0.5));
+  //vec3_print(offset2); printf("scale: %f %f %i (%f)\n", scale, d2, lod, d2 / 5);
+  //vec3 c;
+  //f32 d = model->sdf(model->sdf_userdata, offset2, &c);
+  //if(d > scale * sqrt_3 * 1.5)
+  //  return 0;
+  if(level <= lod){// || vec3_len(vec3_sub(offset2, center)) > scale * 10){
+    //printf("Render chunk: %i %f\n", level, vec3_len(vec3_sub(offset2, center)));
+    // render this LOD
+    vec4 key = vec4_new(offset2.x, offset2.y, offset2.z, (f32)lod);
+    sdf_poly_t poly = {0};
+    if(ht_get(poly_lookup, &key, &poly) == false){
+            //vec3_print(p); printf("%f   <--- \n", scale);
+      
+      mc_vertex_builder builder = {
+        .verts = NULL,
+        .colors = NULL,
+        .count = 0,
+        .offset = 0,
+        .sdf = model
+      };
+      model->userdata = &builder;
+      model->emit_point = mc_take_vertex;
+      model->threshold = scale / 4.0;
+      
+      marching_cubes_sdf(model, offset2, scale * 0.55);
+      builder.count = builder.offset;
+      if(builder.count > 0){
+        
+        //timestamp = timestampf();
+        improve_mesh(&builder);
+        dealloc(builder.verts);
+        
+        var poly_v = blit3d_polygon_new();
+        blit3d_polygon_load_data(poly_v, builder.out_verts,  sizeof(float) * 3 * builder.out_count);
+        blit3d_polygon_configure(poly_v, 3);
+        
+        
+        var poly_c = blit3d_polygon_new();
+        blit3d_polygon_load_data(poly_c, builder.out_colors,  sizeof(float) * 3 * builder.out_count);
+        blit3d_polygon_configure(poly_c, 3);
+        poly.vert = poly_v;
+        poly.color = poly_c;
+      }
+      poly.count = builder.count;
+      ht_set(poly_lookup, &key, &poly);
+      
+    }
+    if(poly.vert != NULL){
+      blit3d_view(blit3d_current_context, tform);
+      blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES_COLOR);
+      
+      blit3d_polygon_blit2(blit3d_current_context, &poly.vert, 2);
+      return poly.count;
+    }
+    return 0;
+  }
+  if(level == 0) return 0;
   int verts = 0;
-  var center2 = vec3_scale(vec3_round(vec3_scale(offset, 1.0 / scale)), scale);
   //vec3_print(center2);printf("%f \n", scale);
   for(int i = -1; i < 2; i++){
     for(int j = -1; j < 2; j++){
       for(int k = -1; k < 2; k++){
-        vec3 p = vec3_add(center2, vec3_scale(vec3_new(i,j,k), scale));
-        vec3 c;
-        f32 d = model->sdf(model->sdf_userdata, p, &c);
-        if(d > scale * 0.5 * sqrt_3)
-          continue;
-        
-        //vec3_print(p);printf(">> \n");
-        if(vec3_len(vec3_sub(center, p)) < scale && level > 0){
-          
-          verts += render_sdf_lods2(model, tform, center, p, scale * 0.5 , level - 1);
-        }else if(level == 1){
-          
-          vec4 key = vec4_new(p.x, p.y, p.z, scale);
-          sdf_poly_t poly = {0};
-          if(ht_get(poly_lookup, &key, &poly) == false){
-            //vec3_print(p); printf("%f   <--- \n", scale);
-            
-            mc_vertex_builder builder = {
-              .verts = NULL,
-              .colors = NULL,
-              .count = 0,
-              .offset = 0,
-              .sdf = model
-            };
-            model->userdata = &builder;
-            model->emit_point = mc_take_vertex;
-            model->threshold = 4.0 * pow(2.0, level);
-            
-            marching_cubes_sdf(model, p, scale * 0.5 * 0.95);
-            builder.count = builder.offset;
-            if(builder.count > 0){
-              
-              //timestamp = timestampf();
-              improve_mesh(&builder);
-              dealloc(builder.verts);
-              
-              var poly_v = blit3d_polygon_new();
-              blit3d_polygon_load_data(poly_v, builder.out_verts,  sizeof(float) * 3 * builder.out_count);
-              blit3d_polygon_configure(poly_v, 3);
-              
-              
-              var poly_c = blit3d_polygon_new();
-              blit3d_polygon_load_data(poly_c, builder.out_colors,  sizeof(float) * 3 * builder.out_count);
-              blit3d_polygon_configure(poly_c, 3);
-              poly.vert = poly_v;
-              poly.color = poly_c;
-            }
-            poly.count = builder.count;
-            ht_set(poly_lookup, &key, &poly);
-
-          }
-          if(poly.vert != NULL){
-            blit3d_view(blit3d_current_context, tform);
-            blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES_COLOR);
-   
-            blit3d_polygon_blit2(blit3d_current_context, &poly.vert, 2);
-            verts += poly.count;
-          }
-        }
+        vec3 p = vec3_add(offset2, vec3_scale(vec3_new(i,j,k), scale / 3.0));
+        //vec3_print(p);printf("\n");
+        verts += render_sdf_lods2(model, tform, center, p, scale / 3.0 , level - 1);
       }
-
     }  
 
   }
   return verts;
-
 }
 
 lisp_value lisp_render_sdf_lods(lisp_value model, lisp_value transform, lisp_value center){
   // lets say we render 4 levels of detail, with a 10x10x10 chunk being the lowest level
   // of detail and 2^4 = 16 * 10 160x160x160 chunk being the biggest
   printf("Render SDF\n");
-  int maxLevel = 2;
+  int maxLevel = 3;
 
   f32 max_scale = powf(2.0, maxLevel);
   vec3 center_pos = lv_vec3(center);
@@ -1885,10 +1886,23 @@ lisp_value lisp_render_sdf_lods(lisp_value model, lisp_value transform, lisp_val
     .sdf = generic_sdf2,
     .sdf_userdata = modelp
   };
-  
+
+  var init_scale = max_scale * 3 * 3 * 2;
+  int count = 0;
+  var offset0 = vec3_scale(vec3_round(vec3_scale(center_pos, 1.0 / init_scale)), init_scale);
+  vec3_print(offset0);printf("init scale: %f\n", init_scale);
+  var tform = lisp_value_mat4(transform);
+   for(int i = -2; i < 3; i++){
+    for(int j = -2; j < 3; j++){
+      for(int k = -2; k < 3; k++){
+        vec3 p = vec3_add(offset0, vec3_scale(vec3_new(i,j,k), init_scale));
+        count += render_sdf_lods2(&ctx2, tform, center_pos, p, init_scale , maxLevel);
+      }
+    }  
+  }
   // then subdivide the space into 27 chunks, whichever of those chunks includes the
   // center or is right next to it, gets subdivided recursively 
-  int count = render_sdf_lods2(&ctx2, lisp_value_mat4(transform), center_pos, center_pos, max_scale * 20, maxLevel);
+  //int count = render_sdf_lods2(&ctx2, , center_pos, offset0,init_scale , maxLevel);
   printf("Render SDF Vertexes: %i\n", count);
   
   return nil;

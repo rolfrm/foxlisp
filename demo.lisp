@@ -521,6 +521,8 @@
           (rotate (0 0.5 0)
            (ref cube-model))
           ))
+          (scale (1.0) 
+         
          (bake
          (translate (0 50 -300)
          (rgb (1.0 1.0 1.0)
@@ -528,8 +530,7 @@
            (scale 50
            (ref cube-model)))
           ))
-         
-         (translate (40 40 -300)
+          (translate (40 40 -300)
          (rgb (1.0 1.0 1.0)
           (rotate (0 0.0 0)
            (scale 25
@@ -551,7 +552,7 @@
             (translate (-0.5 -0.5)
              (ref square-model)))))
          )
-
+           )
 
           
           
