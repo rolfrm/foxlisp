@@ -200,6 +200,23 @@ vec3 trace_point(df_ctx * ctx, vec3 pt, f32 size){
   return r;
 }
 
+
+vec3 optimize_point(df_ctx * ctx, vec3 pt, f32 size){
+  for(int i = 0; i < 10; i++){
+    var x = sdf_gradient(ctx, pt, size);
+    vec3 c;
+    var d0 = ctx->sdf(ctx->sdf_userdata, pt, &c);
+    
+    var r = vec3_sub(pt, vec3_scale(x, d0));
+    pt = r;
+    if(d0 < size * 0.1){
+      break;
+    }
+  }
+  return pt;
+}
+
+
 // idea: use the normal to reduce the number of planes.
 void trace_point_cloud(df_ctx * ctx, vec3 position, f32 size){
   f32 d;
@@ -1315,7 +1332,6 @@ void improve_mesh(mc_vertex_builder * bld){
   hash_table * vert_tri_lookup = lisp_malloc(sizeof(vert_tri_lookup[0]));
   ht_create3(vert_tri_lookup, 1, sizeof(int) * 2, sizeof(int));
   
-  
   vertex_lookup = lisp_malloc(sizeof(*vertex_lookup));
   ht_create3(vertex_lookup, 1, sizeof(vec3), sizeof(int));
   vertex_lookup->hash = (void *)vec3_hash;
@@ -1375,6 +1391,11 @@ void improve_mesh(mc_vertex_builder * bld){
       }
       edge_ids[i] = eid;
     }
+    if(edge_ids[0] == edge_ids[1] || edge_ids[1] == edge_ids[2] || edge_ids[0] == edge_ids[2]){
+
+      //this triangle has the same edge twice.
+      continue;
+    }
     triangle_count += 1;
     triangles = realloc(triangles, triangle_count * sizeof(triangles[0]));
     for(int i = 0; i < 3; i++){
@@ -1385,18 +1406,13 @@ void improve_mesh(mc_vertex_builder * bld){
   var sdf = bld->sdf->sdf;
   var sdf_userdata = bld->sdf->sdf_userdata;
   vec3 c;
-  
+
+  if(true){
  for(int i = 0; i < vertex_count; i++){
-   vec3 v = vertexes[i];
-   for(int j = 0; j < 10; j++){
-     var v2 = trace_point(bld->sdf, v, 0.0001);
-     
-     v = v2;
-     if(vec3_len(vec3_sub(v,v2)) < 0.0001)
-       break;
-   }
+   vec3 v = optimize_point(bld->sdf, vertexes[i], 0.0001);
    vertexes[i] = v;
  }
+  }
  if(false){
   // optimize vertex positions.
   for(int i = 0; i < vertex_count; i++){
@@ -1470,13 +1486,16 @@ void improve_mesh(mc_vertex_builder * bld){
  
   skip_triangles = alloc0(sizeof(skip_triangles[0]) * triangle_count);
   int new_vertexes = 0;
-  int edge_count2 = 0;//edge_count;
+  int edge_count2 = edge_count;
+  printf("OPTIMIZE!\n");
+    
   if(false){
   for(int i = 0; i < edge_count2; i++){
     var e = edges[i];
     var et = edge_triangles[i];
     var f1 = triangles[et.t1];
     var f2 = triangles[et.t2];
+    printf("OPTIMIZE?\n");
     if(skip_triangles[et.t1]) continue;
     if(skip_triangles[et.t2]) continue;
     // only edges with two triangles connected can be split
@@ -1488,13 +1507,15 @@ void improve_mesh(mc_vertex_builder * bld){
     vec3 mid = vec3_scale(vec3_add(v1, v2), 0.5);
     vec3 c;
     var d = sdf(sdf_userdata, mid, &c);
+    
     //vec3 asd = vec3_new(0.5432, -0.3234, 0.7783);
     //vec3 cross = vec3_normalize(vec3_mul_cross(vec3_sub(v2, v1), asd));
-    if(fabs(d) > 100.5){
+    if(fabs(d) > 0.01){
       var m2 = mid;
-      //var m2 = trace_point(bld->sdf, mid, 0.01);
-      for(int i = 0; i < 0; i++)
-        m2 = trace_point(bld->sdf, m2, 0.01);
+      m2 = optimize_point(bld->sdf, mid, 0.01);
+      vec3_print(v1);vec3_print(v2);vec3_print(mid);printf("\n");
+      //for(int i = 0; i < 0; i++)
+      //  m2 = trace_point(bld->sdf, m2, 0.01);
       new_vertexes++;
       int id;
       if(!ht_get(vertex_lookup, &m2.x, &id)){
@@ -1529,8 +1550,11 @@ void improve_mesh(mc_vertex_builder * bld){
       // these 4 edges, along with the center vertex form 4 new triangles.
       int new_edges[] = {e1, e2, e3, e4};
       for(int j = 0; j < 4; j++){
-        if(new_edges[j] == -1)
+        if(new_edges[j] == -1){
+          printf("%i % i %i %i\n", e1, e2, e3, e4);
+          printf("%i % i %i\n", f1.edges[0], f1.edges[1], f1.edges[2]);
           ASSERT(false);
+        }
         //printf("new triangle\n");
         face_edge e0 = edges[new_edges[j]];
         int ids[] = {e0.v1, e0.v2, id};
