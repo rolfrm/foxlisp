@@ -126,6 +126,7 @@ void lisp_scope_stack(lisp_scope * s, lisp_scope * super, cons * lookup, size_t 
 // since symbol IDs are forthrunning numbers anyway, there is not really a good reason to hash them.
 // experiments show a slight performance increase when doing this.
 static int symbol_nohash(const void * key, void * userdata){
+  UNUSED(userdata);
   const u64 * k = key;
   return (int)k[0];
 }
@@ -318,7 +319,7 @@ lisp_scope * lisp_get_root_scope(){
   return current_context->globals;
 }
 
-inline lisp_value car_nocheck(lisp_value v){
+lisp_value car_nocheck(lisp_value v){
   return lisp_value_cons(v)->car;
 }
 
@@ -328,7 +329,7 @@ inline lisp_value car(lisp_value v){
   return nil;
 }
 
-inline lisp_value cdr_nocheck(lisp_value v){
+lisp_value cdr_nocheck(lisp_value v){
   return lisp_value_cons(v)->cdr;
 }
 
@@ -475,7 +476,6 @@ lisp_value new_cons_m(lisp_value a, lisp_value b, lisp_value cons){
   
   if(is_nil(read_cons_offset))
     return new_cons(a, b);
-
   var offset = lisp_hashtable_get(read_cons_offset, cons);
   var file = lisp_hashtable_get(read_cons_file, cons);
   cons = new_cons(a, b);
@@ -484,6 +484,7 @@ lisp_value new_cons_m(lisp_value a, lisp_value b, lisp_value cons){
      return cons;
   lisp_hashtable_set(read_cons_offset, cons, offset);
   lisp_hashtable_set(read_cons_file, cons, file);
+  
   return cons;
 }
 
@@ -493,14 +494,14 @@ lisp_value lisp_sub_macro_expand(lisp_scope * scope, lisp_value c){
   var next = cdr(c);
   var value = lisp_macro_expand(scope, current);
   if(!is_nil(next)){
-	 var nextr = lisp_sub_macro_expand(scope, next);
-	 if(lisp_value_eq(current, value) && lisp_value_eq(next, nextr))
-		return c;
-	 return new_cons_m(value, nextr, c);
+	var nextr = lisp_sub_macro_expand(scope, next);
+	if(lisp_value_eq(current, value) && lisp_value_eq(next, nextr))
+	  return c;
+	return new_cons_m(value, nextr, c);
   }else{
-	 if(lisp_value_eq(current, value))
-		return c;
-	 return new_cons_m(value, nil, c);
+	if(lisp_value_eq(current, value))
+	  return c;
+	return new_cons_m(value, nil, c);
   }
 }
 
@@ -850,7 +851,8 @@ lisp_value lisp_eval_symbol_value(lisp_scope * scope, lisp_value sym_expr, lisp_
   return nil;
 }
 
-lisp_value lisp_eval_boundp(lisp_scope * scope, lisp_value sym_expr, lisp_value root_scope_only_expr){
+lisp_value lisp_eval_boundp(lisp_scope * scope, lisp_value sym_expr,
+							lisp_value root_scope_only_expr){
   var target_scope = scope;
   if(!is_nil(root_scope_only_expr) && !is_nil(lisp_eval(scope, root_scope_only_expr)))
     target_scope = current_context->globals;
@@ -864,12 +866,14 @@ lisp_value lisp_eval_boundp(lisp_scope * scope, lisp_value sym_expr, lisp_value 
   return nil;
 }
 
-lisp_value lisp_eval_with_exception_handler(lisp_scope * scope, lisp_value body, lisp_value handler){
-  var stk0 = lisp_stack;
+lisp_value lisp_eval_with_exception_handler(lisp_scope * scope,
+											lisp_value body, lisp_value handler){
+  
+  var stk0 = lisp_pin(lisp_stack);
   lisp_stack = nil;
   var result = lisp_eval(scope, body);
   if(lisp_is_in_error()){
-    var error = current_error;
+	var error = current_error;
     current_error = nil;
     var error_handler = lisp_eval(scope, handler);
     lisp_scope_create_value(current_context->globals, current_error_sym, error);
@@ -878,11 +882,12 @@ lisp_value lisp_eval_with_exception_handler(lisp_scope * scope, lisp_value body,
     
     result = result2;
   }
-  lisp_stack = stk0;
+  lisp_stack = lisp_unpin(stk0);
   return result;
 }
 
-static lisp_value lisp_eval_case(lisp_scope * scope, lisp_value condition, lisp_value cases){
+static lisp_value lisp_eval_case(lisp_scope * scope, lisp_value condition,
+								 lisp_value cases){
   var result = lisp_eval(scope, condition);
   var result_type = lisp_value_type(result);
   while(is_cons(cases)){
@@ -1056,8 +1061,10 @@ lisp_value lisp_eval_native_functions(lisp_scope * scope, native_function * n, s
     raise_string("function is null");
     return nil;
   }
-
-  lisp_value args[n->nargs == -1 ? argcnt : MAX(argcnt, n->nargs)];
+  size_t argcnt2 = argcnt;
+  if(n->nargs != -1)
+	argcnt2 = MAX(argcnt2, (size_t) n->nargs);
+  lisp_value args[argcnt2];
   lisp_value arglist = arg_form;
   for(size_t i = 0; i < argcnt; i++){
     args[i] = lisp_eval(scope, car(arglist));
@@ -1070,7 +1077,7 @@ lisp_value lisp_eval_native_functions(lisp_scope * scope, native_function * n, s
     for(int i = argcnt; i < n->nargs; i++){
       args[i] = nil;
     }
-    if(argcnt > n->nargs){
+    if(argcnt > (size_t)n->nargs){
       raise_string("Invalid number of arguments");
       return nil;
     }
@@ -1118,8 +1125,45 @@ lisp_value lisp_eval_native_functions(lisp_scope * scope, native_function * n, s
   return nil;
 }
 
+t_cons_arrays cons_arrays = {0};
+
+static inline void lisp_pin_args(cons * argslist, size_t cnt){
+  if(cons_arrays.count == cons_arrays.capacity){
+	size_t new_capacity = cons_arrays.capacity * 2;
+	if(new_capacity == 0)
+	  new_capacity = 32;
+	cons_arrays.arrays = realloc(cons_arrays.arrays, sizeof(cons_arrays.arrays[0]) * new_capacity);
+	cons_arrays.capacity = new_capacity;	
+  }
+  if(cons_arrays.count > 1000){
+	raise_string("cons array leak");
+  }
+  var new = &cons_arrays.arrays[cons_arrays.count];
+  new->array = argslist;
+  new->count = cnt;
+  cons_arrays.count += 1;
+}
+
+static inline void lisp_unpin_args(cons * argslist, size_t cnt){
+  if(cons_arrays.count == 0){
+	raise_string("cons array imbalance");
+	return;
+  }
+  var top = &cons_arrays.arrays[cons_arrays.count - 1];
+  if(top->array != argslist || top->count != cnt){
+	raise_string("Unexpected event in lisp_unpin_args");
+	return;
+  }
+  cons_arrays.count -= 1;
+
+}
+
 static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * f, size_t argcnt, lisp_value args_form){
+  
+  // these args needs to be gc_pinned 
   cons args0[argcnt];
+  memset(args0, 0, sizeof(args0));
+  lisp_pin_args(args0, argcnt);
   
   lisp_value things;
   {
@@ -1140,11 +1184,13 @@ static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * 
     }else
       things = nil;
   }
+  lisp_unpin_args(args0, argcnt);
+
   
   cons args3[argcnt];
   memset(args3, 0, sizeof(args3[0]) * (argcnt));
         
-  lisp_scope function_scope[1];
+  lisp_scope function_scope[1] = {0};
         
   lisp_scope_stack(function_scope, f->closure,  args3, argcnt);
   var prev_scope = scope->sub_scope;
@@ -1376,11 +1422,12 @@ static inline lisp_value lookup_local_index(lisp_scope * scope, lisp_local_index
 }
 
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
+  
   switch(lisp_value_type(value)){
   case LISP_CONS:
-	 {
+	{
       var first = car_nocheck(value);
-      lisp_value first_value = first;
+	  lisp_value first_value = first;
 
       lisp_scope * s1;
       int i1, i2;
@@ -1422,32 +1469,34 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
         break;
       }
       
-		if(is_macro_builtin(first_value)){
-		  switch(first_value.builtin){
-		  case LISP_IF:
-          return lisp_eval_if(scope, cadr(value), caddr(value), cadddr(value));
-        case LISP_QUOTE:
-			 if(first_value.builtin == LISP_QUOTE)
-				return cadr(value);
-		  case LISP_QUASIQUOTE:
-			 return lisp_eval_quasiquoted(scope, cadr(value));
-		  case LISP_UNQUOTE_SPLICE:
-		  case LISP_UNQUOTE:
-			 raise_string("Unexpected unquote!\n");
-			 break;
-		  case LISP_LET:
-			 return lisp_eval_let(scope, cadr(value), cddr(value));
-		  case LISP_PROGN:
+	  if(is_macro_builtin(first_value)){
+		switch(first_value.builtin){
+		case LISP_IF:
+		  return lisp_eval_if(scope, cadr(value), caddr(value), cadddr(value));
+		case LISP_QUOTE:
+		  if(first_value.builtin == LISP_QUOTE)
+			return cadr(value);
+		  goto quasiquote;
+		case LISP_QUASIQUOTE:
+		quasiquote:
+		  return lisp_eval_quasiquoted(scope, cadr(value));
+		case LISP_UNQUOTE_SPLICE:
+		case LISP_UNQUOTE:
+		  raise_string("Unexpected unquote!\n");
+		  break;
+		case LISP_LET:
+		  return lisp_eval_let(scope, cadr(value), cddr(value));
+		case LISP_PROGN:
           return lisp_eval_progn(scope, cdr(value));
-		  case LISP_LOOP:
+		case LISP_LOOP:
           return lisp_eval_loop(scope, cadr(value), cddr(value));
-		  case LISP_LAMBDA:
+		case LISP_LAMBDA:
           return lisp_eval_lambda(scope, cadr(value), cddr(value));
-		  case LISP_MACRO:
+		case LISP_MACRO:
           return lisp_eval_macro(scope, cadr(value), cddr(value));
         case LISP_SET:
           return lisp_eval_set(scope, cdr(value));
-		  case LISP_DEFINE:
+		case LISP_DEFINE:
           return lisp_eval_define(scope, cadr(value), caddr(value));
         case LISP_SYMBOL_VALUE:
           return lisp_eval_symbol_value(scope, cadr(value), caddr(value));
@@ -1503,23 +1552,23 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
         case LISP_CONV_FLOAT32:
           return lisp_float32(lisp_eval(scope, cadr(value)));
         }
-      }
-      size_t argcnt = lisp_optimize_statement(scope, value) - 1;
+	  }
+	  size_t argcnt = lisp_optimize_statement(scope, value) - 1;
       
-      if(lisp_is_in_error())
-        return nil;
-      
-      switch(lisp_value_type(first_value)){
-      case LISP_FUNCTION:
-        return lisp_eval_function(scope, lisp_value_function(first_value), argcnt, cdr(value));
-      case LISP_FUNCTION_NATIVE:
-        return lisp_eval_native_functions(scope, lisp_value_native_function(first_value), argcnt, cdr(value));
-      default:
-        lisp_error(new_cons(value, string_lisp_value("is not a function")));
-        return nil;
-      }     
-    }
-    break;
+	  if(lisp_is_in_error())
+		return nil;
+		
+	  switch(lisp_value_type(first_value)){
+	  case LISP_FUNCTION:
+		return lisp_eval_function(scope, lisp_value_function(first_value), argcnt, cdr(value));
+	  case LISP_FUNCTION_NATIVE:
+		return lisp_eval_native_functions(scope, lisp_value_native_function(first_value), argcnt, cdr(value));
+	  default:
+		lisp_error(new_cons(value, string_lisp_value("is not a function")));
+		return nil;
+	  }     
+	}
+	break;
   case LISP_SYMBOL:
     return lisp_eval_symbol(scope, value);
   case LISP_GLOBAL_INDEX:
@@ -1541,8 +1590,10 @@ lisp_value lisp_eval_value(lisp_value code, lisp_value scope){
     scopeptr = current_context->globals;
   }
   while(true){
+	bool p = gc_unsafe_stack;
+	gc_unsafe_stack = true;
     var next_code = lisp_macro_expand(scopeptr, code);
-		
+	gc_unsafe_stack = p;
     if(lisp_value_eq(next_code, code))
       break;
     code = next_code;
@@ -1555,6 +1606,7 @@ void on_read_cons(io_reader * rd, lisp_value c){
   if(!is_nil(read_cons_offset)){
     int offset = rd->offset;
     lisp_hashtable_set(read_cons_offset, c, integer_lisp_value(offset));
+	
   }
   if(!is_nil(read_current_file) && !is_nil(read_cons_file))
     lisp_hashtable_set(read_cons_file, c, read_current_file);
@@ -1563,8 +1615,10 @@ void on_read_cons(io_reader * rd, lisp_value c){
 lisp_value lisp_code_location(lisp_value cons){
   var offset = lisp_hashtable_get(read_cons_offset, cons);
   var file = lisp_hashtable_get(read_cons_file, cons);
+
   if(lisp_value_type(offset) != LISP_INTEGER)
-    return nil;
+	return nil;
+  
   if(lisp_value_type(file) != LISP_STRING)
     return nil;
   var filepath = lisp_value_string(file); 
@@ -1630,29 +1684,50 @@ lisp_value lisp_print_code_location(lisp_value cons){
   return nil;
 }
 
+lisp_value current_toplevel = {0};
 
 lisp_value lisp_eval_stream(io_reader * rd){
   lisp_value result = nil;
+  lisp_value next_toplevel = {0};
+  cons toplevel = {.car = current_toplevel,
+				   .cdr = lisp_pointer_to_lisp_value(&next_toplevel)};
+  current_toplevel = cons_lisp_value(&toplevel);
+  
   while(true){
-    gc_collect_garbage(current_context);
-    var off = rd->offset;
-    var code = lisp_read_stream(rd);
-    if(off == rd->offset || is_nil(code)) break;
+	gc_collect_garbage(current_context);
+	
+	var off = rd->offset;
+
+	var p = gc_unsafe_stack;
+	gc_unsafe_stack = true;
+	  
+	var code = lisp_read_stream(rd);
+	gc_unsafe_stack = p;	
+	
+	if(off == rd->offset || is_nil(code)) break;
     while(true){
-      if(lisp_is_in_error())
+      if(lisp_is_in_error()){
+		current_toplevel = toplevel.car;
         return nil;
-      lisp_register_value("lisp:++current-toplevel++", code);
-      var next_code = lisp_macro_expand(current_context->globals, code);
-		
-      if(lisp_value_eq(next_code, code))
+	  }
+      var p = gc_unsafe_stack;
+	  gc_unsafe_stack = true;
+	  next_toplevel = code;
+	  var next_code = lisp_macro_expand(current_context->globals, code);
+	  gc_unsafe_stack = p;	
+	  
+	  if(lisp_value_eq(next_code, code))
         break;
       code = next_code;
-    }
-    //println(code);
-    lisp_register_value("lisp:++current-toplevel++", code);
+
+	}
+
+	next_toplevel = code;
     result = lisp_eval(current_context->globals, code);
-    if(lisp_is_in_error())
-      return nil;
+	current_toplevel = toplevel.car;
+    	
+	if(lisp_is_in_error())
+	  return nil;
   }
   return result;
 }
@@ -1789,6 +1864,13 @@ case LISP_CONS:
       
       return l;
     }
+  case LISP_GLOBAL_CONS_ARRAYS:
+	snprintf(OBUF, LEN1, "[global cons array %i]",  ((t_cons_arrays *)lisp_value_pointer(v))->count);
+	return l;
+  case LISP_VALUE_SET:
+	snprintf(OBUF, LEN1, "[lisp_value_set ?]");
+	return l;
+	
   }
   return 0;
 }
@@ -2232,6 +2314,8 @@ const char * lisp_type_to_string(lisp_type t){
   case LISP_LOCAL_INDEX: return "LOCAL_INDEX";
   case LISP_ALLOCATED_POINTER: return "ALLOCATED_POINTER";
   case LISP_NATIVE_POINTER_TO_VALUE: return "NATIVE_POINTER_TO_VALUE";
+  case LISP_GLOBAL_CONS_ARRAYS: return "GLOBAL_CONS_ARRAY";
+  case LISP_VALUE_SET: return "LISP_VALUE_SET";
   }
   raise_string("Unknown type:\n");
   
@@ -2303,7 +2387,7 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
 lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value){
   TYPE_ASSERT(_vector, LISP_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
-  var i = lisp_value_integer(k);
+  var i = (size_t)lisp_value_integer(k);
   var vector = lisp_value_vector(_vector);
   var v = value;
   void * dst = vector->data + i * vector->elem_size;
@@ -2468,6 +2552,7 @@ static bool lisp_value_full_compare(const void * _k1, const void * _k2, void * u
 }
 
 
+
 lisp_value lisp_make_hashtable(lisp_value * args, int n){
   static lisp_value full_keyword;
   static lisp_value weak_keyword;
@@ -2493,6 +2578,10 @@ lisp_value lisp_make_hashtable(lisp_value * args, int n){
     ((void **) &ht->userdata)[0] = (void *) (size_t)LISP_HASHTABLE_WEAK_KEYS;  
   }
   return hashtable_lisp_value(ht);
+}
+
+lisp_value lisp_make_hashtable0(){
+  return lisp_make_hashtable(NULL, 0);
 }
 
 lisp_value lisp_make_hashtable_weak_keys(){
@@ -2527,6 +2616,7 @@ lisp_value lisp_hashtable_count(lisp_value ht){
 }
 
 void it_symbols(void * k1, void * k2, void * target){
+  UNUSED(k1);
   lisp_value * val = target;
   const int64_t * sym = k2;
   lisp_value prev = *val;
@@ -2644,7 +2734,9 @@ lisp_value lisp_trace(lisp_value v){
 
 void foxgl_register();
 void lisp_process_module_init();
+void gc_register();
 void load_modules(){
+  gc_register();
   foxgl_register();
   lisp_process_module_init();
 }
@@ -2720,6 +2812,7 @@ int main(int argc, char ** argv){
   if(lisp_is_in_error()){
     printf("Exiting due to unhandled exception\n");
     var stk = current_error_stack;
+	
     while(!is_nil(stk)){
       println(car(stk));
       stk = cdr(stk);
@@ -2949,6 +3042,14 @@ lisp_context * lisp_context_new(){
   lisp_register_value("lisp:++current-error-stack++", lisp_pointer_to_lisp_value(&current_error_stack));
   lisp_register_value("lisp:++current-file-ptr++", lisp_pointer_to_lisp_value(&read_current_file));
   lisp_register_value("lisp:++current-files-ptr++", lisp_pointer_to_lisp_value(&read_current_files));
+
+  lisp_register_value("lisp:++current-toplevel-ptr++", lisp_pointer_to_lisp_value(&current_toplevel));
+  
+  
+
+  lisp_value cons_arrays_val = native_pointer_lisp_value(&cons_arrays);
+  cons_arrays_val.type = LISP_GLOBAL_CONS_ARRAYS;
+  lisp_register_value("lisp:++pinned_cons_arrays++", cons_arrays_val );
   
   load_modules();
 

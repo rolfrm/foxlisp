@@ -279,7 +279,6 @@
               (prev-scope foxgl:current-scope))
           (lisp:with-scope-binding prev-scope (lisp:get-current-scope) '(body) vars
                                    '((set! foxgl:current-scope (lisp:get-current-scope))
-                                     
                                      (foxgl:render-sub-models body)
 
                    ))
@@ -564,8 +563,8 @@
                 (poly
                   (foxgl:sdf-marching-cubes size resolution model2 (println position))
                   ))
-           (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)
-                                     (foxgl:load-polygon (cdr poly) 3 nil nil :triangles-color)
+           (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil)
+                                     (foxgl:load-polygon (cdr poly) 3 nil nil)
                                      )))
          (hashtable-set foxgl:polygon-cache model r)
          
@@ -588,8 +587,8 @@
                                         ;(set! model nil)
            (foxgl:render-sub-models (cdr model))
            (let ((baked (foxgl:bake foxgl:baking-stack tform)))
-              (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil :triangles-color)
-                                        (foxgl:load-polygon (cdr baked) 3 nil nil :triangles-color)
+              (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil)
+                                        (foxgl:load-polygon (cdr baked) 3 nil nil)
                                         )))
               (hashtable-set foxgl:polygon-cache (cdr model) r)
 

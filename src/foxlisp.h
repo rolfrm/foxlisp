@@ -23,7 +23,10 @@ typedef enum {
       // marks a GC-managed pointer
       LISP_ALLOCATED_POINTER,
       // a native pointer to a lisp_value
-      LISP_NATIVE_POINTER_TO_VALUE
+      LISP_NATIVE_POINTER_TO_VALUE,
+	  // internal
+	  LISP_GLOBAL_CONS_ARRAYS,
+	  LISP_VALUE_SET
 }lisp_type;
 
 // assuming 5 tags:
@@ -183,6 +186,7 @@ struct __lisp_scope{
   bool stack_scope;
   bool lookup_on_stack;
   lisp_scope * sub_scope;
+  int non_heap_mark;
 };
 
 typedef struct __gc_context gc_context;
@@ -222,6 +226,20 @@ typedef struct{
   size_t elem_size;
   lisp_value2 default_value;
 }lisp_vector2;
+
+// internal structs
+typedef struct{
+  cons * array;
+  size_t count;
+}t_cons_array;
+
+typedef struct {
+
+  t_cons_array * arrays;
+  size_t count;
+  size_t capacity;
+}t_cons_arrays;
+
 
 // globals
 extern lisp_value nil;
@@ -284,6 +302,15 @@ bool is_keyword(lisp_value sym);
 lisp_value global_index_lisp_value(size_t i);
 lisp_value local_index_lisp_value(size_t scope_level, size_t scope_index, bool scope_type);
 
+typedef struct __lisp_set lisp_set;
+
+lisp_value lisp_set_lisp_value(lisp_set * set);
+lisp_value lisp_set_push(lisp_value set, lisp_value obj);
+lisp_value lisp_set_pop(lisp_value set, lisp_value index);
+lisp_value lisp_set_new();
+
+void * lisp_pin(lisp_value value);
+lisp_value lisp_unpin(void * p);
 //
 void foxlist_thread_init();
 // mark an sweep garbage collector
@@ -300,7 +327,7 @@ void gc_recover_unmarked(gc_context * gc);
 bool gc_mark_cons(gc_context * gc, cons * c);
 bool cons_is_marked(gc_context * gc, cons * c);
 
-bool vector_is_marked(gc_context * gc, void * vector);
+bool vector_is_marked(void * vector);
 
 lisp_value lisp_count_allocated();
 void * gc_clone(const void * mem, size_t s);
@@ -309,9 +336,6 @@ void * nogc_clone(const void * mem, size_t s);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 
 lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body);
-
-
-
 
 int64_t get_symbol_id(const char * s);
 lisp_value print(lisp_value v);
@@ -345,10 +369,13 @@ lisp_value lisp_print_code_location(lisp_value cons);
 
 lisp_value lisp_string(const char *str );
 
-lisp_value lisp_make_hashtable();
+lisp_value lisp_make_hashtable(lisp_value * args, int n);
+lisp_value lisp_make_hashtable0();
 lisp_value lisp_hashtable_set(lisp_value ht, lisp_value key, lisp_value value);
 lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key);
 lisp_value lisp_hashtable_count(lisp_value ht);
+lisp_value lisp_hashtable_keys(lisp_value _ht);
+lisp_value lisp_hashtable_values(lisp_value _ht);
 //void * lisp_realloc(void * p, size_t v);
 
 lisp_value get_symbol(const char * s);
@@ -417,3 +444,11 @@ lisp_value lisp_read_string(const char * str);
 
 #define TYPE_ASSERT(v, t) if(!type_assert(v, t)) return nil;
 #define RETURN_ERROR(err) {lisp_error(err); return nil;}
+#define RAISE(err) {raise_string(err); return nil;}
+#define EXPR_ASSERT(expr) if(!expr){RAISE("AssertError: '" #expr "'" " returned false");}
+
+extern bool gc_unsafe_stack;
+
+// internals
+typedef struct __binary_io io_reader;
+void on_read_cons(io_reader * rd, lisp_value c);

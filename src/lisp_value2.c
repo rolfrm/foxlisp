@@ -74,7 +74,7 @@ inline bool is_macro_builtin(lisp_value a){
   return a.type == LISP_MACRO_BUILTIN;
 }
 
-inline bool is_scope(lisp_value a){
+bool is_scope(lisp_value a){
   return a.type == LISP_SCOPE;
 }
 
@@ -194,11 +194,11 @@ inline lisp_value hashtable_lisp_value(hash_table * ht){
   return (lisp_value){.type = LISP_HASHTABLE, .native_pointer = ht};
 }
 
-inline lisp_value scope_lisp_value(lisp_scope * scope){
+lisp_value scope_lisp_value(lisp_scope * scope){
   return (lisp_value){.type = LISP_SCOPE, .pointer = scope };
 }
 
-inline lisp_scope * lisp_value_scope(lisp_value val){
+lisp_scope * lisp_value_scope(lisp_value val){
   return val.pointer;
 }
 

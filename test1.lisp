@@ -439,7 +439,7 @@
 ;;; blank line!!
 (defun test-func-2 () (+ 1 2))
 (println (car (function->code test-func-1)))
-;(println (hashtable-keys lisp:++cons-file-offset++))
+										;(println (hashtable-keys lisp:++cons-file-offset++))
 (assert (eq (cadr (println (lisp:function-location test-func-1)))
             (- (cadr (println (lisp:function-location test-func-2))) 2)))
 
@@ -475,8 +475,6 @@
 (println (symbol-value 'asd scope1))
 
 
-(println "Tests Passed")
-
 
 
 (let ((a1 '(1 2 3))
@@ -496,3 +494,30 @@
 
 (defvar ht0 (make-hashtable :deep-equality))
 (hashtable-set ht0 '(1 2 3) '(4 5 6))
+
+(let ((x 1))
+  (load "test4.lisp"))
+(lisp:collect-garbage)
+
+(defun test1 ()
+
+  (dotimes! i 10000
+			(cons 1 2)))
+(defun test2()
+  (dotimes! i 2
+			(lisp:collect-garbage)
+			(test1)))
+
+(test2)
+
+
+(println (test-4-a))
+
+;(let ((a 3)
+;	  (b 4))
+  
+;  (lisp:with-scope-binding (lisp:get-current-scope)
+
+
+
+(println "Tests Passed")

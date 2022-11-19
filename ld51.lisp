@@ -48,10 +48,10 @@
                 )
               ;(println evt)
               )
-    (game-update events))
+    (game-update events)
+	)
   (let ((first (lisp:count-allocated)))
-    (foxgl:render-model model)
-
+	(foxgl:render-model model)
     )
   (foxgl:swap win)
   (foxgl:poll-events)
@@ -99,7 +99,7 @@
               (update)
               )
           (lambda (x)
-            (lisp:print-stack-trace)
+			(lisp:print-stack-trace)
             (println x)
             (thread:sleep 0.1)
       

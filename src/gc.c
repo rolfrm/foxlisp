@@ -74,6 +74,7 @@ struct __array_pool{
   array_header * occupied_arrays;
   size_t pool_size;
 };
+
 typedef enum{
   CLEAR = 0,
   MARK = 1,
@@ -85,14 +86,92 @@ struct __gc_context{
   cons_buffer * cons_pool;
   array_pool array_pool[3 * 1024 + 1];
   gc_stage stage;
+  int iteration;
 };
+
+struct __lisp_set{
+  lisp_value * values;
+  size_t * free_values;
+  size_t capacity;
+  size_t count;
+  size_t free_count;
+};
+
+lisp_value lisp_set_new(){
+  lisp_set * set = alloc0(sizeof(*set));
+  return lisp_set_lisp_value(set);
+}
+lisp_value lisp_set_lisp_value(lisp_set * set){
+  return (lisp_value){.type = LISP_VALUE_SET, .pointer = set};
+
+}
+
+static size_t _lisp_set_push(lisp_set * set, lisp_value value){
+  if(set->free_count > 0){
+	var idx = set->free_values[0];
+	set->free_count -= 1;
+	if(set->free_count > 0)
+	  SWAP(set->free_values[0], set->free_values[set->free_count]);
+	set->values[idx] = value;
+	return idx;
+  }
+  if(set->capacity == set->count){
+	size_t new_cap = set->capacity == 0 ? 16 : set->capacity * 2;
+	set->values = realloc(set->values, sizeof(set->values[0]) * new_cap);
+	set->free_values = realloc(set->free_values, sizeof(set->free_values[0]) * new_cap);
+	set->capacity = new_cap;
+  }
+  
+  {
+	var idx = set->count;
+	set->count += 1;
+	set->values[idx] = value;
+	return idx;
+  }
+}
+
+static lisp_value _lisp_set_pop(lisp_set * set, size_t index){
+  if(set->count <= index){
+	raise_string("Index out of bounds for lisp_set");
+	return nil;
+  }
+  lisp_value v = set->values[index];
+  set->values[index] = nil;
+  set->free_values[set->free_count] = index;
+  set->free_count++;
+  return v;
+}
+
+lisp_value lisp_set_push(lisp_value set, lisp_value obj){
+  lisp_set * setp = lisp_value_pointer(set);
+  return integer_lisp_value(_lisp_set_push(setp, obj));
+}
+
+lisp_value lisp_set_pop(lisp_value set, lisp_value v){
+  lisp_set * setp = lisp_value_pointer(set);
+  return _lisp_set_pop(setp, lisp_value_integer(v));
+}
+
+
+lisp_value lisp_pinned_set = {0};
+
+void * lisp_pin(lisp_value value){
+  var i = lisp_value_integer(lisp_set_push(lisp_pinned_set, value));
+  return (void *) (size_t) i;
+}
+
+lisp_value lisp_unpin(void * p){
+  var i = (size_t) p;
+  return lisp_set_pop(lisp_pinned_set, integer_lisp_value(i));
+}
+
 
 gc_context * gc_context_new(){
   gc_context * ctx = _alloc0(sizeof(*ctx));
   return ctx;
 }
 
-inline u8 * cons_marker_pointer(gc_context * gc, cons * c){
+u8 * cons_marker_pointer(gc_context * gc, cons * c){
   cons_buffer * pool = gc->cons_pool;
   while(pool){
     size_t offset = c - pool->buffer;
@@ -137,7 +216,7 @@ static inline bool mark_vector(gc_context * gc, void * vector){
 }
 
 
-bool vector_is_marked(gc_context * gc, void * vector){
+bool vector_is_marked(void * vector){
   array_header * mark = vector - sizeof(array_header);
   ASSERT(mark->mark <= 2);
   if(mark->mark)
@@ -170,6 +249,7 @@ static ht_op iterate_keys_remove_unmarked(void * key, void * value, void * data)
 }
 
 static ht_op iterate_values_remove_unmarked(void * key, void * value, void * data){
+  UNUSED(key);
   lisp_value * val = value;
   gc_context * gc = data;
   switch(val->type){
@@ -184,11 +264,19 @@ static ht_op iterate_values_remove_unmarked(void * key, void * value, void * dat
 }
 
 
-void mark_scope(gc_context * gc, lisp_scope * scope){
+static inline void mark_scope(gc_context * gc, lisp_scope * scope){
   if(scope == NULL)
     return;
-  if(is_heap_ptr(scope) && !mark_vector(gc, scope))
+  bool is_heap = is_heap_ptr(scope);
+  if(is_heap && !mark_vector(gc, scope))
     return;
+  else if(!is_heap){
+	if(scope->non_heap_mark != gc->iteration)
+	  scope->non_heap_mark = gc->iteration;
+	else
+	  return;
+  }
+  
   iterate_scope(gc, scope);
 }
 
@@ -257,6 +345,7 @@ static inline void visit_value(gc_context * gc, lisp_value val){
   case LISP_ALLOCATED_POINTER:
     if(!mark_vector(gc, val.native_pointer))
       return;
+	break;
   case LISP_NATIVE_POINTER_TO_VALUE:
     // assuming a non-gc'd pointer
     {
@@ -283,6 +372,8 @@ static inline void visit_value(gc_context * gc, lisp_value val){
     case LISP_FLOAT32:
     case LISP_GLOBAL_INDEX:
     case LISP_LOCAL_INDEX:
+	case LISP_GLOBAL_CONS_ARRAYS: // maybe an error
+	case LISP_VALUE_SET: // maybe an error?
       return;
     case LISP_NIL:
     case LISP_T:
@@ -308,10 +399,12 @@ static inline void visit_value(gc_context * gc, lisp_value val){
       }
       return;
     }
+	break;
   case LISP_STRING:
     if(is_heap_ptr(val.string))
       mark_vector(gc, val.string);
-    return;
+    break;
+	
   case LISP_NATIVE_POINTER:
   case LISP_MACRO_BUILTIN:
   case LISP_INTEGER:
@@ -325,6 +418,28 @@ static inline void visit_value(gc_context * gc, lisp_value val){
   case LISP_GLOBAL_INDEX:
   case LISP_LOCAL_INDEX:
     return;
+  case LISP_GLOBAL_CONS_ARRAYS:
+	{
+	  t_cons_arrays * ca = lisp_value_pointer(val);
+	  for(size_t i = 0; i < ca->count; i++){
+		t_cons_array * ar = ca->arrays + i;
+		for(size_t j = 0; j < ar->count; j++){
+		  visit_value(gc, ar->array[j].car);
+		  visit_value(gc, ar->array[j].cdr);
+		}
+	  }
+	  break;
+	}
+  case LISP_VALUE_SET:
+	{
+	  lisp_set * set = lisp_value_pointer(val);
+	  for(size_t i = 0; i < set->count; i++){
+		var sub_value = set->values[i];
+		if(!is_nil(sub_value))
+		  visit_value(gc, sub_value);
+	  }
+	}
+	break;
   }
 }
 
@@ -338,12 +453,14 @@ static inline void visit_value(gc_context * gc, lisp_value val){
 
 
  void iterate_values_only(void * key, void * value, void * data){
+   UNUSED(key);
   lisp_value * val = value;
   gc_context * gc = data;
   visit_value(gc, *val);
 }
 
  void iterate_keys_only(void * key, void * value, void * data){
+   UNUSED(value);
   lisp_value * ke = key;
   gc_context * gc = data;
   visit_value(gc, *ke);
@@ -351,6 +468,7 @@ static inline void visit_value(gc_context * gc, lisp_value val){
 
 
 void gc_clear(gc_context * gc){
+  gc->iteration += 1;
   var buf = gc->cons_pool;
   
   while(buf != NULL){
@@ -456,7 +574,7 @@ void iterate_scope(gc_context * ctx, lisp_scope * scope){
     return;
     
   if(scope->values != NULL){
-    for(int i = 0; i < scope->values_count; i++){
+    for(size_t i = 0; i < scope->values_count; i++){
       visit_value(ctx, scope->values[i]);
     }
   }
@@ -528,8 +646,10 @@ void gc_collect_garbage(lisp_context * lisp){
 }
 
 extern lisp_context * current_context;
-
+bool gc_unsafe_stack = false;
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
+  bool gc_run = false;
+ start:
   var ctx = current_context->gc;
    while(true){
     var pool = ctx->cons_pool;
@@ -540,12 +660,19 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
         pool->free_cons = found->cdr.cons;
         found->car = _car;
         found->cdr = _cdr;
-        return (lisp_value){.type = LISP_CONS, .cons = found};
+        return cons_lisp_value(found);
       }else{
         pool = pool->next;
       }
     }
-    size_t pool_size = 1024 * 8;
+
+	if(!gc_run && !gc_unsafe_stack){
+	  gc_collect_garbage(current_context);
+	  gc_run = true;
+	  goto start;
+
+	}
+	size_t pool_size = 1024 * 8;
     if(pool == NULL){
       cons_buffer ** parent = &ctx->cons_pool;
       while(*parent != NULL){
@@ -675,7 +802,12 @@ lisp_value lisp_get_allocated(){
 }
 
 
+
 void lisp_free(void * p){
+  // this function is not really implemented
+  // it is not currently allowed to 'help'
+  // the garbage collector by explicitly freeing memory.
+  UNUSED(p);
   //free(p);
 }
 
@@ -705,4 +837,10 @@ lisp_value lisp_count_allocated(){
   }
   return integer(allocated);
 
+}
+
+void gc_register(){
+  lisp_pinned_set = lisp_set_new();
+  lisp_register_value("gc:++pinned-set++", lisp_pointer_to_lisp_value(&lisp_pinned_set));
+  
 }

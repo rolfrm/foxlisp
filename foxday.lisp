@@ -15,7 +15,7 @@
 (define swnk (swank-server-new 8810))
 (foxgl:set-title win "Demo 1")
 (foxgl:make-current win)
-(foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
+(foxgl:load-font "./DejaVuSans.ttf" (integer 22))
 
 (define square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
 

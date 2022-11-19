@@ -87,14 +87,18 @@ lisp_value math_random(lisp_value range){
 }
 
 lisp_value foxgl_load_font(lisp_value str, lisp_value size){
+  TYPE_ASSERT(str, LISP_STRING);
+  TYPE_ASSERT(size, LISP_INTEGER);
   const char * fontfile_init = str.string;
-  //printf("Load font: %s %i\n", str.string, size.integer);
+  EXPR_ASSERT(file_exists(fontfile_init));
+
   var fnt0 =  blit_load_font_file(fontfile_init,  size.integer);
   blit_set_current_font(fnt0);
   return nil;
 }
 
 lisp_value foxgl_load_texture_from_path(lisp_value str){
+  TYPE_ASSERT(str, LISP_STRING);
   image img2 = image_from_file(str.string);
   if(img2.source == NULL) return nil;
 
@@ -393,7 +397,7 @@ blit3d_context * blit3d_current_context = NULL;
 lisp_value foxgl_color_to_int(lisp_value r, lisp_value g, lisp_value b, lisp_value a){
   lisp_value values[] = {r, g, b, a};
   int v = 0;
-  for(int i = 0; i < array_count(values); i++){
+  for(size_t i = 0; i < array_count(values); i++){
     var x = values[i];
     var l = is_nil(x) ? 255 : is_float(x) ? (int)(lisp_value_rational(x) * 255) : lisp_value_integer(x) * 255;
     v += (CLAMP(l, 0, 255) << (i * 8));
@@ -444,7 +448,7 @@ lisp_value foxgl_square2(){
   return nil;
 }
 
-lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, lisp_value opt_count, lisp_value opt_type){
+lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, lisp_value opt_count){
   if(blit3d_current_context == NULL) return nil;
   type_assert(val, LISP_VECTOR);
   type_assert(val.vector->default_value, LISP_FLOAT32);
@@ -758,7 +762,7 @@ lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform){
     var newcnt = vert_cnt + thiscnt + 2;
     verts = realloc(verts, newcnt * dims * sizeof(f32));
     colors = realloc(colors, newcnt * 3 * sizeof(f32));
-    for(int i = 0; i < thiscnt; i++){
+    for(size_t i = 0; i < thiscnt; i++){
       var index = i + vert_cnt + 1;
       vec3 pt = vec3_new(pointsf[i * 3], pointsf[i*3 + 1], pointsf[i*3 + 2]);
       var pt2 = mat4_mul_vec3(tform, pt);
@@ -858,7 +862,7 @@ void foxgl_register(){
   lrn("foxgl:transform", 1, foxgl_transform);
   lrn("foxgl:init", 0, foxgl_init);
   lrn("foxgl:quad", 1, foxgl_square2);
-  lrn("foxgl:load-polygon", 5, load_polygon);
+  lrn("foxgl:load-polygon", 4, load_polygon);
   lrn("foxgl:blit-polygon", 1, blit_polygon);
   lrn("foxgl:delete-polygon", 1, delete_polygon);
 

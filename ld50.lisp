@@ -1163,7 +1163,7 @@ Restart by pressing [Enter]
   (define win (foxgl:create-window (integer 800) (integer 800)))
   (foxgl:set-title win "Fox Driver")
   (foxgl:make-current win)
-  (foxgl:load-font "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" (integer 22))
+  (foxgl:load-font "DejaVuSans.ttf" (integer 22))
 
   (loop t
        (when swank-loaded

@@ -4,12 +4,11 @@
 #include <iron/full.h>
 #include "foxlisp.h"
 
-void on_read_cons(io_reader * rd, cons * c);
 
 // like new_cons, but marks the code location as well.
 lisp_value new_cons_r(io_reader * rd, lisp_value a, lisp_value b){
-  lisp_value newcons =  new_cons(a, b);
-  on_read_cons(rd, lisp_value_cons(newcons));
+  lisp_value newcons = new_cons(a, b);
+  on_read_cons(rd, newcons);
   return newcons;
 }
 

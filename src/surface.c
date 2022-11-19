@@ -123,6 +123,7 @@ f32 d1(vec3 v, vec3 * c){
 }
 
 f32 tree(void * userdata, vec3 v, vec3 * c){
+  UNUSED(userdata);
   v = vec3_scale(v, 1.2);
   //v.y += 2;
   f32 d1 = vert_capsule(vec3_sub(v, vec3_new(0,0,0)), 3.0, 0.5);
@@ -302,6 +303,8 @@ void emit_pt2(void * userdata, vec3 p, vec3 c){
 }
 
 static void emit_pt(void * userdata, vec3 p, vec3 c){
+  UNUSED(p);
+  UNUSED(c);
   sft_context * ud = userdata;
   ud->count += 1;
 }
@@ -620,7 +623,7 @@ f32 models_sdf(void * ud, vec3 p, vec3 * color){
   f32 d = 100000;
   vec3 c2 = color != NULL ? *color : vec3_zero;
   vec3 * c2p = color != NULL ? &c2 : NULL;
-  for(var i = 0; i < models->model_count; i++){
+  for(size_t i = 0; i < models->model_count; i++){
     var d1 = generic_sdf(models->models[i], p, c2p);
     if(d1 < d){
       d = d1;
@@ -656,7 +659,7 @@ f32 subtract_sdf(void * ud, vec3 p, vec3 * color){
   var k = soft->k;
   if(soft->model_count == 0) return 1000000;
   var d1 = generic_sdf(soft->models[0],p, color);
-  for(int i = 1; i < soft->model_count; i++){
+  for(size_t i = 1; i < soft->model_count; i++){
     var d2 = generic_sdf(soft->models[i],p, NULL);
     float h = CLAMP( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
     d1 = mixf( d1, -d2, h ) + k*h*(1.0-h); 
@@ -1207,7 +1210,7 @@ void test_layered_sdf(){
 #include "mc.h"
 
 void print_triangle(void * ud, vec3 v1, vec3 v2, vec3 v3){
-
+  UNUSED(ud);UNUSED(v1);UNUSED(v2);UNUSED(v3);
 }
 
 
@@ -1273,6 +1276,7 @@ typedef struct{
 }mc_vertex_builder;
 
 int vec3_hash(const void * _key_data, void * userdata){
+  UNUSED(userdata);
   const vec3 * key_data = _key_data;
   int x = (int)round((f64)key_data->x * 10000.0);
   int y = (int)round((f64)key_data->y * 10000.0);
@@ -1286,7 +1290,7 @@ void mc_take_vertex(void * userdata, vec3 pt, vec3 color){
 
   mc_vertex_builder * b = userdata;
   if(b->count == b->offset){
-    b->count = MAX(16, b->count * 2);
+    b->count = MAX((size_t)16, b->count * 2);
     b->verts = realloc(b->verts, b->count * sizeof(f32) * 3);
   }
   f32 * v = b->verts + b->offset * 3;
@@ -1340,7 +1344,7 @@ void improve_mesh(mc_vertex_builder * bld){
   ht_create3(edge_lookup, 1, sizeof(face_edge), sizeof(int));
   
   int id = 0;
-  for(int trg = 0; trg < bld->count / 3; trg++){
+  for(size_t trg = 0; trg < bld->count / 3; trg++){
 
     int ids[3];
     
@@ -1361,7 +1365,7 @@ void improve_mesh(mc_vertex_builder * bld){
         if(!ht_get(vert_tri_lookup, id2, &trg2)){
           ht_set(vert_tri_lookup, id2, &trg);
           break;
-        }else if(trg2 == trg){
+        }else if(trg2 == (int)trg){
           // already added.
         }
       }
@@ -1954,6 +1958,7 @@ typedef struct{
 }triangles_builder;
 
 void test_marching_cubes_f(void * userdata, vec3 pt, vec3 color){
+  UNUSED(color);
   triangles_builder * b = userdata;
   b->count += 1;
   printf("Vertex: ");

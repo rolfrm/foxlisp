@@ -56,16 +56,16 @@ void test_gc(){
         y[i] = i * 2;
       }
       
-      ASSERT(!vector_is_marked(ctx->gc, x));
+      ASSERT(!vector_is_marked(x));
       gc_mark(current_context);
-      ASSERT(!vector_is_marked(ctx->gc, x));
+      ASSERT(!vector_is_marked(x));
       
       var ptr = allocated_pointer_lisp_value(x);
       printf("ptr: %p\n", ptr.native_pointer);
       lisp_scope_create_value(ctx->globals, s2, ptr);
       gc_clear(current_context->gc);
       gc_mark(current_context);
-      ASSERT(vector_is_marked(ctx->gc, x));
+      ASSERT(vector_is_marked(x));
       gc_recover_unmarked(ctx->gc);
     }
     }
@@ -79,7 +79,7 @@ void test_gc(){
      // test hashtable related GCing
     var s2 = get_symbol("c");
 
-    var ht = lisp_make_hashtable();
+    var ht = lisp_make_hashtable0();
     var c2 = new_cons(nil, nil);
     var c1 = new_cons(c2, nil);
     var c5 = new_cons(nil, nil);
