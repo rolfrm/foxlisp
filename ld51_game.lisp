@@ -187,7 +187,7 @@
     (let ((col nil)
           (outcons (cons nil nil))
           )
-      (for-each i level-objects
+	  (for-each i level-objects
                 (when (foxgl:detect-collision
                        i player-object
                        (get-physics-model-name (caddr i))
@@ -220,7 +220,7 @@
 
 
 (defun drop-point-collision(px py)
-  (let ((player-object `((,px 0 ,py) ,ang model-player)))
+  (let ((player-object (list (list px 0 py) ang 'model-player)))
     
     (let ((col nil)
           (colpt (cons nil nil)))
@@ -240,7 +240,7 @@
       col)))
 
 (defun player-floor-collision (px py)
-  (let ((player-object `((,px 0 ,py) ,ang model-player))
+  (let ((player-object (list (list px 0 py) ang 'model-player))
         (collider nil))
     (for-each f floor-tiles
        (when

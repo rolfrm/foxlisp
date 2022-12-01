@@ -23,10 +23,12 @@ typedef enum {
       // marks a GC-managed pointer
       LISP_ALLOCATED_POINTER,
       // a native pointer to a lisp_value
+
       LISP_NATIVE_POINTER_TO_VALUE,
 	  // internal
 	  LISP_GLOBAL_CONS_ARRAYS,
-	  LISP_VALUE_SET
+	  LISP_VALUE_SET,
+	  LISP_ARRAY
 }lisp_type;
 
 // assuming 5 tags:
@@ -220,6 +222,11 @@ struct __lisp_vector{
 };
 
 typedef struct{
+  lisp_value * array;
+  size_t count;
+}lisp_array;
+
+typedef struct{
   lisp_type type;
   void * data;
   size_t count;
@@ -309,8 +316,16 @@ lisp_value lisp_set_push(lisp_value set, lisp_value obj);
 lisp_value lisp_set_pop(lisp_value set, lisp_value index);
 lisp_value lisp_set_new();
 
+lisp_value array_lisp_value(lisp_array * array);
+
 void * lisp_pin(lisp_value value);
+void * lisp_pin_array(lisp_array * array);
 lisp_value lisp_unpin(void * p);
+
+
+void lisp_pin_args(cons * argslist, size_t cnt);
+void lisp_unpin_args(cons * argslist, size_t cnt);
+
 //
 void foxlist_thread_init();
 // mark an sweep garbage collector
@@ -319,6 +334,7 @@ void gc_collect_garbage(lisp_context * context);
 // the three functions bellow are called by gc_collect_garbage
 // clear the GC marks
 void gc_clear(gc_context * gc);
+
 // mark active objects
 void gc_mark(lisp_context * lisp);
 // recover unmarked objects.

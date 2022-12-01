@@ -2,7 +2,6 @@
 #include <iron/gl.h>
 #include "foxlisp.h"
 
-
 typedef enum{
 	     DITHER_NONE,
 	     DITHER_FLOYD_STEINBERG
@@ -57,8 +56,8 @@ rgb df_pseudo(f32 x);
 
 vec2 p1 = {.x = 0, .y = 3}; // top left coordinate.
 vec2 p2 = {.x = 0, .y = 10}; // bottom right coordinate..
-rgb color1 = {.r = 0.5, .g = 0.8, .b = 0.5}; // light blue
-rgb color2 = {.r = 0.3, .g = 0.5, .b = 0.2}; // white
+rgb color1 = {.r = 0.5f, .g = 0.8f, .b = 0.5f}; // light blue
+rgb color2 = {.r = 0.3f, .g = 0.5f, .b = 0.2f}; // white
 
 rgb get_color(vec2 p){
   // (P - P1) dot (P - P2)
@@ -66,7 +65,7 @@ rgb get_color(vec2 p){
   f32 n = noise(p);
   vec2 lvec = vec2_sub(p2, p1);
   f32 ratio = vec2_dot(vec2_sub(p, p1), lvec) / vec2_dot(lvec, lvec);
-  ratio = CLAMP(ratio,0,1.0);
+  ratio = CLAMP(ratio,0,1.0f);
   return rgb_blend(color1, color2, ratio + 1 * (n - 0.5f) / 128.0f);  
 }
 
@@ -76,7 +75,7 @@ float box(vec3 p, vec3 b )
 {
   vec3 q = vec3_sub(vec3_abs(p), b);
   
-  return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x, MAX(q.y, q.z)), 0.0);
+  return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x, MAX(q.y, q.z)), 0.0f);
 }
 
 f32 clampf(f32 a, f32 b, f32 c){
@@ -171,24 +170,24 @@ vec3 sdf_gradient(df_ctx * ctx, vec3 pt, f32 size){
   var ptx = pt;
   var pty = pt;
   var ptz = pt;
-  ptx.x += size * 0.2;
-  pty.y += size * 0.2;
-  ptz.z += size * 0.2;
+  ptx.x += size * 0.2f;
+  pty.y += size * 0.2f;
+  ptz.z += size * 0.2f;
   var dx1 = ctx->sdf(ctx->sdf_userdata, ptx, &c);
   var dy1 = ctx->sdf(ctx->sdf_userdata, pty, &c);
   var dz1 = ctx->sdf(ctx->sdf_userdata, ptz, &c);
 
-  ptx.x -= size * 0.2 * 2;
-  pty.y -= size * 0.2 * 2;
-  ptz.z -= size * 0.2 * 2;
+  ptx.x -= size * 0.2f * 2;
+  pty.y -= size * 0.2f * 2;
+  ptz.z -= size * 0.2f * 2;
   var dx2 = ctx->sdf(ctx->sdf_userdata, ptx, &c);
   var dy2 = ctx->sdf(ctx->sdf_userdata, pty, &c);
   var dz2 = ctx->sdf(ctx->sdf_userdata, ptz, &c);
   var dv = vec3_new(dx1 - dx2, dy1 - dy2, dz1 - dz2);
   var l = vec3_len(dv);
-  if(fabs(l) < 0.00001)
+  if(fabsf(l) < 0.00001f)
     return vec3_zero;
-  var x = vec3_scale(dv, 1.0 / l);
+  var x = vec3_scale(dv, 1.0f / l);
   return x;
 }
 
@@ -210,7 +209,7 @@ vec3 optimize_point(df_ctx * ctx, vec3 pt, f32 size){
     
     var r = vec3_sub(pt, vec3_scale(x, d0));
     pt = r;
-    if(d0 < size * 0.1){
+    if(d0 < size * 0.1f){
       break;
     }
   }
@@ -223,13 +222,13 @@ void trace_point_cloud(df_ctx * ctx, vec3 position, f32 size){
   f32 d;
   vec3 c;
   d = ctx->sdf(ctx->sdf_userdata, position, &c);
-  if(fabs(d) < size * 1.5 ){
-    f32 s2 = size * 0.5;
+  if(fabsf(d) < size * 1.5f ){
+    f32 s2 = size * 0.5f;
     
-    if(size < ctx->threshold * 1.42){
-      size = size * 0.5;
-      position = trace_point(ctx, position, size * 0.1);
-      var g = sdf_gradient(ctx, position, size * 0.1);
+    if(size < ctx->threshold * 1.42f){
+      size = size * 0.5f;
+      position = trace_point(ctx, position, size * 0.1f);
+      var g = sdf_gradient(ctx, position, size * 0.1f);
       
       var s1 = vec3_normalize(vec3_mul_cross(g, vec3_new(g.y,g.z,g.x)));
       var s2 = vec3_mul_cross(g, s1);
@@ -239,16 +238,16 @@ void trace_point_cloud(df_ctx * ctx, vec3 position, f32 size){
       for(f32 j = -1; j < 2; j++){
       for(f32 i = -1; i < 2; i++){
         position = vec3_add(vec3_add(vec3_scale(s2, j * 2 ), vec3_scale(s1, i * 2)), pos2);
-        position = trace_point(ctx, position, size * 0.1);
+        position = trace_point(ctx, position, size * 0.1f);
         
         vec3 p1 = vec3_add(position, vec3_add(s1, s2));
         vec3 p2 = vec3_add(position, vec3_sub(s1, s2));
         vec3 p3 = vec3_sub(position, vec3_add(s1, s2));
         vec3 p4 = vec3_sub(position, vec3_sub(s1, s2));
-        p1 = trace_point(ctx, p1, size * 0.1);
-        p2 = trace_point(ctx, p2, size * 0.1);
-        p3 = trace_point(ctx, p3, size * 0.1);
-        p4 = trace_point(ctx, p4, size * 0.1);
+        p1 = trace_point(ctx, p1, size * 0.1f);
+        p2 = trace_point(ctx, p2, size * 0.1f);
+        p3 = trace_point(ctx, p3, size * 0.1f);
+        p4 = trace_point(ctx, p4, size * 0.1f);
 
         ctx->sdf(ctx->sdf_userdata, p1, &c);
         
@@ -371,7 +370,7 @@ typedef struct{
   int iterations;
 }cdf_ctx;
 
-const float sqrt_3 = 1.73205; 
+const float sqrt_3 = 1.73205f; 
 
 void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
   if(ctx->collision_detected) return;
@@ -380,7 +379,7 @@ void sdf_detect_collision(cdf_ctx * ctx, vec3 position, f32 size){
   //vec3_print(position);
   //printf("%f %f %f\n", d, d2, size);
   if(d < size * sqrt_3 && d2 < size * sqrt_3 ){
-    f32 s2 = size * 0.5;
+    f32 s2 = size * 0.5f;
     
     if(size < ctx->threshold * sqrt_3){
       // collison detected
@@ -415,11 +414,11 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
   // minimize max(d(p), d2(p))
   ctx->iterations += 1;
   
-  if(size < ctx->threshold * 1.7){
+  if(size < ctx->threshold * 1.7f){
     var d = ctx->sdf1(ctx->userdata1, position, NULL);
     var d2 = ctx->sdf2(ctx->userdata2, position, NULL);
-    var min_d = d - size * 1.73 * 0.5;
-    var min_d2 = d2 - size * 1.73 * 0.5;
+    var min_d = d - size * 1.73f * 0.5f;
+    var min_d2 = d2 - size * 1.73f * 0.5f;
   
 
     // collison detected
@@ -430,7 +429,7 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
   }
     
     else{
-      f32 s2 = size * 0.5;
+      f32 s2 = size * 0.5f;
       
       fi_pair candidates[8] = {0};
       f32 o[] = {-s2, s2};
@@ -453,7 +452,7 @@ void sdf_detect_max_overlap(cdf_ctx * ctx, vec3 position, f32 size){
       for(int _i = 0; _i < 8; _i++){
         int i = candidates[_i].i;
         var d = candidates[i].d;
-        if(d - s2 * 1.73 * 0.5 > ctx->greatest_common_overlap){
+        if(d - s2 * 1.73f * 0.5f > ctx->greatest_common_overlap){
           break;
         }
         
@@ -583,13 +582,13 @@ f32 sphere_sdf(void * ud, vec3 p, vec3 * c){
 f32 sphere_bounds_sdf(void * ud, vec3 p, vec3 * c){
   UNUSED(c);
   sdf_sphere_bounds * a = ud;
-  var d = vec3_len(vec3_sub(p, a->pos)) - a->radius * 1.5;
-  if(d < 0){
+  var d = vec3_len(vec3_sub(p, a->pos)) - a->radius * 1.5f;
+  if(d < 0.0f){
   
     return models_sdf(ud, p, c);
   }
   //return models_sdf(ud, p, c);
-  return d + a->radius * 0.5;
+  return d + a->radius * 0.5f;
 }
 
 
@@ -599,7 +598,7 @@ f32 aabb_sdf(void * ud, vec3 p, vec3 * color){
 
   p = vec3_sub(p, a->pos);
   vec3 q = vec3_sub(vec3_abs(p), a->size);
-  return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x,MAX(q.y,q.z)),0.0);
+  return vec3_len(vec3_max(q, vec3_zero)) + MIN(MAX(q.x,MAX(q.y,q.z)),0.0f);
 }
 
 f32 vert_capsule_sdf(void * ud, vec3 p, vec3 * c){
@@ -648,7 +647,7 @@ f32 soft_sdf(void * ud, vec3 p, vec3 * color){
 }
 //x×(1−a)+y×a. 
 f32 mixf(f32 x, f32 y, f32 a){
-  return x * (1 - a) + y * a;
+  return x * (1.f - a) + y * a;
 }
 //float opSmoothSubtraction( float d1, float d2, float k ) {
 //    float h = clamp( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
@@ -657,12 +656,12 @@ f32 mixf(f32 x, f32 y, f32 a){
 f32 subtract_sdf(void * ud, vec3 p, vec3 * color){
   sdf_subtract * soft = ud;
   var k = soft->k;
-  if(soft->model_count == 0) return 1000000;
+  if(soft->model_count == 0) return 1000000.0f;
   var d1 = generic_sdf(soft->models[0],p, color);
   for(size_t i = 1; i < soft->model_count; i++){
     var d2 = generic_sdf(soft->models[i],p, NULL);
-    float h = CLAMP( 0.5 - 0.5*(d2+d1)/k, 0.0, 1.0 );
-    d1 = mixf( d1, -d2, h ) + k*h*(1.0-h); 
+    float h = CLAMP( 0.5f - 0.5f*(d2+d1)/k, 0.0f, 1.0f );
+    d1 = mixf( d1, -d2, h ) + k*h*(1.0f-h); 
   }
 
   return d1;
@@ -894,7 +893,7 @@ static void * get_physics_sdf2(lisp_value value){
       }
       d[i] = maxd;
       check_points[i] = vec3_add(check_points[i], vec3_scale(dir, d[i] ));
-      center = vec3_add(center, vec3_scale(check_points[i], 1.0 / 8.0));
+      center = vec3_add(center, vec3_scale(check_points[i], 1.0f / 8.0f));
     }
     sphere->pos = center;
     sphere->radius = 0.0;
@@ -950,18 +949,18 @@ void describe_sdf(void * ptr){
   }
    case SDF_TYPE_SPHERE:{
      sdf_sphere * t = ptr;
-     printf("SPHERE %f\n", t->radius);
+     printf("SPHERE %f\n", (f64)t->radius);
      break;
    }
   case SDF_TYPE_SPHERE_BOUNDS:{
      sdf_sphere_bounds * t = ptr;
-     printf("SPHERE Bounds %f  ", t->radius); vec3_print(t->pos);
+     printf("SPHERE Bounds %f  ", (f64)t->radius); vec3_print(t->pos);
      printf("\n");
      break;
    }
   case SDF_TYPE_VERT_CAPSULE:{
      sdf_vert_capsule * t = ptr;
-     printf("CAPSULE r=%f h=%f\n", t->radius, t->height);
+     printf("CAPSULE r=%f h=%f\n", (f64)t->radius, (f64)t->height);
      break;
    }
   case SDF_TYPE_MODELS:{
@@ -983,7 +982,7 @@ void describe_sdf(void * ptr){
     case SDF_TYPE_SOFT:{
     
     sdf_soft * m = ptr;
-    printf("SOFT: %f\n", m->soft);
+    printf("SOFT: %f\n", (f64)m->soft);
     for(size_t i = 0; i < m->model_count; i++)
       describe_sdf(m->models[i]);
     break;
@@ -991,7 +990,7 @@ void describe_sdf(void * ptr){
     case SDF_TYPE_SUBTRACT:{
     
       sdf_subtract * m = ptr;
-      printf("SUBTRACT: %f\n", m->k);
+      printf("SUBTRACT: %f\n", (f64)m->k);
       for(size_t i = 0; i < m->model_count; i++)
         describe_sdf(m->models[i]);
       break;
@@ -1162,22 +1161,22 @@ lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2, 
 
 void test_sdf_col(){
   
-  sdf_sphere s1 = {.pos = vec3_new(-0.1, -0.1, 0), .radius = 1.0 };
-  sdf_sphere s2= {.pos = vec3_new(1.599, 0, 0), .radius = 1.0 };
+  sdf_sphere s1 = {.pos = vec3_new(-0.1f, -0.1f, 0), .radius = 1.0f };
+  sdf_sphere s2= {.pos = vec3_new(1.599f, 0, 0), .radius = 1.0f };
   cdf_ctx ctx = {
     .sdf1 = sphere_sdf,
     .sdf2 = sphere_sdf,
     .userdata1 = &s1,
     .userdata2 = &s2,
-    .threshold = 0.01,
-    .greatest_common_overlap = 10.0
+    .threshold = 0.01f,
+    .greatest_common_overlap = 10.0f
   };
-  sdf_detect_max_overlap(&ctx, vec3_new(2,2,2), 10.0);
+  sdf_detect_max_overlap(&ctx, vec3_new(2,2,2), 10.0f);
   var truth = vec3_len(vec3_sub(s1.pos, s2.pos)) - s1.radius  - s2.radius;
   
   
-  printf("MAx overlap: %f == %f %i? \n", ctx.greatest_common_overlap, truth, ctx.iterations);
-  if(ctx.greatest_common_overlap > 0.0){
+  printf("MAx overlap: %f == %f %i? \n", (f64)ctx.greatest_common_overlap, (f64)truth, ctx.iterations);
+  if(ctx.greatest_common_overlap > 0.0f){
     return;
   }
   //return;
@@ -1197,7 +1196,7 @@ void test_sdf_col(){
   var truth = vec3_len(vec3_sub(s1.pos, s2.pos)) - s1.radius  - s2.radius;
 
   
-  printf("MAx overlap: %f == %f %i? \n", ctx.greatest_common_overlap, truth, ctx.iterations);
+  printf("MAx overlap: %f == %f %i? \n", (f64)ctx.greatest_common_overlap, (f64)truth, ctx.iterations);
 
   }
   
@@ -1237,13 +1236,13 @@ void marching_cubes_sdf(df_ctx * ctx, vec3 position, f32 size){
       sdf_model model = {
         .sdf = marching_cubes_sdff,
         .userdata = ctx,
-        .threshold = 0.01
+        .threshold = 0.01f
       };
       process_cube(&model, position, size, marching_cubes_emit_point, ctx);
     }
     else{
       
-      f32 s2 = size * 0.5;
+      f32 s2 = size * 0.5f;
       f32 o[] = {-s2, s2};
       for(int i = 0; i < 8; i++){
         vec3 offset = vec3_new(o[i&1], o[(i>>1)&1], o[(i>>2)&1]);
@@ -1413,7 +1412,7 @@ void improve_mesh(mc_vertex_builder * bld){
 
   if(true){
  for(int i = 0; i < vertex_count; i++){
-   vec3 v = optimize_point(bld->sdf, vertexes[i], 0.0001);
+   vec3 v = optimize_point(bld->sdf, vertexes[i], 0.0001f);
    vertexes[i] = v;
  }
   }
@@ -1457,7 +1456,7 @@ void improve_mesh(mc_vertex_builder * bld){
       f32 e = 0;
       
       for(int i = 0; i < cnt; i++){
-        vec3 mid = vec3_scale(vec3_add(connected[i], vec3_add(v, u2)), 0.5);
+        vec3 mid = vec3_scale(vec3_add(connected[i], vec3_add(v, u2)), 0.5f);
         var d2 = sdf(sdf_userdata, mid, &c);
         e += d2 * d2;
       }
@@ -1473,10 +1472,10 @@ void improve_mesh(mc_vertex_builder * bld){
     }
     //printf("E: %f\n", ers[min_i]);
     if(min_i == 0)
-      di *= 0.5;
+      di *= 0.5f;
     else
       v = vec3_add(v, vec3_scale(u[min_i], di));
-    if(di < 0.0001)
+    if(di < 0.0001f)
       break;
     //vec3_print(vd);
     //v = vec3_sub(v, vec3_scale(vd, 1.0));
@@ -1635,14 +1634,14 @@ void improve_mesh(mc_vertex_builder * bld){
         var vx = vertexes[trig.verts[j]];
         vec3 vx_c;
         sdf(sdf_userdata, vx, &vx_c);
-        var vxup = vec3_add(vx, vec3_new(0,0.3,0));
+        var vxup = vec3_add(vx, vec3_new(0,0.3f,0));
         sdf(sdf_userdata, vx, &vx_c);
         for(int i = 0; i < 20; i++){
           float dup = sdf(sdf_userdata, vxup, &_c2);
           vxup = vec3_add(vxup, vec3_new(0,dup,0));
         }
-        if(vec3_len(vec3_sub(vxup, vx)) < 50.0){
-          vx_c = vec3_scale(vx_c, 0.9);
+        if(vec3_len(vec3_sub(vxup, vx)) < 50.0f){
+          vx_c = vec3_scale(vx_c, 0.9f);
         }
         //vec3_print(vx); printf("\n");
         for(int k = 0; k < 3; k++){
@@ -1828,7 +1827,7 @@ int render_sdf_lods2(df_ctx * model, mat4 tform, vec3 center, vec3 offset, f32 s
   }
   var offset2 = offset;
   var d2 = vec3_len(vec3_sub(offset2, center));
-  int lod = floor(powf(d2 / 20, 0.5));
+  int lod = floorf(powf(d2 / 20, 0.5f));
   //vec3_print(offset2); printf("scale: %f %f %i (%f)\n", scale, d2, lod, d2 / 5);
   //vec3 c;
   //f32 d = model->sdf(model->sdf_userdata, offset2, &c);
@@ -1851,9 +1850,9 @@ int render_sdf_lods2(df_ctx * model, mat4 tform, vec3 center, vec3 offset, f32 s
       };
       model->userdata = &builder;
       model->emit_point = mc_take_vertex;
-      model->threshold = scale / 4.0;
+      model->threshold = scale / 4.0f;
       
-      marching_cubes_sdf(model, offset2, scale * 0.55);
+      marching_cubes_sdf(model, offset2, scale * 0.55f);
       builder.count = builder.offset;
       if(builder.count > 0){
         
@@ -1891,9 +1890,9 @@ int render_sdf_lods2(df_ctx * model, mat4 tform, vec3 center, vec3 offset, f32 s
   for(int i = -1; i < 2; i++){
     for(int j = -1; j < 2; j++){
       for(int k = -1; k < 2; k++){
-        vec3 p = vec3_add(offset2, vec3_scale(vec3_new(i,j,k), scale / 3.0));
+        vec3 p = vec3_add(offset2, vec3_scale(vec3_new(i,j,k), scale / 3.0f));
         //vec3_print(p);printf("\n");
-        verts += render_sdf_lods2(model, tform, center, p, scale / 3.0 , level - 1);
+        verts += render_sdf_lods2(model, tform, center, p, scale / 3.0f , level - 1);
       }
     }  
 
@@ -1917,8 +1916,8 @@ lisp_value lisp_render_sdf_lods(lisp_value model, lisp_value transform, lisp_val
 
   var init_scale = max_scale * 3 * 3 * 2;
   int count = 0;
-  var offset0 = vec3_scale(vec3_round(vec3_scale(center_pos, 1.0 / init_scale)), init_scale);
-  vec3_print(offset0);printf("init scale: %f\n", init_scale);
+  var offset0 = vec3_scale(vec3_round(vec3_scale(center_pos, 1.0f / init_scale)), init_scale);
+  vec3_print(offset0);printf("init scale: %lf\n", (f64)init_scale);
   var tform = lisp_value_mat4(transform);
    for(int i = -2; i < 3; i++){
     for(int j = -2; j < 3; j++){

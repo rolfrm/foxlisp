@@ -321,7 +321,7 @@ int process_cube(sdf_model * model, vec3 pt, f32 size, void (* f)(void * userdat
   
   f32 isolevel = 0;
       
-  f32 s2 = size * 0.5;
+  f32 s2 = size * 0.5f;
   f32 o[] = {s2, -s2};
 
   vec3 points[8];
@@ -336,7 +336,7 @@ int process_cube(sdf_model * model, vec3 pt, f32 size, void (* f)(void * userdat
     points[i2] = vec3_add(vec3_scale(offset2,1.0), pt);
     
     var d = model->sdf(userdata, p2, NULL);
-    if(d > 0.0 ){
+    if(d > 0.0f ){
       cubeindex |= cell_index;      
     }
     ds[i2] = d;

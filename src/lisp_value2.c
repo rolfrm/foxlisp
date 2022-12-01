@@ -224,3 +224,8 @@ inline lisp_value local_index_lisp_value(size_t scope_level, size_t scope_index,
                       .scope_type = scope_type }};
   return new; 
 }
+
+lisp_value array_lisp_value(lisp_array * array){
+  return (lisp_value){.type = LISP_ARRAY, .pointer = array};
+		  
+}

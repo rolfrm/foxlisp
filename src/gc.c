@@ -165,6 +165,11 @@ lisp_value lisp_unpin(void * p){
   return lisp_set_pop(lisp_pinned_set, integer_lisp_value(i));
 }
 
+void * lisp_pin_array(lisp_array * values){
+
+  return lisp_pin(array_lisp_value(values));
+}
+
 
 gc_context * gc_context_new(){
   gc_context * ctx = _alloc0(sizeof(*ctx));
@@ -229,7 +234,7 @@ static inline void visit_value(gc_context * gc, lisp_value val);
 void iterate_value(void * key, void * value, void * data);
 void iterate_keys_only(void * key, void * value, void * data);
 void iterate_values_only(void * key, void * value, void * data);
-void iterate_scope(gc_context * ctx, lisp_scope * scope);
+void iterate_scope(gc_context * ctx, lisp_scope * scope, bool check_mark);
 
 static ht_op iterate_keys_remove_unmarked(void * key, void * value, void * data){
   lisp_value * ke = key;
@@ -276,8 +281,7 @@ static inline void mark_scope(gc_context * gc, lisp_scope * scope){
 	else
 	  return;
   }
-  
-  iterate_scope(gc, scope);
+  iterate_scope(gc, scope, false);
 }
 
 static inline bool visit_cons(gc_context * gc, cons * c){
@@ -331,7 +335,7 @@ static inline void visit_value(gc_context * gc, lisp_value val){
   case LISP_FUNCTION:
     if(is_heap_ptr(val.function) && !mark_vector(gc, val.function))
       return;
-    iterate_scope(gc, val.function->closure);
+    iterate_scope(gc, val.function->closure, true);
     visit_value(gc, val.function->code);
     visit_value(gc, val.function->args);
     return;
@@ -355,8 +359,8 @@ static inline void visit_value(gc_context * gc, lisp_value val){
     }
     break;
   case LISP_SCOPE:
-    mark_scope(gc, val.scope);
-    break;
+	mark_scope(gc, val.scope);
+	break;
     
   case LISP_VECTOR:
     if(!mark_vector(gc, val.vector))
@@ -374,6 +378,8 @@ static inline void visit_value(gc_context * gc, lisp_value val){
     case LISP_LOCAL_INDEX:
 	case LISP_GLOBAL_CONS_ARRAYS: // maybe an error
 	case LISP_VALUE_SET: // maybe an error?
+	case LISP_ARRAY:
+					   
       return;
     case LISP_NIL:
     case LISP_T:
@@ -438,6 +444,18 @@ static inline void visit_value(gc_context * gc, lisp_value val){
 		if(!is_nil(sub_value))
 		  visit_value(gc, sub_value);
 	  }
+	}
+	break;
+  case LISP_ARRAY:
+	{
+
+	  lisp_array * array = lisp_value_pointer(val);
+	  for(size_t i = 0; i < array->count; i++){
+		var sub_value = array->array[i];
+		if(!is_nil(sub_value))
+		  visit_value(gc, sub_value);
+	  }
+
 	}
 	break;
   }
@@ -569,9 +587,10 @@ void gc_recover_unmarked(gc_context * gc){
   }
 }
 
-void iterate_scope(gc_context * ctx, lisp_scope * scope){
-  if(scope->stack_scope == false && !mark_vector(ctx, scope))
-    return;
+void iterate_scope(gc_context * ctx, lisp_scope * scope, bool check_mark){
+  if(scope->stack_scope == false && check_mark && !mark_vector(ctx, scope)){
+	return;
+  }
     
   if(scope->values != NULL){
     for(size_t i = 0; i < scope->values_count; i++){
@@ -583,7 +602,7 @@ void iterate_scope(gc_context * ctx, lisp_scope * scope){
     mark_vector(ctx, scope->lookup);
 
   for(size_t i = 0; i < scope->argcnt; i++){
-    visit_value(ctx, cns[i].cdr);
+	visit_value(ctx, cns[i].cdr);
     visit_value(ctx, cns[i].car);
   }
   
@@ -596,7 +615,7 @@ void iterate_scope(gc_context * ctx, lisp_scope * scope){
     if(!mark_vector(ctx, scope->super))
       return;
   }
-  iterate_scope(ctx, scope->super);
+  iterate_scope(ctx, scope->super, false);
 }
 
 int gc_unsorted_cons(gc_context * gc){
@@ -620,14 +639,14 @@ size_t ht_count(hash_table * ht);
 
 void gc_mark(lisp_context * lisp){
   lisp->gc->stage = MARK;
-  iterate_scope(lisp->gc, lisp->globals);
+  iterate_scope(lisp->gc, lisp->globals, true);
 }
 
 //todo: check if there is a performance benefit to adding gc weak objects.
 
 void gc_clear_weak(lisp_context * lisp){
   lisp->gc->stage = CLEAR_WEAK;
-  iterate_scope(lisp->gc, lisp->globals);
+  iterate_scope(lisp->gc, lisp->globals, true);
 }
 
 void gc_collect_garbage(lisp_context * lisp){
@@ -653,7 +672,9 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   var ctx = current_context->gc;
    while(true){
     var pool = ctx->cons_pool;
+	int pool_count = 0;
     while(pool != NULL){
+	  pool_count += 1;
       if(pool->free_cons != NULL){
         
         var found = pool->free_cons;
@@ -672,15 +693,15 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
 	  goto start;
 
 	}
-	size_t pool_size = 1024 * 8;
+	size_t pool_size = 256;
     if(pool == NULL){
       cons_buffer ** parent = &ctx->cons_pool;
       while(*parent != NULL){
         pool_size *= 4;
         parent = &(*parent)->next;
       }
-      printf("new pool %i\n", (int)pool_size);
       
+      //raise(SIGINT);
       cons_buffer * new_pool = _alloc0(sizeof(*pool));
       new_pool->buffer = _alloc0(sizeof(cons) * pool_size);
       new_pool->gc_mark = _alloc0(sizeof(bool) * pool_size);

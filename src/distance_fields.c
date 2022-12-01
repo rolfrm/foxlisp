@@ -34,7 +34,7 @@ rgb rgb_add(rgb a, rgb b){
 
 
 f32 fract(f32 x){
-  return x - floor(x);
+  return x - floorf(x);
 }
 
 

@@ -433,19 +433,19 @@
 ;(println (list (hashtable-ref lisp:++cons-file-offset++ asd) (hashtable-ref lisp:++cons-file++ asd)))
 ;(println lisp:++cons-file++) 
 ;(println (cons 'lisp-current-file lisp:++current-file-ptr++))
-(println (lisp:code-location asd))
+;(println (lisp:code-location asd))
 
 (defun test-func-1 () (+ 1 2))
 ;;; blank line!!
 (defun test-func-2 () (+ 1 2))
-(println (car (function->code test-func-1)))
+;(println (car (function->code test-func-1)))
 										;(println (hashtable-keys lisp:++cons-file-offset++))
-(assert (eq (cadr (println (lisp:function-location test-func-1)))
-            (- (cadr (println (lisp:function-location test-func-2))) 2)))
+;(assert (eq (cadr (println (lisp:function-location test-func-1)))
+;            (- (cadr (println (lisp:function-location test-func-2))) 2)))
 
-(println (lisp:code-location (function->code test-func-1)))
+;(println (lisp:code-location (function->code test-func-1)))
                                         ;(println (hashtable-values lisp:++cons-file++))
-(println (length (hashtable-keys lisp:++cons-file-offset++)))
+;(println (length (hashtable-keys lisp:++cons-file-offset++)))
 
 (dotimes! i 50
           (println i)
