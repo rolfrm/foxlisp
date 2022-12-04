@@ -98,10 +98,9 @@
     (set! foxgl:current-scope cscope)))
 
 (define get-framebuffer nil)
-(define load-framebuffer nil)
 (define foxgl:current-color '(1 1 1 1))
 (define foxgl:current-transform (mat4-identity))
-(define foxgl:framebuffer-cache (make-hashtable))
+(define foxgl:framebuffer-cache (make-hashtable :keys 2))
 (define foxgl:polygon-cache2 nil)
 (define foxgl:polygon-cache (make-hashtable))
 (define foxgl:square-buffers nil)
@@ -183,17 +182,17 @@
   (plist-rest model foxgl:render-model2))
 (define foxgl:test-tex nil)
 
-(defun foxgl:get-framebuffer (model)
-  (hashtable-ref foxgl:framebuffer-cache model))
-(defun foxgl:load-framebuffer (model size)
+(defun foxgl:get-framebuffer (model key2)
+  (hashtable-refn foxgl:framebuffer-cache model key2))
+(defun foxgl:load-framebuffer (model size key2)
   (let ((bf (foxgl:create-framebuffer (car size) (cadr size))))
-    (hashtable-set! foxgl:framebuffer-cache model bf)
+	(hashtable-setn! foxgl:framebuffer-cache model key2 bf)
     bf))
 
 (define foxgl:current-scope nil)
-(defun unbind(p)
+(defun unbind(p scope)
   (if (= (car p) 'bind)
-      (eval (cadr p) foxgl:current-scope)
+      (eval (cadr p) (or scope foxgl:current-scope))
       p))
 (defmacro !render-sub (modelx)
   `(progn
@@ -446,6 +445,7 @@
          (let ((s (plookup (cdr model) :size)))
            (set! fb (foxgl:load-framebuffer model (or s '(100 100))))))
        (foxgl:bind-framebuffer fb)
+	   
        (set! foxgl:transform (mat4-identity))
        (foxgl:unbind-framebuffer fb)
        (set! foxgl:current-transform prev-transform)
@@ -579,6 +579,7 @@
        ))
        (set! model nil)
        ))
+	
     (bake
      (let ((r (hashtable-ref foxgl:polygon-cache (cdr model))))
        (unless r
@@ -945,6 +946,318 @@
                          
 
 (define window-title "window")
+
+(defun eval-scoped0(scope form)
+  (let ((head (car form)))
+
+	(let ((f (when (symbol? head) (symbol-value head scope))))
+	  
+	  (if (procedure? f)
+		  (f scope (cdr form))
+		  (eval-scoped scope form)))))
+
+(defun eval-scoped(scope body2)
+  (for-each i body2
+	(let ((head (car i)))
+			  
+	  (let ((f (when (symbol? head) (symbol-value head scope))))
+		
+		(if (procedure? f)
+			(f scope (cdr i))
+			(eval-scoped scope i))))))
+
+(defun scope:let(scope body)
+  (let ((vars (car body))
+		(body (cdr body)))
+	(println 'scope2)
+	(lisp:with-scope-binding scope (lisp:get-current-scope) '(body) vars
+                             '((eval-scoped (lisp:get-current-scope) body)))))
+(defun scope:for(scope body)
+  (let ((var (car body))
+		(evalues (unbind (cadr body) scope))
+		(rest (cddr body)))
+	(lisp:with-scope-variable
+		scope (lisp:get-current-scope!!)
+		'(evalues rest var) var
+		'((loop evalues
+			   (lisp:scope-set! (lisp:get-current-scope!!) var (unbind (car evalues) (lisp:get-current-scope!!)))
+			   (eval-scoped (lisp:get-current-scope!!) rest)
+				(set! evalues (cdr evalues))))				 
+		)))
+
+(defun scope:ref (scope body)
+  (let ((ref (car body)))
+	(eval-scoped0 scope (symbol-value ref scope))))
+
+(defun scope:bind (scope form)
+  (let ((bind-clause (car form)))
+	(eval-scoped scope (eval bind-clause scope))))
+
+(defvar base-scope
+  (let ((let2 scope:let)
+		(print (lambda (scope body) (println (unbind (car body) scope))))
+		(for scope:for)
+		(ref scope:ref)
+		(bind scope:bind)
+		)
+	
+	(lisp:get-current-scope)))
+
+(defun scope:translate (scope body)
+  (let ((t0 (symbol-value 'current-transform scope))
+		(translate (unbind (car body) scope))
+		(rest (cdr body))
+		(current-transform (get-matrix)))
+	(math:*! current-transform current-transform t0)
+	(math:translate! current-transform
+                     (unbind (car translate) scope)
+                     (or (unbind (cadr translate) scope) 0.0)
+                     (or (unbind (caddr translate) scope) 0.0))
+	(lisp:with-scope-binding scope
+	  (lisp:get-current-scope!!)
+	  '(current-transform rest) nil
+	  '((eval-scoped (lisp:get-current-scope!!) rest)))
+
+	(release-matrix current-transform)
+	))
+
+(defun scope:rotate (scope body)
+  (let ((t0 (symbol-value 'current-transform scope))
+		(rot (unbind (car body) scope))
+		(rest (cdr body))
+		(current-transform (get-matrix)))
+	(math:*! current-transform current-transform t0)
+	(math:rotate! current-transform
+                  (unbind (car rot) scope)
+                  (or (unbind (cadr rot) scope) 0.0)
+                  (or (unbind (caddr rot) scope) 0.0))
+	(lisp:with-scope-binding scope
+	  (lisp:get-current-scope!!)
+	  '(current-transform rest) nil
+	  '((eval-scoped (lisp:get-current-scope!!) rest)))	
+	(release-matrix current-transform)
+	))
+
+(defun scope:scale (scope body)
+  (let ((t0 (symbol-value 'current-transform scope))
+		(scale (unbind (car body) scope))
+		(rest (cdr body))
+		(current-transform (get-matrix)))
+	(math:*! current-transform current-transform t0)
+	(math:scale! current-transform
+                  (unbind (car scale) scope)
+                  (or (unbind (cadr scale) scope) 1.0)
+                  (or (unbind (caddr scale) scope) 1.0))
+	(lisp:with-scope-binding scope
+	  (lisp:get-current-scope!!)
+	  '(current-transform rest) nil
+	  '((eval-scoped (lisp:get-current-scope!!) rest)))	
+	(release-matrix current-transform)
+	))
+
+
+(defvar current-transform (mat4-identity))
+(defvar transform-scope
+  (eval
+   '(let ((translate scope:translate)
+		  (rotate scope:rotate)
+		  (scale scope:scale)
+		  ) 
+	 (lisp:get-current-scope))
+   base-scope))
+
+(defun on-box (scope w h d)
+
+  )
+
+(defun scope:box (scope  model)
+  (let ((w (unbind (car model) scope))
+		(h (unbind (cadr model) scope))
+		(d (unbind (cadr model) scope))
+		(on-box (symbol-value 'on-box scope)))
+	
+	(on-box scope w h d))
+  )
+
+;(defvar bakery:out (list nil))
+
+(defun bakery:push (scope data)
+  (lisp:scope-set! scope 'bakery:out (cons data (symbol-value 'bakery:out scope))))
+
+(defun bakery:sub (scope body)
+  (let ((prev (symbol-value 'bakery:out scope)))
+	(lisp:scope-set! scope 'bakery:out nil)
+	(eval-scoped scope body)
+	(let ((new (symbol-value 'bakery:out scope)))
+	  (println (list 'new new))
+	
+	  (lisp:scope-set! scope 'bakery:out prev)
+	  new)))
+
+(defun bakery:box (scope w h d)
+  (bakery:push scope (list 'aabb w h d))
+  )
+
+(defun bakery:rgb (scope body)
+  (let ((color (unbind (car body) scope))
+		(rest (cdr body))
+		)
+	(let ((color (foxgl:color->int
+				  (or (unbind (car color) scope) 0)
+				  (or (unbind (cadr color) scope) 0)
+				  (or (unbind (caddr color) scope) 0)
+				  (or (unbind (cadddr color) scope) 1.0)))
+		  (sub (bakery:sub scope rest)))
+	  (println (list 'sub sub))
+	  (when sub
+		(bakery:push scope (cons 'rgb (cons color sub)))))	
+  ))
+
+
+(defun scope:bake (scope body)
+  (let ((key (car body))
+		(dims (cadr body))
+		(rest (cddr body))
+		(on-box bakery:box)
+		(bakery:out nil)
+		(rgb bakery:rgb)
+		)
+	(set! bakery:out (lisp:with-scope-binding scope
+	  (lisp:get-current-scope!!)
+	  '(on-box rest bakery:out rgb) nil
+	  '((eval-scoped (lisp:get-current-scope!!) rest)
+		bakery:out)))	
+	(println 'done)
+	(println bakery:out)
+	(let ((image (sdf:to-image bakery:out
+							   (mat4-identity) scope:view-transform
+							   (car dims) (cadr dims) (caddr dims))))
+	  (println image)
+	  )))
+
+
+(defvar scope:color 0)
+(defun scope:rgb (scope body)
+  (let ((color (unbind (car body) scope))
+		(rest (cdr body))
+		(prev-color scope:color))
+	(set! scope:color
+		  (foxgl:color->int (or (unbind (car color) scope) 0)
+							(or (unbind (cadr color) scope) 0)
+							(or (unbind (caddr color) scope) 0)
+							(or (unbind (cadddr color) scope) 1.0)))
+	(eval-scoped scope rest)
+	(set! scope:color prev-color)
+	))
+
+(defvar scope:view-transform (mat4:orthographic 1.0 1.0 1.0))
+
+(defun scope:ortho (scope body)
+  (let ((dims (unbind (car body) scope))
+		(rest (cdr body))
+		(prev current-transform))
+	
+	(set! current-transform
+		  (mat4:orthographic (unbind (car dims) scope)
+							 (unbind (cadr dims) scope)
+							 (unbind (caddr dims) scope)))
+	(eval-scoped scope rest)
+	(set! current-transform prev)))
+(defun scope:depth (scope body)
+										;(foxgl:depth 123)
+  (foxgl:depth 1)
+  (eval-scoped scope (cdr body))
+  ;(foxgl:depth 0)
+  
+  )
+    
+(defvar paint-scope
+  (eval
+   '(let ((box scope:box)
+		  (bake scope:bake)
+		  (rgb scope:rgb)
+		  (ortho scope:ortho)
+		  (depth scope:depth)
+		  )
+	 (lisp:get-current-scope))
+   transform-scope))
+
+(defun scope:polygon(scope model)
+  (let ((dims 2)
+        (poly (plookup model :2d-triangle-strip))
+		(view scope:view-transform)
+		(model-transform (symbol-value 'current-transform scope))
+		(verbose (symbol-value 'verbose scope))
+		)
+       (unless poly
+         (set! poly (plookup model :3d-triangle-strip))
+         (set! dims 3)
+         )
+       (when poly
+		 
+		 (let ((r (hashtable-ref foxgl:polygon-cache model)))
+           (unless r
+             (set! r (list 'poly (foxgl:load-polygon (list-to-array poly) dims)))
+			 (println (cons '>>>>> (cons r model)))
+		     (hashtable-set foxgl:polygon-cache model r)
+             )
+		   (foxgl:color scope:color)
+           (foxgl:transform model-transform)
+		   (foxgl:blit-polygon (cdr r))
+           ))))
+(defvar scope:cache-scale (mat4-identity))
+(math:scale! scope:cache-scale 2 2 1)
+(math:translate! scope:cache-scale -0.5 -0.5 0)
+
+(defun scope:cache-image(scope model)
+
+  ;; in this test I should try projecting a unit vector space
+  ;; into the current transform matrix. The angles and sizes should
+  ;; be used for the key, otherwise rotated objects will be cached as
+  ;; non-rotated.
+  (let ((eigen-key (foxgl:get-eigen-key (symbol-value 'current-transform scope))))
+	(println eigen-key)
+  (let ((fb (foxgl:get-framebuffer model eigen-key)))
+	(when (null? fb)
+      (let ((s (plookup model :size)))
+		(set! fb (foxgl:load-framebuffer model (or s '(200 200)) eigen-key))
+		)
+	;; the size is whatever.
+	(foxgl:bind-framebuffer fb)
+	(let ((submodel model))
+	  (lisp:with-scope-binding scope
+		(lisp:get-current-scope!!)
+		'(submodel verbose) nil
+		'((eval-scoped (lisp:get-current-scope!!) submodel)))
+	  
+	  )
+	(foxgl:unbind-framebuffer fb))
+
+	(unless foxgl:square-buffers
+         
+      (set! foxgl:square-buffers
+            (list
+             (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
+             (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
+         
+      )
+	(foxgl:bind-textures (foxgl:framebuffer-texture fb)
+						 (foxgl:framebuffer-depth-texture fb)
+						 )
+    (foxgl:color '(1.0 1.0 1.0 1.0))
+    (foxgl:transform scope:cache-scale)
+	(foxgl:blit-mode :triangle-strip-depth)
+	(foxgl:blit-polygon foxgl:square-buffers)
+    (foxgl:bind-texture nil)
+    (foxgl:blit-mode :triangle-strip)
+  )))
+
+(defvar scope-3d
+  (eval
+   '(let ((polygon scope:polygon)
+		  (cache scope:cache-image))
+	 (lisp:get-current-scope))
+   paint-scope))
 
 ;(render-model2 nil)
 ;(lisp:exit 0)

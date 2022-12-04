@@ -75,6 +75,10 @@ lisp_value math_tan(lisp_value a){
   return rational_lisp_value(atan(lisp_value_as_rational(a)));
 }
 
+lisp_value math_tan2(lisp_value a, lisp_value b){
+  return rational_lisp_value(atan2(lisp_value_as_rational(a), lisp_value_as_rational(b)));
+}
+
 
 
 lisp_value math_random(lisp_value range){
@@ -265,11 +269,12 @@ lisp_value math_mat4_perspective(lisp_value fov, lisp_value aspect, lisp_value n
   return mat4_to_lisp(p);
 }
            
-lisp_value math_mat4_orthographic(lisp_value w, lisp_value h, lisp_value z){
-  TYPE_ASSERT(w, LISP_RATIONAL);
-  TYPE_ASSERT(h, LISP_RATIONAL);
-  TYPE_ASSERT(z, LISP_RATIONAL);
-  mat4 p = mat4_ortho(-w.rational, w.rational, -h.rational, h.rational, -z.rational, z.rational);
+lisp_value math_mat4_orthographic(lisp_value _w, lisp_value _h, lisp_value _z){
+  var w = lisp_value_as_rational(_w);
+  var h = lisp_value_as_rational(_h);
+  var z = lisp_value_as_rational(_z);
+  
+  mat4 p = mat4_ortho(-w, w, -h, h, -z, z);
   return mat4_to_lisp(p);
 }
 
@@ -482,30 +487,25 @@ lisp_value load_polygon (lisp_value val, lisp_value dim, lisp_value opt_offset, 
   var poly = blit3d_polygon_new();
   blit3d_polygon_load_data(poly, pts + offset,  l * val.vector->elem_size);
   blit3d_polygon_configure(poly, dimensions);
-
   return native_pointer(poly);
 }
 
 lisp_value blit_set_mode(lisp_value mode){
   if(lisp_value_eq(mode, get_symbol(":points"))){
     blit3d_set_mode(blit3d_current_context, BLIT3D_POINTS);
-    //glEnable(GL_PROGRAM_POINT_SIZE);
-  }
-  else if(lisp_value_eq(mode, get_symbol(":triangles"))){
+  }else if(lisp_value_eq(mode, get_symbol(":triangles"))){
     blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES);
-    //glEnable(GL_PROGRAM_POINT_SIZE);
   }else if(lisp_value_eq(mode, get_symbol(":triangles-color"))){
     blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLES_COLOR);
-    //glEnable(GL_PROGRAM_POINT_SIZE);
   }else if(lisp_value_eq(mode, get_symbol(":triangle-strip-color"))){
     blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLE_STRIP_COLOR);
-    //glEnable(GL_PROGRAM_POINT_SIZE);
+  }else if(lisp_value_eq(mode, get_symbol(":triangle-strip-depth"))){
+	blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLE_STRIP_TEXTURE_DEPTH);
   }
   else{
-    //glDisable(GL_PROGRAM_POINT_SIZE);
     blit3d_set_mode(blit3d_current_context, BLIT3D_TRIANGLE_STRIP);
   }
-    return nil;
+  return nil;
 }
 
 lisp_value blit_polygon (lisp_value val){
@@ -608,11 +608,13 @@ lisp_value foxgl_get_events(){
 lisp_value foxgl_create_framebuffer (lisp_value width, lisp_value height){
   type_assert(width, LISP_INTEGER);
   type_assert(height, LISP_INTEGER);
-  blit_framebuffer * b = lisp_malloc(sizeof(*b));
+  blit_framebuffer * b = alloc0(sizeof(*b));
+  printf("B: %p\n", b);
   b->width = width.integer;
   b->height = height.integer;
   b->channels = 4;
   b->mode = IMAGE_MODE_NONE;
+  b->depth_mode =  IMAGE_MODE_DEPTH16;
  
   blit_create_framebuffer(b);
   return native_pointer(b);
@@ -623,7 +625,7 @@ lisp_value foxgl_bind_framebuffer(lisp_value fb){
   type_assert(fb, LISP_NATIVE_POINTER);
   blit_use_framebuffer(fb.native_pointer);
   glClearColor(0,0,0,0);
-  glClear(GL_COLOR_BUFFER_BIT);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   return nil;
 }
 
@@ -653,6 +655,14 @@ lisp_value foxgl_framebuffer_texture(lisp_value fb){
   return native_pointer(tx);
 }
 
+lisp_value foxgl_framebuffer_depth_texture(lisp_value fb){
+  type_assert(fb, LISP_NATIVE_POINTER);
+  texture * tx = lisp_malloc(sizeof(*tx));
+  *tx = blit_framebuffer_depth_as_texture(fb.native_pointer);
+  return native_pointer(tx);
+}
+
+
 //blit3d_bind_texture(blit3d_context * ctx, texture * tex){
 lisp_value foxgl_bind_texture(lisp_value tex){
   if(is_nil(tex)){
@@ -664,6 +674,21 @@ lisp_value foxgl_bind_texture(lisp_value tex){
   blit3d_bind_texture(blit3d_current_context, tex.native_pointer);
   return nil;
 }
+
+lisp_value foxgl_bind_textures(lisp_value * tex, size_t count){
+
+  texture * textures[count];
+  for(size_t i = 0; i < count; i++){
+	if(is_nil(tex[i]))
+	  return nil;
+  
+	textures[i] = tex[i].native_pointer;
+  }
+  
+  blit3d_bind_textures(blit3d_current_context, textures, count);
+  return nil;
+}
+
 
 lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
   type_assert(text, LISP_STRING);
@@ -691,6 +716,11 @@ lisp_value foxgl_blend(lisp_value blend){
 lisp_value foxgl_depth(lisp_value blend){
   if(!is_nil(blend)){
     glEnable(GL_DEPTH_TEST);
+	if(lisp_value_eq(blend, get_symbol(":always"))){
+	  glDepthFunc(GL_ALWAYS);
+	}else{
+	  glDepthFunc(GL_LESS);
+	}
   }
   else{
     glDisable(GL_DEPTH_TEST);
@@ -809,6 +839,44 @@ lisp_value foxgl_web_canvas_size(){
   return new_cons(integer_lisp_value(w), integer_lisp_value(h));
 }
 
+lisp_value foxgl_error(){
+  return integer_lisp_value(glGetError());
+}
+
+float vec3_angle(vec3 v1, vec3 v2) {
+  float dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+  float len1 = sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
+  float len2 = sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
+  vec3 cr = vec3_mul_cross(v1,v2);
+  
+  float angle = acos(dot / (len1 * len2));
+  if(cr.z < 0)
+	return (float)(2.0 * M_PI - (double)angle);
+	 
+  return angle;
+}
+lisp_value foxgl_get_eigen_key(lisp_value transform){
+  
+  mat4 * m1 = transform.vector->data;
+  var z0 = vec3_new(0,0,0);
+  var z = mat4_mul_vec3(*m1, z0); 
+  var a0 = vec3_new(1,0,0);
+  var a = vec3_sub(mat4_mul_vec3(*m1, a0), z); 
+  var b0 = vec3_new(0,1,0);
+  var b = vec3_sub(mat4_mul_vec3(*m1, b0), z);
+  var c0 = vec3_new(0,0,1);
+  var c = vec3_sub(mat4_mul_vec3(*m1, c0), z);
+
+  f32 angle1 =vec3_angle(a,a0);
+  f32 angle2 =vec3_angle(b,b0);
+  f32 angle3 =vec3_angle(c,c0);
+  printf("%f %f %f\n", (double)angle1, (double)angle2, (double)angle3);
+  unsigned int scaled1 = (unsigned int)(angle1 * 10000);
+  unsigned int scaled2 = (unsigned int)(angle2 * 10000);
+  unsigned int scaled3 = (unsigned int)(angle3 * 10000);
+
+  return integer_lisp_value(scaled1 ^ scaled2 ^ scaled3);
+}
 
 lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2);
 lisp_value foxgl_detect_collision_floor(lisp_value obj1, lisp_value obj2);
@@ -824,6 +892,7 @@ void foxgl_register(){
   lrn("math:random", 1, math_random);
   lrn("math:mod", 2, math_mod);
   lrn("math:tan", 1, math_tan);
+  lrn("math:tan2", 2, math_tan2);
   lrn("math:atan", 2, math_atan);
   lrn("math:round", 2, math_round);
   lrn("math:floor", 2, math_floor);
@@ -872,8 +941,10 @@ void foxgl_register(){
   lrn("foxgl:unbind-framebuffer", 1, foxgl_unbind_framebuffer);
   lrn("foxgl:destroy-framebuffer", 1, foxgl_destroy_framebuffer);
 
-  lrn("foxgl:frame-buffer-texture", 1, foxgl_framebuffer_texture);
+  lrn("foxgl:framebuffer-texture", 1, foxgl_framebuffer_texture);
+  lrn("foxgl:framebuffer-depth-texture", 1, foxgl_framebuffer_depth_texture);
   lrn("foxgl:bind-texture", 1, foxgl_bind_texture);
+  lrn("foxgl:bind-textures", -1, foxgl_bind_textures);
   lrn("foxgl:blit-text", 2, foxgl_blit_text);
   lrn("foxgl:blend", 1, foxgl_blend);
   lrn("foxgl:depth", 1, foxgl_depth);
@@ -885,6 +956,8 @@ void foxgl_register(){
   lrn("foxgl:bake", 2, foxgl_bake_polygons);
   lrn("foxgl:detect-collision", 5, foxgl_detect_collision);
   lrn("foxgl:detect-collision-floor", 3, foxgl_detect_collision_floor);
+  lrn("foxgl:get-error", 0, foxgl_error);
+  lrn("foxgl:get-eigen-key", 1, foxgl_get_eigen_key);
   tcp_register();
   foxal_register();
   sdf_register();

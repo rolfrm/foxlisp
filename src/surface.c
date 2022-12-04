@@ -764,9 +764,13 @@ static void * get_physics_sdf(lisp_value value){
   }
   return models;
 }
-
+vec3 color_from_integer(int color){
+  u8 * color2 = (u8*) &color;
+  return vec3_scale(vec3_new(color2[0], color2[1], color2[2]), 1.0 / 255);
+}
 static void * get_physics_sdf2(lisp_value value){
   var model_type = car(value);
+
   if(lisp_value_eq(model_type, get_symbol("transform"))){
     
     sdf_transform * transform = alloc(sizeof(*transform));
@@ -783,10 +787,14 @@ static void * get_physics_sdf2(lisp_value value){
     return transform;
   }
   if(lisp_value_eq(model_type, get_symbol("rgb"))){
-    
+
     sdf_color * rgb = alloc(sizeof(*rgb));
     rgb->type = SDF_TYPE_COLOR;
-    rgb->color = lv_vec3(cadr(value));
+	if(is_integer(cadr(value))){
+	  rgb->color = color_from_integer(cadr(value).integer);
+	}else{
+	  rgb->color = lv_vec3(cadr(value));
+	}
     value = cddr(value);
     
     rgb->model_count = lisp_length(value).integer;
@@ -913,18 +921,42 @@ static void * get_physics_sdf2(lisp_value value){
     capsule->height = h;
     return capsule;
   }
+  println(value);
+  if(is_symbol(model_type)){
+	println(model_type);
+	printf("UNKNOWN MODEL!!\n");
+	lisp_error(new_cons(get_symbol("Unknown symbol"), model_type));
+	return NULL;
+  }
   
-  size_t count = lisp_length(cdr(value)).integer;
+  size_t count = 0;
+  var value2 = value;
+  lisp_value first = nil;
+  while(!is_nil(value2)){
+	if(is_cons(car(value2))){
+	  count += 1;
+	  first = car(value2);
+	}
+	  
+	value2 = cdr(value2);
+  }
+
+  printf("iter sub: %i\n", count);
   if(count == 0)
     return NULL;
   if(count == 1)
-    return get_physics_sdf2(cadr(value));
+    return get_physics_sdf2(first);
   sdf_models * mod = alloc0(sizeof(*mod));
   mod->type = SDF_TYPE_MODELS;
   mod->model_count = count;
   mod->models = alloc0(sizeof(void *) * mod->model_count);
-  for(size_t i = 0; i < mod->model_count; i++){
-    mod->models[i] = get_physics_sdf2(car(value));
+  value2 = value;
+  int i = 0;
+  while(!is_nil(value2)){
+	if(is_cons(car(value))){
+	   mod->models[i] = get_physics_sdf2(car(value));
+	   i++;
+	}
     value = cdr(value);
   }
   return mod;
@@ -1933,7 +1965,6 @@ lisp_value lisp_render_sdf_lods(lisp_value model, lisp_value transform, lisp_val
   printf("Render SDF Vertexes: %i\n", count);
   
   return nil;
-  
 }
 
 lisp_value lisp_sdf_distance(lisp_value model, lisp_value p){
@@ -1948,10 +1979,7 @@ lisp_value lisp_sdf_distance(lisp_value model, lisp_value p){
   return rational_lisp_value(generic_sdf(modelp, p2, &c));
 }
 void lrn(const char * l, int args, void * f);
-void sdf_register(){
-  lrn("sdf:dist", 2, lisp_sdf_distance);
-  lrn("sdf:render", 3, lisp_render_sdf_lods);
-}
+
 typedef struct{
   int count;
 }triangles_builder;
@@ -1992,3 +2020,86 @@ void test_sdf(){
   test_marching_cubes();
 }
 
+
+lisp_value lisp_render_sdf_to_image(lisp_value model, lisp_value model_transform, lisp_value camera_transform,lisp_value width, lisp_value height, lisp_value depth){
+  // lets say we render 4 levels of detail, with a 10x10x10 chunk being the lowest level
+  // of detail and 2^4 = 16 * 10 160x160x160 chunk being the biggest
+  void * modelp = get_physics_model_cached2(model);
+  if(modelp == 0){
+	raise_string("Unable to load physics model");
+	return nil;
+  }
+  df_ctx ctx = {
+    .sdf = generic_sdf2,
+    .sdf_userdata = modelp
+  };
+
+  int w = lisp_value_integer_checked(width);
+  int h = lisp_value_integer_checked(height);
+  var d = lisp_value_as_rational(depth);
+  var model_tform = lisp_value_mat4(model_transform);
+  var model_tform_i = mat4_invert(model_tform);
+  var cam_tform = lisp_value_mat4(camera_transform);
+  var cam_tform_i = mat4_invert(cam_tform);
+  u8 * image = lisp_malloc(w * h * 4);
+  f32 * dimage = lisp_malloc(w * h * 4);
+
+  //var campos = mat4_mul_vec3(cam_tform, vec3_new(0,0,0));
+  mat4_print(cam_tform);
+
+  for(int j = 0; j < h; j++){
+	for(int i = 0; i < w; i++){
+	  var vpx = vec3_new(i, j, 1);
+	  vpx.x = (2.0f * vpx.x / w) - 1.0f;
+	  vpx.y = (2.0f * vpx.y / h) - 1.0f;
+	  var cpx = mat4_mul_vec3(cam_tform_i, vpx);
+	  var dvec = vec3_new(0,0,-1);
+	  cpx = vec3_sub(cpx, vec3_scale(dvec, d));
+	  var cpx0 = cpx;
+	  //vec3_print(cpx);
+	  vec3 color = {0};
+	  float d0 = 10000;
+	  cpx = mat4_mul_vec3(model_tform_i, cpx);
+	  while(d0 > 0.01f && d0 < 20000.0f){
+		d0 = ctx.sdf(ctx.sdf_userdata, cpx, &color);
+		cpx = vec3_add(cpx, vec3_scale(dvec, d0));
+	  }
+	  int idx = i + j * w;
+	  dimage[idx] = vec3_len(vec3_sub(cpx, cpx0));
+	  if(d0 < 0.0001f){
+		printf("#");
+		for(int k = 0; k < 3; k++)
+		  image[idx + k] = (u8)(color.data[k] * 255);
+		image[idx + 3] = 255;
+
+	  }else{
+		printf(" ");
+		for(int k = 0; k < 4; k++)
+		  image[idx + k] = 0;
+	  }
+	}
+	printf("\n");
+  }
+
+  lisp_vector * image_vec = lisp_malloc(sizeof(lisp_vector));
+  image_vec->data = image;
+  image_vec->count = w * h * 4;
+  image_vec->elem_size = 1;
+  image_vec->default_value = byte_lisp_value(0);
+
+  lisp_vector * depth_vec = lisp_malloc(sizeof(lisp_vector));
+  depth_vec->data = dimage;
+  depth_vec->count = w * h;
+  depth_vec->elem_size = 4;
+  depth_vec->default_value = float32_lisp_value(0.0f);
+  
+  
+  return new_cons(vector_lisp_value(image_vec), vector_lisp_value(depth_vec));
+}
+
+
+void sdf_register(){
+  lrn("sdf:dist", 2, lisp_sdf_distance);
+  lrn("sdf:render", 3, lisp_render_sdf_lods);
+  lrn("sdf:to-image", 6, lisp_render_sdf_to_image);
+}

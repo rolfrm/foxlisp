@@ -667,8 +667,8 @@ void gc_collect_garbage(lisp_context * lisp){
 extern lisp_context * current_context;
 bool gc_unsafe_stack = false;
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
-  bool gc_run = false;
- start:
+  //bool gc_run = false;
+  //start:
   var ctx = current_context->gc;
    while(true){
     var pool = ctx->cons_pool;
@@ -687,12 +687,12 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
       }
     }
 
-	if(!gc_run && !gc_unsafe_stack){
-	  gc_collect_garbage(current_context);
-	  gc_run = true;
-	  goto start;
+	//if(!gc_run && !gc_unsafe_stack){
+	  //gc_collect_garbage(current_context);
+	  //gc_run = true;
+	  //goto start;
 
-	}
+	//}
 	size_t pool_size = 256;
     if(pool == NULL){
       cons_buffer ** parent = &ctx->cons_pool;

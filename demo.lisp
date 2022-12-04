@@ -480,9 +480,11 @@
        (translate (0 0  (bind (+ -20 zoom)))
         
         (rotate (0.4 (bind turned) 0)
-         (translate ((bind (- 0 (car ball-position))) (bind (- 0 (cadr ball-position)))  (bind (- 0 (caddr ball-position))))
-          (bind world-model)
-
+				(translate ((bind (- 0 (car ball-position)))
+							(bind (- 0 (cadr ball-position)))
+							(bind (- 0 (caddr ball-position))))
+			(bind world-model)
+		  
           (translate (65 -55 -150)
            (rotate (0 0.5 1)
             (scale (40 40 40)

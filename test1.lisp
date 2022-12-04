@@ -519,5 +519,14 @@
 ;  (lisp:with-scope-binding (lisp:get-current-scope)
 
 
+(defvar keystable (make-hashtable :keys 2))
+(hashtable-setn keystable 1 2 3)
+(hashtable-setn keystable 2 2 4)
+(println '??)
+(println nil)
+(println (hashtable-refn keystable 1 2))
+(println (hashtable-refn keystable 2 2))
 
+;(println (hashtable-count keystable))
+;(println (hashtable-values keystable))
 (println "Tests Passed")

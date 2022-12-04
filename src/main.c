@@ -858,6 +858,7 @@ lisp_value lisp_eval_symbol_value(lisp_scope * scope, lisp_value sym_expr, lisp_
   return nil;
 }
 
+
 lisp_value lisp_eval_boundp(lisp_scope * scope, lisp_value sym_expr,
 							lisp_value root_scope_only_expr){
   var target_scope = scope;
@@ -1532,6 +1533,7 @@ lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value){
           return lisp_eval_define(scope, cadr(value), caddr(value));
         case LISP_SYMBOL_VALUE:
           return lisp_eval_symbol_value(scope, cadr(value), caddr(value));
+	
         case LISP_BOUND:
           return lisp_eval_boundp(scope, cadr(value), caddr(value));          
         case LISP_WITH_EXCEPTION_HANDLER:
@@ -2593,8 +2595,10 @@ static bool lisp_value_full_compare(const void * _k1, const void * _k2, void * u
 lisp_value lisp_make_hashtable(lisp_value * args, int n){
   static lisp_value full_keyword;
   static lisp_value weak_keyword;
+  static lisp_value keys_keyword;
   bool full = false;
   bool weak = false;
+  int keys = 1;
   for(int i = 0; i < n; i++){
     lisp_value arg = args[i];
     if(eq(arg, get_symbol_cached(&full_keyword, ":deep-equality")))
@@ -2602,10 +2606,18 @@ lisp_value lisp_make_hashtable(lisp_value * args, int n){
     
     if(eq(arg, get_symbol_cached(&weak_keyword, ":weak")))
       weak = true;
+	if(eq(arg, get_symbol_cached(&keys_keyword, ":keys"))){
+	  if(i + 1 == n) {
+		raise_string("invalid use of :keys");
+		return nil;
+	  }
+	  keys = args[i + 1].integer;
+	  i += 1;
+	}
   }
-  
+
   hash_table * ht = lisp_malloc(sizeof(*ht));
-  ht_create3(ht, 1, sizeof(lisp_value), sizeof(lisp_value));
+  ht_create3(ht, 1, sizeof(lisp_value) * keys, sizeof(lisp_value));
   ht_set_alloc(ht, lisp_malloc, lisp_free);
   if(full){
     ht->hash = lisp_value_full_hash;
@@ -2637,6 +2649,8 @@ lisp_value lisp_hashtable_set(lisp_value _ht, lisp_value key, lisp_value value){
   return nil;
 }
 
+
+
 lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
   hash_table * ht = lisp_value_hashtable(_ht);
@@ -2646,6 +2660,33 @@ lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key){
   return nil;
 }
 
+lisp_value lisp_hashtable_setn(lisp_value * values, size_t count){
+  if(count <= 2){
+	raise_string("not enough values for set");
+	return nil;
+ 
+  }
+  var _ht = values[0];
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
+  hash_table * ht = lisp_value_hashtable(_ht);
+  ht_set(ht, values + 1, values + count - 1);
+  return nil;
+}
+
+
+lisp_value lisp_hashtable_getn(lisp_value * values, size_t count){
+  if(count <= 1){
+	raise_string("not enough values for get");
+	return nil;
+  }
+  lisp_value ht = values[0];
+  lisp_value value = {0};
+  //println(values[1]);
+				 
+  if(ht_get(lisp_value_hashtable(ht), &values[1], &value))
+    return value;
+  return nil;
+}
 lisp_value lisp_hashtable_count(lisp_value ht){
   TYPE_ASSERT(ht, LISP_HASHTABLE);
   var ht2 = lisp_value_hashtable(ht);
@@ -2996,11 +3037,14 @@ lisp_context * lisp_context_new(){
   lisp_register_native("make-hashtable", -1, lisp_make_hashtable);
   lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
   lisp_register_native("hashtable-set", 3, lisp_hashtable_set);
+  lisp_register_native("hashtable-refn", -1, lisp_hashtable_getn);
+  lisp_register_native("hashtable-setn!", -1, lisp_hashtable_setn);
   lisp_register_native("hashtable-remove", 2, lisp_hashtable_remove);
   lisp_register_native("hashtable-ref2", 2, lisp_hashtable_get2);
   lisp_register_native("hashtable-keys", 1, lisp_hashtable_keys);
   lisp_register_native("hashtable-values", 1, lisp_hashtable_values);
   lisp_register_native("hashtable-clear", 1, lisp_hashtable_clear);
+  lisp_register_native("hashtable-count", 1, lisp_hashtable_count);
   lisp_register_native("function-signature", 1, lisp_signature);
 
   lisp_register_native("optimize-statement", 2, _lisp_optimize_statement);

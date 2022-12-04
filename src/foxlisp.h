@@ -52,10 +52,10 @@ typedef enum {
 				  LISP_UNQUOTE = 12,
 				  LISP_UNQUOTE_SPLICE = 13,
               LISP_SYMBOL_VALUE = 14,
-              LISP_BOUND = 15,
-              LISP_WITH_EXCEPTION_HANDLER = 16,
-              LISP_CASE = 17,
-              LISP_COND = 18,
+              LISP_BOUND,
+              LISP_WITH_EXCEPTION_HANDLER,
+              LISP_CASE,
+              LISP_COND,
               LISP_AND,
               LISP_OR,
               LISP_GET_SCOPE,
@@ -284,6 +284,7 @@ lisp_value string_lisp_value(const char * str);
 char * lisp_value_string(lisp_value v);
 lisp_value integer_lisp_value(i64 i);
 int64_t lisp_value_integer(lisp_value v);
+int64_t lisp_value_integer_checked(lisp_value v);
 lisp_value byte_lisp_value(u8 i);
 u8 lisp_value_byte(lisp_value v);
 void * lisp_value_pointer(lisp_value val);

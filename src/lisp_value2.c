@@ -118,6 +118,19 @@ inline int64_t lisp_value_integer(lisp_value v){
   return v.integer;
 }
 
+inline int64_t lisp_value_integer_checked(lisp_value v){
+  switch(v.type){
+  case LISP_INTEGER:
+  case LISP_BYTE:
+	break;
+  default:
+	raise_string("type is not an integer");
+	return 0;
+
+  }
+  return v.integer;
+}
+
 inline lisp_value byte_lisp_value(u8 i){
   return (lisp_value){.type = LISP_BYTE, .integer = i};
 }
