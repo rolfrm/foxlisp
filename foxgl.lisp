@@ -964,12 +964,13 @@
 		
 		(if (procedure? f)
 			(f scope (cdr i))
-			(eval-scoped scope i))))))
+			(if (cons? f)
+				(eval-scoped0 scope f)
+				(eval-scoped scope i)))))))
 
 (defun scope:let(scope body)
   (let ((vars (car body))
 		(body (cdr body)))
-	(println 'scope2)
 	(lisp:with-scope-binding scope (lisp:get-current-scope) '(body) vars
                              '((eval-scoped (lisp:get-current-scope) body)))))
 (defun scope:for(scope body)
@@ -993,12 +994,14 @@
   (let ((bind-clause (car form)))
 	(eval-scoped scope (eval bind-clause scope))))
 
+
 (defvar base-scope
-  (let ((let2 scope:let)
+  (let ((vars scope:let)
 		(print (lambda (scope body) (println (unbind (car body) scope))))
 		(for scope:for)
 		(ref scope:ref)
 		(bind scope:bind)
+		(ignore (lambda (s b) ))
 		)
 	
 	(lisp:get-current-scope)))
@@ -1028,9 +1031,9 @@
 		(current-transform (get-matrix)))
 	(math:*! current-transform current-transform t0)
 	(math:rotate! current-transform
-                  (unbind (car rot) scope)
-                  (or (unbind (cadr rot) scope) 0.0)
-                  (or (unbind (caddr rot) scope) 0.0))
+                  (* 2 pi (unbind (car rot) scope))
+                  (* 2 pi (or (unbind (cadr rot) scope) 0.0))
+                  (* 2 pi (or (unbind (caddr rot) scope) 0.0)))
 	(lisp:with-scope-binding scope
 	  (lisp:get-current-scope!!)
 	  '(current-transform rest) nil
@@ -1057,6 +1060,7 @@
 
 
 (defvar current-transform (mat4-identity))
+
 (defvar transform-scope
   (eval
    '(let ((translate scope:translate)
@@ -1073,7 +1077,7 @@
 (defun scope:box (scope  model)
   (let ((w (unbind (car model) scope))
 		(h (unbind (cadr model) scope))
-		(d (unbind (cadr model) scope))
+		(d (unbind (caddr model) scope))
 		(on-box (symbol-value 'on-box scope)))
 	
 	(on-box scope w h d))
@@ -1095,8 +1099,11 @@
 	  new)))
 
 (defun bakery:box (scope w h d)
-  (bakery:push scope (list 'aabb w h d))
-  )
+  (let((tform (symbol-value 'current-transform scope)))
+	(println (list '????? tform w h d))
+  
+	(bakery:push scope (list 'transform tform (list 'aabb w h d))
+  )))
 
 (defun bakery:rgb (scope body)
   (let ((color (unbind (car body) scope))
@@ -1113,6 +1120,7 @@
 		(bakery:push scope (cons 'rgb (cons color sub)))))	
   ))
 
+(defvar scope:bake-hashtable (make-hashtable))
 
 (defun scope:bake (scope body)
   (let ((key (car body))
@@ -1121,18 +1129,45 @@
 		(on-box bakery:box)
 		(bakery:out nil)
 		(rgb bakery:rgb)
+		(current-transform (get-matrix))
+		
 		)
-	(set! bakery:out (lisp:with-scope-binding scope
-	  (lisp:get-current-scope!!)
-	  '(on-box rest bakery:out rgb) nil
-	  '((eval-scoped (lisp:get-current-scope!!) rest)
-		bakery:out)))	
-	(println 'done)
-	(println bakery:out)
-	(let ((image (sdf:to-image bakery:out
-							   (mat4-identity) scope:view-transform
-							   (car dims) (cadr dims) (caddr dims))))
-	  (println image)
+	(let ((tex (hashtable-ref scope:bake-hashtable body)))
+
+	  (unless tex
+		(println 'baking)
+		(set! bakery:out (lisp:with-scope-binding scope
+					   (lisp:get-current-scope!!)
+					   '(on-box rest bakery:out rgb current-transform) nil
+					   '((eval-scoped (lisp:get-current-scope!!) rest)
+						 bakery:out)))
+		(release-matrix current-transform)
+	
+		(let ((image (sdf:to-image bakery:out
+								   (mat4-identity) scope:view-transform
+								   (car dims) (cadr dims) (caddr dims))))
+		  (set! tex (foxgl:load-texture-from-vector (car image) (car dims) (cadr dims) 3 ))
+		  (hashtable-set scope:bake-hashtable body tex)))
+	  ;(println foxgl:square-buffers)
+	  (unless foxgl:square-buffers
+         
+		  (set! foxgl:square-buffers
+				(list
+				 (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
+				 (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
+         
+		  )
+	  (foxgl:bind-texture tex)
+	  (foxgl:color '(1.0 1.0 1.0 1.0))
+      ;(foxgl:transform mat2);scope:cache-scale)
+	  (foxgl:blit-mode :triangle-strip-depth)
+	  (foxgl:blit-polygon foxgl:square-buffers)
+      (foxgl:bind-texture nil)
+      (foxgl:blit-mode :triangle-strip)
+	  ;(release-matrix mat2)
+	
+	  ;(println tex)
+
 	  )))
 
 
@@ -1164,17 +1199,14 @@
 	(eval-scoped scope rest)
 	(set! current-transform prev)))
 (defun scope:depth (scope body)
-										;(foxgl:depth 123)
   (foxgl:depth 1)
-  (eval-scoped scope (cdr body))
-  ;(foxgl:depth 0)
-  
+  (eval-scoped scope (cdr body))  
   )
     
 (defvar paint-scope
   (eval
    '(let ((box scope:box)
-		  (bake scope:bake)
+		  (bake (lambda (x y) (scope:bake x y)))
 		  (rgb scope:rgb)
 		  (ortho scope:ortho)
 		  (depth scope:depth)
@@ -1208,19 +1240,23 @@
 (defvar scope:cache-scale (mat4-identity))
 (math:scale! scope:cache-scale 2 2 1)
 (math:translate! scope:cache-scale -0.5 -0.5 0)
-
+(defvar scope:fb-extra-info (make-hashtable))
 (defun scope:cache-image(scope model)
 
   ;; in this test I should try projecting a unit vector space
   ;; into the current transform matrix. The angles and sizes should
   ;; be used for the key, otherwise rotated objects will be cached as
   ;; non-rotated.
-  (let ((eigen-key (foxgl:get-eigen-key (symbol-value 'current-transform scope))))
-	(println eigen-key)
-  (let ((fb (foxgl:get-framebuffer model eigen-key)))
+  
+  (let* ((tform (symbol-value 'current-transform scope))
+		 (eigen-key (foxgl:get-eigen-key tform))
+		 (key2 (unbind (plookup model :key) scope))
+		 (key (or key2 eigen-key))
+		 (fb (foxgl:get-framebuffer model key)))
+
 	(when (null? fb)
       (let ((s (plookup model :size)))
-		(set! fb (foxgl:load-framebuffer model (or s '(200 200)) eigen-key))
+		(set! fb (foxgl:load-framebuffer model (or s '(200 200)) key))
 		)
 	;; the size is whatever.
 	(foxgl:bind-framebuffer fb)
@@ -1231,6 +1267,9 @@
 		'((eval-scoped (lisp:get-current-scope!!) submodel)))
 	  
 	  )
+	(let ((iv (mat4:invert tform)))
+	  (println iv)
+	  (hashtable-set scope:fb-extra-info fb iv)) 
 	(foxgl:unbind-framebuffer fb))
 
 	(unless foxgl:square-buffers
@@ -1241,16 +1280,27 @@
              (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
          
       )
+
+	(let ((itform (hashtable-ref scope:fb-extra-info fb)))
+	  (let ((mat2 (get-matrix)))
+		(math:*! mat2 mat2 tform)
+		(math:*! mat2 mat2 itform)
+		(math:*! mat2 mat2 scope:cache-scale)
+		
+		  
 	(foxgl:bind-textures (foxgl:framebuffer-texture fb)
 						 (foxgl:framebuffer-depth-texture fb)
-						 )
+						;(foxgl:framebuffer-depth-texture fb)
+						 ) 
     (foxgl:color '(1.0 1.0 1.0 1.0))
-    (foxgl:transform scope:cache-scale)
+    (foxgl:transform mat2);scope:cache-scale)
 	(foxgl:blit-mode :triangle-strip-depth)
 	(foxgl:blit-polygon foxgl:square-buffers)
     (foxgl:bind-texture nil)
     (foxgl:blit-mode :triangle-strip)
-  )))
+	(release-matrix mat2)
+
+	))))
 
 (defvar scope-3d
   (eval

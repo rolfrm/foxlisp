@@ -113,6 +113,74 @@ lisp_value foxgl_load_texture_from_path(lisp_value str){
   return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = t};
 }
 
+lisp_value foxgl_load_texture_from_vector(lisp_value data0, lisp_value width, lisp_value height, lisp_value channels){
+  int w = lisp_value_integer_checked(width);
+  int h = lisp_value_integer_checked(height);
+  int c = lisp_value_integer_checked(channels);
+
+  lisp_vector * data = lisp_value_vector_checked(data0);
+  if(lisp_error_state())
+	return nil;
+  image im = image_from_bitmap(data->data, w, h, c);
+  texture duck_tex = texture_from_image(&im);
+  image_delete(&im);
+  texture * t = malloc(sizeof(duck_tex));
+  *t = duck_tex;
+  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = t};
+}
+
+int64_t integer_checked(lisp_value v){
+  if(!type_assert(v, LISP_INTEGER))
+	return 0;
+  return v.integer;
+}
+
+lisp_vector * vector_checked(lisp_value v){
+  if(!type_assert(v, LISP_VECTOR))
+	return NULL;
+  return v.vector;
+}
+
+
+lisp_value foxgl_load_texture_from_data(lisp_value * args, size_t cnt){
+  if(cnt <= 3){
+	raise_string("invalid number of arguments");
+	return nil;
+  }
+  var array = vector_checked(args[0]);
+  var width = integer_checked(args[1]);
+  var height = integer_checked(args[2]);
+  if(lisp_error_state())
+	return nil;
+  CHECK_ERROR();
+  int channels = 1;
+  for(size_t i = 3; i < cnt; i++){
+	static lisp_value rgb_keyword, rgba_keyword;
+	if(eq(args[i], get_symbol_cached(&rgb_keyword, ":rgb"))){
+	  channels = 3;
+	}
+	if(eq(args[i], get_symbol_cached(&rgba_keyword, ":rgba"))){
+	  channels = 4;
+	}
+  }
+
+  var elems = array->count;
+  if(elems != (size_t)channels * width * height){
+	raise_string("Invalid number of elements in array");
+	return nil;
+  }
+
+  //var t = lisp_value_type(array->default_value);
+  image duck_image = image_from_bitmap(array->data, width, height, channels);
+  
+  texture duck_tex = texture_from_image(&duck_image);
+  //image_delete(&img2);
+  texture * t = lisp_malloc(sizeof(duck_tex));
+  //*t = duck_tex;
+  return (lisp_value){.type = LISP_NATIVE_POINTER, .native_pointer = t};
+}
+
+
 lisp_value math_mul_in_place(lisp_value target, lisp_value a, lisp_value b){
   type_assert(target, LISP_VECTOR);
   type_assert(a, LISP_VECTOR);
@@ -289,6 +357,16 @@ mat4 lisp_to_mat4(lisp_value a){
   return mat4_identity();
 }
 
+mat4 * lisp_to_mat4_ptr(lisp_value a){
+  type_assert(a, LISP_VECTOR);
+  type_assert(a.vector->default_value, LISP_FLOAT32);
+  if(a.vector->count == 16){
+	 mat4 * m1 = a.vector->data;
+	 return m1;
+  }
+  raise_string("Invalid number of rows and columns");
+  return NULL;
+}
 
 lisp_value mat4_to_lisp (mat4 a){
   lisp_value vec = make_vector(integer(16), (lisp_value){.type = LISP_FLOAT32, .rational = 0.0f});
@@ -296,6 +374,20 @@ lisp_value mat4_to_lisp (mat4 a){
   *v = a;
   return vec;
 }
+
+
+lisp_value math_mat4_invert(lisp_value mat){
+  var m = lisp_to_mat4(mat);
+  m = mat4_invert(m);
+  return mat4_to_lisp(m);
+}
+
+lisp_value math_mat4_invert_in_place(lisp_value mat){
+  var m = lisp_to_mat4_ptr(mat);
+  *m = mat4_invert(*m);
+  return nil;
+}
+
 
 lisp_value math_mat4_print(lisp_value a){
   type_assert(a, LISP_VECTOR);
@@ -614,7 +706,7 @@ lisp_value foxgl_create_framebuffer (lisp_value width, lisp_value height){
   b->height = height.integer;
   b->channels = 4;
   b->mode = IMAGE_MODE_NONE;
-  b->depth_mode =  IMAGE_MODE_DEPTH16;
+  b->depth_mode = IMAGE_MODE_DEPTH16;
  
   blit_create_framebuffer(b);
   return native_pointer(b);
@@ -870,10 +962,9 @@ lisp_value foxgl_get_eigen_key(lisp_value transform){
   f32 angle1 =vec3_angle(a,a0);
   f32 angle2 =vec3_angle(b,b0);
   f32 angle3 =vec3_angle(c,c0);
-  printf("%f %f %f\n", (double)angle1, (double)angle2, (double)angle3);
-  unsigned int scaled1 = (unsigned int)(angle1 * 10000);
-  unsigned int scaled2 = (unsigned int)(angle2 * 10000);
-  unsigned int scaled3 = (unsigned int)(angle3 * 10000);
+  unsigned int scaled1 = (unsigned int)(angle1 * 100000);
+  unsigned int scaled2 = (unsigned int)(angle2 * 100000);
+  unsigned int scaled3 = (unsigned int)(angle3 * 100000);
 
   return integer_lisp_value(scaled1 ^ scaled2 ^ scaled3);
 }
@@ -898,6 +989,7 @@ void foxgl_register(){
   lrn("math:floor", 2, math_floor);
   lrn("foxgl:load-font", 2, foxgl_load_font);
   lrn("foxgl:load-texture-from-path", 1, foxgl_load_texture_from_path);
+  lrn("foxgl:load-texture-from-vector", 4, foxgl_load_texture_from_vector);
   lrn("foxgl:create-window", 2, foxgl_create_window);
   lrn("foxgl:window-set-size", 3, foxgl_set_window_size);
   lrn("foxgl:make-current", 1, foxgl_make_current);
@@ -917,6 +1009,8 @@ void foxgl_register(){
   lrn("mat4:rotate", 3, math_mat4_rotate);
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);
+  lrn("mat4:invert", 1, math_mat4_invert);
+  lrn("mat4:invert!", 1, math_mat4_invert_in_place);
   lrn("mat4:identity!", 1, math_mat4_identity_in_place);
   lrn("mat4:print", 1, math_mat4_print);
   lrn("vec2:len", 1, lisp_vec2_len);
@@ -951,7 +1045,7 @@ void foxgl_register(){
   lrn("foxgl:key-down?", 2, foxgl_key_down);
   lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
   lrn("foxgl:blit-mode", 1, blit_set_mode);
-  lrn("foxgl:sdf-poly", 1, sdf_poly);
+  lrn("foxgl:sdf-poly", 4, sdf_poly);
   lrn("foxgl:sdf-marching-cubes", 4, sdf_marching_cubes);
   lrn("foxgl:bake", 2, foxgl_bake_polygons);
   lrn("foxgl:detect-collision", 5, foxgl_detect_collision);

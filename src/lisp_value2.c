@@ -130,6 +130,13 @@ inline int64_t lisp_value_integer_checked(lisp_value v){
   }
   return v.integer;
 }
+inline lisp_vector * lisp_value_vector_checked(lisp_value v){
+  if(v.type != LISP_VECTOR){
+	raise_string("argument is not a vector");
+	return NULL;
+  }
+  return v.vector;
+}
 
 inline lisp_value byte_lisp_value(u8 i){
   return (lisp_value){.type = LISP_BYTE, .integer = i};

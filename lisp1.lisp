@@ -5,6 +5,11 @@
                         `(def ,name  (macro ,args ,@body))))
 (defmacro define (var value)
   `(def ,var ,value))
+
+;(defmacro let (vars &rest body)
+;  `(+let-impl+ ,vars ,@body))
+(define let +let-impl+)
+
 (define defvar define)
 
 (def list (lambda (&rest x) x))

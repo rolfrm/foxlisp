@@ -51,6 +51,7 @@ struct _cons_buffer {
   cons * buffer;
   u8 * gc_mark;
   size_t size;
+  //size_t used;
 };
 
 typedef struct __array_header array_header; 
@@ -524,7 +525,7 @@ static void recover_pool(cons_buffer * buf){
   // this means
   // always a multiple of 8 bytes.
   u64 * marks = (u64 *) buf->gc_mark;
-  size_t mark_count = buf->size / 8;
+  size_t mark_count = buf->size/*used*/ / 8;
   for(ssize_t j = mark_count; j > 0; j--){
     // 02020202... - the GC mark when a full block is all marked
     // 2 is the stage 2 GC mark.
@@ -671,7 +672,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   //start:
   var ctx = current_context->gc;
    while(true){
-    var pool = ctx->cons_pool;
+	 cons_buffer * pool = ctx->cons_pool;
 	int pool_count = 0;
     while(pool != NULL){
 	  pool_count += 1;
@@ -681,18 +682,14 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
         pool->free_cons = found->cdr.cons;
         found->car = _car;
         found->cdr = _cdr;
+		//var index = (size_t)(found - pool->buffer);
+		//pool->used = MAX(pool->used, index);
         return cons_lisp_value(found);
       }else{
         pool = pool->next;
       }
     }
 
-	//if(!gc_run && !gc_unsafe_stack){
-	  //gc_collect_garbage(current_context);
-	  //gc_run = true;
-	  //goto start;
-
-	//}
 	size_t pool_size = 256;
     if(pool == NULL){
       cons_buffer ** parent = &ctx->cons_pool;
@@ -700,9 +697,12 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
         pool_size *= 4;
         parent = &(*parent)->next;
       }
-      
-      //raise(SIGINT);
-      cons_buffer * new_pool = _alloc0(sizeof(*pool));
+	  if(pool_size > 1024  * 32){
+		printf("Pool size %i\n", pool_size);
+		raise(SIGINT);
+	  }
+
+	  cons_buffer * new_pool = _alloc0(sizeof(*pool));
       new_pool->buffer = _alloc0(sizeof(cons) * pool_size);
       new_pool->gc_mark = _alloc0(sizeof(bool) * pool_size);
       new_pool->size = pool_size;

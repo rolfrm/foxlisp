@@ -15,20 +15,20 @@ typedef enum {
 		LISP_VECTOR,
 		LISP_BYTE,
 		LISP_FLOAT32,
-      LISP_HASHTABLE,
-      LISP_INTEGER32,
-      LISP_SCOPE,
-      LISP_GLOBAL_INDEX,
-      LISP_LOCAL_INDEX,
-      // marks a GC-managed pointer
-      LISP_ALLOCATED_POINTER,
-      // a native pointer to a lisp_value
+		LISP_HASHTABLE,
+		LISP_INTEGER32,
+		LISP_SCOPE,
+		LISP_GLOBAL_INDEX,
+		LISP_LOCAL_INDEX,
+		// marks a GC-managed pointer
+		LISP_ALLOCATED_POINTER,
+		// a native pointer to a lisp_value
 
-      LISP_NATIVE_POINTER_TO_VALUE,
-	  // internal
-	  LISP_GLOBAL_CONS_ARRAYS,
-	  LISP_VALUE_SET,
-	  LISP_ARRAY
+		LISP_NATIVE_POINTER_TO_VALUE,
+		// internal
+		LISP_GLOBAL_CONS_ARRAYS,
+		LISP_VALUE_SET,
+		LISP_ARRAY
 }lisp_type;
 
 // assuming 5 tags:
@@ -159,9 +159,9 @@ typedef struct{
 	 lisp_builtin builtin;
 	 void * native_pointer;
 	 lisp_vector * vector;    
-    lisp_scope * scope;
-    lisp_local_index local_index;
-    void * pointer;
+	 lisp_scope * scope;
+	 lisp_local_index local_index;
+	 void * pointer;
   };
 }lisp_value;
 void lisp_push_scope(lisp_scope * scope);
@@ -285,6 +285,7 @@ char * lisp_value_string(lisp_value v);
 lisp_value integer_lisp_value(i64 i);
 int64_t lisp_value_integer(lisp_value v);
 int64_t lisp_value_integer_checked(lisp_value v);
+lisp_vector * lisp_value_vector_checked(lisp_value v);
 lisp_value byte_lisp_value(u8 i);
 u8 lisp_value_byte(lisp_value v);
 void * lisp_value_pointer(lisp_value val);
@@ -426,6 +427,8 @@ bool is_nil(lisp_value a);
 lisp_value lisp_is_symbol(lisp_value a);
 lisp_value lisp_is_list(lisp_value a);
 lisp_value lisp_error(lisp_value v);
+bool lisp_error_state();
+  
 void raise_string(const char * str);
 bool type_assert(lisp_value val, lisp_type type);
 bool elem_type_assert(lisp_value vector, lisp_type type);
@@ -463,7 +466,7 @@ lisp_value lisp_read_string(const char * str);
 #define RETURN_ERROR(err) {lisp_error(err); return nil;}
 #define RAISE(err) {raise_string(err); return nil;}
 #define EXPR_ASSERT(expr) if(!expr){RAISE("AssertError: '" #expr "'" " returned false");}
-
+#define CHECK_ERROR() if(lisp_error_state()) return nil;
 extern bool gc_unsafe_stack;
 
 // internals

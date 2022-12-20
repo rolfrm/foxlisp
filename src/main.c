@@ -49,6 +49,10 @@ static inline bool lisp_is_in_error(){
   return !is_nil(current_error);
 }
 
+bool lisp_error_state(){
+  return !is_nil(current_error);
+}
+
 void raise_string(const char * str){
   current_error = string_lisp_value(str);
   current_error_stack = copy_cons(lisp_stack);
@@ -287,12 +291,15 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   int idx;
   
   if(scope->values == NULL){
-         
-    scope->values_index = ht_create2(2048, sizeof(u64), sizeof(int));
+	size_t scope_size = 8;
+	if(scope->super == NULL){
+	  scope_size = 2048;
+	}
+    scope->values_capacity = scope_size;
+    scope->values_index = ht_create2(scope->values_capacity, sizeof(u64), sizeof(int));
     scope->values_index->hash = symbol_nohash;
-    scope->values_capacity = 2048;
-    scope->values = alloc0(scope->values_capacity * sizeof(lisp_value));
-    scope->value_symbol = alloc0(scope->values_capacity * sizeof(lisp_symbol));
+    scope->values = alloc(scope->values_capacity * sizeof(lisp_value));
+    scope->value_symbol = alloc(scope->values_capacity * sizeof(lisp_symbol));
     scope->values[0] = nil;
     scope->value_symbol[0] = 0;
     scope->values_count = 1;
@@ -302,9 +309,9 @@ lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_valu
   }
   
   if(scope->values_count == scope->values_capacity){
-    scope->values_capacity *= 2;
+	scope->values_capacity *= 2;
     scope->values = realloc(scope->values, scope->values_capacity * sizeof(lisp_value)); 
-    scope->value_symbol = realloc(scope->value_symbol, scope->values_capacity * sizeof(lisp_symbol)); 
+    scope->value_symbol = realloc(scope->value_symbol, scope->values_capacity * sizeof(lisp_symbol));
   }
   
   idx = scope->values_count;
@@ -613,9 +620,6 @@ lisp_value lisp_eval_quasiquoted(lisp_scope * scope, lisp_value value){
   }
 }
 
-void print_call_stack(){
-}
-
 lisp_value lisp_collect_garbage(){
   gc_collect_garbage(current_context);
   return nil;
@@ -676,6 +680,29 @@ lisp_value lisp_function_code(lisp_value function){
   TYPE_ASSERT(function, LISP_FUNCTION);
   var f = lisp_value_function(function);
   return f->code;
+}
+
+lisp_value lisp_scope_vars(lisp_value _scope){
+  TYPE_ASSERT(_scope, LISP_SCOPE);
+  var values = nil;
+  var scope = lisp_value_scope(_scope);
+  if(scope->lookup != NULL){
+    for(size_t i = 0; i < scope->argcnt; i++){
+      if(is_nil(scope->lookup[i].car))
+        break;
+	  values = new_cons(new_cons(scope->lookup[i].car, scope->lookup[i].cdr), values);
+	}
+  }
+  return values;
+}
+
+// return the super scope.
+lisp_value lisp_scope_super(lisp_value scope){
+  TYPE_ASSERT(scope, LISP_SCOPE);
+  lisp_scope * scope2 = lisp_value_scope(scope);
+  if(scope2->super == NULL)
+	return nil;
+  return scope_lisp_value(scope2->super);
 }
 
 lisp_value lisp_sub_scope(lisp_value scope, lisp_value sym, lisp_value value){
@@ -2592,6 +2619,7 @@ static bool lisp_value_full_compare(const void * _k1, const void * _k2, void * u
 
 
 
+// TODO: add support for GCing >1 columns of the hashtable key.
 lisp_value lisp_make_hashtable(lisp_value * args, int n){
   static lisp_value full_keyword;
   static lisp_value weak_keyword;
@@ -2846,6 +2874,23 @@ void setup_fpe_handler(){
   sigaction (SIGFPE, &new_action, &old_action);
 }
 
+#ifndef WASM
+#include <sys/resource.h>
+void init_linux(){
+  // protect system from running out of resources due to a memory leak.
+  // this is done by setting the soft/hard limit of virtual memory for the current
+  // process to something relatively low.
+  rlim_t virtual_memory_limit = 1L * 1024L * 1024L * 1024L;
+  struct rlimit rl;
+  rl.rlim_cur = virtual_memory_limit;
+  rl.rlim_max = virtual_memory_limit;
+  if (setrlimit(RLIMIT_AS, &rl) != 0) {
+   ERROR("setrlimit");
+   raise(SIGINT);
+  }
+}
+#endif
+
 void test_gc();
 void test_sdf();
 int main(int argc, char ** argv){
@@ -2857,6 +2902,8 @@ int main(int argc, char ** argv){
   }
 
 
+  
+  
   current_context = lisp_context_new();
 
   for(int i = 1; i < argc; i++){
@@ -2873,6 +2920,7 @@ int main(int argc, char ** argv){
   lisp_register_value("lisp:*test-enabled*", nil);
   
 #ifndef WASM
+  init_linux();
   for(int i = 1; i < argc; i++){
     if(strcmp(argv[i], "--test") == 0){
       lisp_register_value("lisp:*test-enabled*", t);
@@ -3053,13 +3101,15 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:with-sub-scope", 4, lisp_with_sub_scope);
   lisp_register_native("lisp:with-scope-binding", 5, lisp_with_scope_binding);
   lisp_register_native("lisp:with-scope-variable", 5, lisp_with_scope_vars);
+  lisp_register_native("lisp:scope-vars", 1, lisp_scope_vars);
+  lisp_register_native("lisp:scope-super", 1, lisp_scope_super);
   lisp_register_native("lisp:scope-set!", 3, lisp_scope_set);
   lisp_register_native("lisp:code-location", 1, lisp_code_location);
   lisp_register_native("deref-pointer", 1, lisp_value_deref);
   lisp_register_native("eval", 2, lisp_eval_value);
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
-  lisp_register_macro("let", LISP_LET);
+  lisp_register_macro("+let-impl+", LISP_LET);
   lisp_register_macro("progn", LISP_PROGN);
   lisp_register_macro("lambda", LISP_LAMBDA);
   lisp_register_macro("loop", LISP_LOOP);
@@ -3077,6 +3127,7 @@ lisp_context * lisp_context_new(){
   lisp_register_macro("with-exception-handler", LISP_WITH_EXCEPTION_HANDLER);
   lisp_register_macro("lisp:get-current-scope", LISP_GET_SCOPE);
   lisp_register_macro("lisp:get-current-scope!!", LISP_GET_SCOPE_UNSAFE);
+  
   lisp_register_macro("ref!!", LISP_REF);
 
   lisp_register_macro("car", LISP_CAR);

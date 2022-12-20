@@ -10,7 +10,7 @@
   )
 (define should-exit nil)
 (println 'load-demo)
-(load "demo2.lisp")
+(load "demo3.lisp")
 (lisp:collect-garbage)
 (defvar +custom-events+ ())
 (defun push-event (event)

@@ -991,7 +991,7 @@ void describe_sdf(void * ptr){
      break;
    }
   case SDF_TYPE_VERT_CAPSULE:{
-     sdf_vert_capsule * t = ptr;
+	sdf_vert_capsule * t = ptr;
      printf("CAPSULE r=%f h=%f\n", (f64)t->radius, (f64)t->height);
      break;
    }
@@ -2060,7 +2060,7 @@ lisp_value lisp_render_sdf_to_image(lisp_value model, lisp_value model_transform
 	  vec3 color = {0};
 	  float d0 = 10000;
 	  cpx = mat4_mul_vec3(model_tform_i, cpx);
-	  while(d0 > 0.01f && d0 < 20000.0f){
+	  while(d0 > 0.00001f && d0 < 20000.0f){
 		d0 = ctx.sdf(ctx.sdf_userdata, cpx, &color);
 		cpx = vec3_add(cpx, vec3_scale(dvec, d0));
 	  }
