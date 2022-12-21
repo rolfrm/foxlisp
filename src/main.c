@@ -1449,7 +1449,17 @@ lisp_value lisp_eval_vector_ref(lisp_scope * scope, lisp_value vec_form, lisp_va
 }
 
 lisp_value lisp_eval_vector_set(lisp_scope * scope, lisp_value vec_form, lisp_value index_form, lisp_value value_form){
-  return vector_set(lisp_eval(scope, vec_form),lisp_eval(scope, index_form),lisp_eval(scope, value_form));
+  var vec = lisp_eval(scope, vec_form);
+  if(is_nil(vec) && lisp_is_in_error())
+	return nil;
+  var index = lisp_eval(scope, index_form);
+  if(is_nil(index) && lisp_is_in_error())
+	return nil;
+  var value = lisp_eval(scope, value_form);
+  if(lisp_is_in_error())
+	return nil;
+  
+  return vector_set(vec, index, value);
 }
 
 lisp_value lisp_stack;
@@ -1805,9 +1815,7 @@ lisp_value lisp_eval_string(const char * str){
 lisp_value read_current_files = {0};
 
 lisp_value lisp_eval_file(const char * filepath){
-  printf("Eval: %s\n", filepath);
   char * buffer = read_file_to_string(filepath);
-  printf("Read: %s\n", buffer);
   println(read_current_file);
   read_current_file = lisp_string(filepath);
   read_current_files = new_cons(read_current_file, read_current_files);
