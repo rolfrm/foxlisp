@@ -295,9 +295,9 @@ static inline bool visit_cons(gc_context * gc, cons * c){
 
 static inline void visit_hashtable(gc_context * gc, hash_table * table){
   if(!mark_vector(gc, table)
-     & !mark_vector(gc, table->keys)
-     & !mark_vector(gc, table->elems)
-     & !mark_vector(gc, table->occupied)
+     && !mark_vector(gc, table->keys)
+     && !mark_vector(gc, table->elems)
+     && !mark_vector(gc, table->occupied)
      )
     return;
   
@@ -673,9 +673,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   var ctx = current_context->gc;
    while(true){
 	 cons_buffer * pool = ctx->cons_pool;
-	int pool_count = 0;
     while(pool != NULL){
-	  pool_count += 1;
       if(pool->free_cons != NULL){
         
         var found = pool->free_cons;
@@ -698,7 +696,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
         parent = &(*parent)->next;
       }
 	  if(pool_size > 1024  * 32){
-		printf("Pool size %i\n", pool_size);
+		printf("Pool size %i\n", (int)pool_size);
 		raise(SIGINT);
 	  }
 

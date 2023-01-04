@@ -1876,7 +1876,7 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_SYMBOL:
     return snprintf(buffer, LEN1, "%s", symbol_name(v.integer));
   case LISP_FUNCTION:
-    return snprintf(buffer, LEN1, "FUNCTION");
+    return snprintf(buffer, LEN1, "FUNCTION %p", v.native_pointer);
   case LISP_FUNCTION_MACRO:
     return snprintf(buffer, LEN1, "FUNCTION_MACRO");
   case LISP_FUNCTION_NATIVE:
@@ -1936,13 +1936,13 @@ case LISP_CONS:
       return l;
     }
   case LISP_GLOBAL_CONS_ARRAYS:
-	snprintf(OBUF, LEN1, "[global cons array %i]",  ((t_cons_arrays *)lisp_value_pointer(v))->count);
+	snprintf(OBUF, LEN1, "[global cons array %i]", (int)  ((t_cons_arrays *)lisp_value_pointer(v))->count);
 	return l;
   case LISP_VALUE_SET:
 	snprintf(OBUF, LEN1, "[lisp_value_set ?]");
 	return l;
   case LISP_ARRAY:
-	snprintf(OBUF, LEN1, "[lisp_array %i]", ((lisp_array *) lisp_value_pointer)->count);
+	snprintf(OBUF, LEN1, "[lisp_array %i]", (int)((lisp_array *) lisp_value_pointer)->count);
 	return l;
   }
   return 0;
@@ -2449,7 +2449,7 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k){
   if(is_nil(v)){
     return ((lisp_value *) vector->data)[i];
   }else if(is_float32(v)){
-    v.rational = ((float *) vector->data)[i];
+    v.rational = (double)((float *) vector->data)[i];
     return v;
   }else
     dst = &v.integer;

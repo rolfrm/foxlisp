@@ -906,7 +906,7 @@ static void * get_physics_sdf2(lisp_value value){
     sphere->pos = center;
     sphere->radius = 0.0;
     for(int i = 0; i < 8; i++)
-      sphere->radius = fmax(sphere->radius, vec3_len(vec3_sub(check_points[i], center)));
+      sphere->radius = fmaxf(sphere->radius, vec3_len(vec3_sub(check_points[i], center)));
         return sphere;
   }
 
@@ -941,7 +941,7 @@ static void * get_physics_sdf2(lisp_value value){
 	value2 = cdr(value2);
   }
 
-  printf("iter sub: %i\n", count);
+  printf("iter sub: %i\n", (int)count);
   if(count == 0)
     return NULL;
   if(count == 1)
@@ -1140,8 +1140,8 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value ph
     describe_sdf(ctx.userdata1);
     describe_sdf(ctx.userdata2);
     sdf_detect_max_overlap(&ctx2, p2, 10.0);
-    set_car(out_cons, rational_lisp_value(ctx2.pt.x));
-    set_cdr(out_cons, rational_lisp_value(ctx2.pt.z));
+    set_car(out_cons, rational_lisp_value((f64)ctx2.pt.x));
+    set_cdr(out_cons, rational_lisp_value((f64)ctx2.pt.z));
 
   }
   return ctx.collision_detected ? t : nil;
@@ -1545,7 +1545,7 @@ void improve_mesh(mc_vertex_builder * bld){
     
     //vec3 asd = vec3_new(0.5432, -0.3234, 0.7783);
     //vec3 cross = vec3_normalize(vec3_mul_cross(vec3_sub(v2, v1), asd));
-    if(fabs(d) > 0.01){
+    if(fabsf(d) > 0.01f){
       var m2 = mid;
       m2 = optimize_point(bld->sdf, mid, 0.01);
       vec3_print(v1);vec3_print(v2);vec3_print(mid);printf("\n");
@@ -1976,7 +1976,7 @@ lisp_value lisp_sdf_distance(lisp_value model, lisp_value p){
   }
   vec3 c;
   vec3 p2 = lv_vec3(p);
-  return rational_lisp_value(generic_sdf(modelp, p2, &c));
+  return rational_lisp_value((double)generic_sdf(modelp, p2, &c));
 }
 void lrn(const char * l, int args, void * f);
 

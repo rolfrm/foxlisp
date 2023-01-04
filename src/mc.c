@@ -301,11 +301,11 @@ vec3 VertexInterp(f32 isolevel,vec3 p1,vec3 p2,f32 valp1, f32 valp2)
    f32 mu;
    vec3 p;
 
-   if (fabs(isolevel-valp1) < 0.00001)
+   if (fabsf(isolevel-valp1) < 0.00001f)
       return(p1);
-   if (fabs(isolevel-valp2) < 0.00001)
+   if (fabsf(isolevel-valp2) < 0.00001f)
       return(p2);
-   if (fabs(valp1-valp2) < 0.00001)
+   if (fabsf(valp1-valp2) < 0.00001f)
       return(p1);
    mu = (isolevel - valp1) / (valp2 - valp1);
    p.x = p1.x + mu * (p2.x - p1.x);

@@ -276,7 +276,8 @@
 (define lisp:descriptions (make-hashtable))
 
 (defun lisp:write-doc (item signature)
-  (hashtable-set! lisp:descriptions item signature))
+  (hashtable-set! lisp:descriptions item signature)
+  )
 
 (defun lisp:describe (item)
   (println (list 'describe item))

@@ -11,7 +11,7 @@ rgb rgb_blend(rgb a, rgb b, f32 ratio){
 
 hsv hsv_blend(hsv a, hsv b, f32 ratio){
   f32 inv_ratio = 1.0f - ratio;
-  f32 d1 = fabs(a.h - b.h);
+  f32 d1 = fabsf(a.h - b.h);
   if(d1 > 180){
     b.h -= 360;
   }
@@ -39,5 +39,5 @@ f32 fract(f32 x){
 
 
 f32 noise(vec2 coords) {
-   return fract(sin(dot(coords, vec2_new(12.9898,78.233))) * 43758.5453);
+   return fract(sinf(dot(coords, vec2_new(12.9898f,78.233f))) * 43758.5453f);
 }

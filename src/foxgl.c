@@ -369,7 +369,7 @@ mat4 * lisp_to_mat4_ptr(lisp_value a){
 }
 
 lisp_value mat4_to_lisp (mat4 a){
-  lisp_value vec = make_vector(integer(16), (lisp_value){.type = LISP_FLOAT32, .rational = 0.0f});
+  lisp_value vec = make_vector(integer(16), (lisp_value){.type = LISP_FLOAT32, .rational = 0.0});
   mat4 * v = vec.vector->data;
   *v = a;
   return vec;
@@ -844,7 +844,7 @@ lisp_value foxgl_timestampf(){
 lisp_value lisp_vec2_len(lisp_value v){
   TYPE_ASSERT(v, LISP_VECTOR);
   vec2 * x = v.vector->data;
-  return rational(vec2_len(*x));
+  return rational((double)vec2_len(*x));
 }
 
 lisp_value lisp_viewport(lisp_value w, lisp_value h){
@@ -937,11 +937,11 @@ lisp_value foxgl_error(){
 
 float vec3_angle(vec3 v1, vec3 v2) {
   float dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-  float len1 = sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
-  float len2 = sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
+  float len1 = sqrtf(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
+  float len2 = sqrtf(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
   vec3 cr = vec3_mul_cross(v1,v2);
   
-  float angle = acos(dot / (len1 * len2));
+  float angle = acosf(dot / (len1 * len2));
   if(cr.z < 0)
 	return (float)(2.0 * M_PI - (double)angle);
 	 

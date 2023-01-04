@@ -19,4 +19,4 @@ endpoints:
   /:
     call: cat index.html
 
-host: localhost:8890
+host: http://localhost:8890

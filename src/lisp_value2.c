@@ -191,7 +191,7 @@ lisp_native_function * lisp_value_native_function(lisp_value val){ return val.nf
 
 
 inline lisp_value float32_lisp_value(f32 v){
-  return (lisp_value){.type = LISP_FLOAT32, .rational = v };
+  return (lisp_value){.type = LISP_FLOAT32, .rational = (double)v };
 }
 
 inline lisp_value native_pointer_lisp_value(void * v){

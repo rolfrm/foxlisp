@@ -1214,7 +1214,7 @@
 	 (lisp:get-current-scope))
    transform-scope))
 
-(defun scope:polygon(scope model)
+(defun scope:polygon (scope model)
   (let ((dims 2)
         (poly (plookup model :2d-triangle-strip))
 		(view scope:view-transform)
@@ -1237,6 +1237,7 @@
            (foxgl:transform model-transform)
 		   (foxgl:blit-polygon (cdr r))
            ))))
+
 (defvar scope:cache-scale (mat4-identity))
 (math:scale! scope:cache-scale 2 2 1)
 (math:translate! scope:cache-scale -0.5 -0.5 0)
@@ -1302,10 +1303,28 @@
 
 	))))
 
+
+(defun scope:bake2 (scope model)
+  (println model)
+  ;(println (symbol-value 'polygon scope))
+  (let ((polygon (lambda (a b)
+				   (println 'polygon!)
+
+				   (println b)))
+		(submodel model))
+	(lisp:with-scope-binding scope (lisp:get-current-scope!!)
+	  '(polygon submodel) nil
+	  '((eval-scoped0 (lisp:get-current-scope!!)
+		 (println submodel))) 
+  ;(eval-scoped scope (cdr model))
+  )))
+
 (defvar scope-3d
   (eval
    '(let ((polygon scope:polygon)
-		  (cache scope:cache-image))
+		  (cache scope:cache-image)
+		  (bake2 (lambda (a b) (scope:bake2 a b)))
+		  )
 	 (lisp:get-current-scope))
    paint-scope))
 
