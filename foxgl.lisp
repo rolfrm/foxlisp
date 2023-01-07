@@ -1006,16 +1006,33 @@
 	
 	(lisp:get-current-scope)))
 
+(defun scope:transform (scope body)
+  (let ((t0 (symbol-value 'current-transform scope))
+		(tform (unbind (car body) scope))
+		(rest (cdr body))
+		(current-transform (get-matrix)))
+	(math:*! current-transform t0 tform )
+	
+	(lisp:with-scope-binding scope
+	  (lisp:get-current-scope!!)
+	  '(current-transform rest) nil
+	  '((eval-scoped (lisp:get-current-scope!!) rest)))
+
+	(release-matrix current-transform)
+	))
+
 (defun scope:translate (scope body)
   (let ((t0 (symbol-value 'current-transform scope))
 		(translate (unbind (car body) scope))
 		(rest (cdr body))
 		(current-transform (get-matrix)))
 	(math:*! current-transform current-transform t0)
+	
 	(math:translate! current-transform
                      (unbind (car translate) scope)
                      (or (unbind (cadr translate) scope) 0.0)
                      (or (unbind (caddr translate) scope) 0.0))
+
 	(lisp:with-scope-binding scope
 	  (lisp:get-current-scope!!)
 	  '(current-transform rest) nil
@@ -1066,6 +1083,7 @@
    '(let ((translate scope:translate)
 		  (rotate scope:rotate)
 		  (scale scope:scale)
+		  (transform scope:transform)
 		  ) 
 	 (lisp:get-current-scope))
    base-scope))
@@ -1198,6 +1216,21 @@
 							 (unbind (caddr dims) scope)))
 	(eval-scoped scope rest)
 	(set! current-transform prev)))
+
+(defun scope:perspective (scope body)
+  (let ((dims (unbind (car body) scope))
+		(rest (cdr body))
+		(prev current-transform))
+	(let ((fov (unbind (car dims) scope))
+		  (aspect (or (unbind (cadr dims) scope) 1.0))
+		  (near (or (unbind (caddr dims) scope) 0.1))
+		  (far (or (unbind (cadddr dims) scope) 1000.0)))
+	(set! current-transform 
+		  (mat4:perspective fov aspect near far))
+	(eval-scoped scope rest)
+	(set! current-transform prev))))
+
+
 (defun scope:depth (scope body)
   (foxgl:depth 1)
   (eval-scoped scope (cdr body))  
@@ -1209,6 +1242,7 @@
 		  (bake (lambda (x y) (scope:bake x y)))
 		  (rgb scope:rgb)
 		  (ortho scope:ortho)
+		  (perspective scope:perspective)
 		  (depth scope:depth)
 		  )
 	 (lisp:get-current-scope))
@@ -1237,6 +1271,77 @@
            (foxgl:transform model-transform)
 		   (foxgl:blit-polygon (cdr r))
            ))))
+
+(defun scope:sdf (scope model)
+  (let ((conf (car model))
+		(body (cdr model)))
+  (let ((size (plookup conf :size))
+        (resolution (plookup conf :resolution))
+        (clip (unbind (plookup conf :clip)))
+        (positions nil)
+        )
+       (when clip
+         (let ((sdf-build (hashtable-ref foxgl:sdf-build-lookup (cdr model))))
+           (unless sdf-build
+             (set! sdf-build (foxgl:build-sdf (cdr model) foxgl:current-scope)))
+           (hashtable-set foxgl:sdf-build-lookup (cdr model) sdf-build)
+         ;(render-sdf-clip model size resolution clip)
+           (sdf:render sdf-build foxgl:current-transform clip)
+         ))
+       (unless clip
+       (set! foxgl:sdf-stack nil)
+     (let ((r (hashtable-ref foxgl:polygon-cache model)))
+       (unless r
+         (let* ((model2 (println (foxgl:build-sdf (cdr model) foxgl:current-scope)) )
+                
+                (poly
+                  (foxgl:sdf-marching-cubes size resolution model2 (println position))
+                  ))
+           (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil)
+                                     (foxgl:load-polygon (cdr poly) 3 nil nil)
+                                     )))
+         (hashtable-set foxgl:polygon-cache model r)
+         
+         ))
+       
+       (foxgl:color foxgl:current-color)
+       (foxgl:transform foxgl:current-transform)
+       (foxgl:blit-mode :triangles-color)
+       (foxgl:blit-polygon (cdr r))
+       (foxgl:blit-mode :triangle-strip)
+       
+       ))
+       (set! model nil)
+       ))
+  )
+
+(defun scope:sdf0 (scope model)
+  (let ((conf (car model))
+		(body (unbind (cadr model)))
+		(r (hashtable-ref foxgl:polygon-cache model))
+		(model-transform (symbol-value 'current-transform scope))
+		)
+	(unless r
+	  (let ((size (plookup conf :size))
+			(resolution (plookup conf :resolution))
+			(clip (unbind (plookup conf :clip)))
+			)
+		(let* ((model2 body)
+			   (poly
+				(foxgl:sdf-marching-cubes size resolution model2 nil)
+				 ))
+		  (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil)
+									(foxgl:load-polygon (cdr poly) 3 nil nil)
+									)))
+          (hashtable-set foxgl:polygon-cache model r)
+		  )))
+	(foxgl:color scope:color)
+    (foxgl:transform model-transform)
+    (foxgl:blit-mode :triangles-color)
+    (foxgl:blit-polygon (cdr r))
+    (foxgl:blit-mode :triangle-strip)
+    )
+  )
 
 (defvar scope:cache-scale (mat4-identity))
 (math:scale! scope:cache-scale 2 2 1)
@@ -1279,7 +1384,6 @@
             (list
              (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))
              (foxgl:load-polygon (list-to-array '(0 0 1 0 0 1 1 1)))))
-         
       )
 
 	(let ((itform (hashtable-ref scope:fb-extra-info fb)))
@@ -1291,10 +1395,9 @@
 		  
 	(foxgl:bind-textures (foxgl:framebuffer-texture fb)
 						 (foxgl:framebuffer-depth-texture fb)
-						;(foxgl:framebuffer-depth-texture fb)
 						 ) 
     (foxgl:color '(1.0 1.0 1.0 1.0))
-    (foxgl:transform mat2);scope:cache-scale)
+    (foxgl:transform mat2)
 	(foxgl:blit-mode :triangle-strip-depth)
 	(foxgl:blit-polygon foxgl:square-buffers)
     (foxgl:bind-texture nil)
@@ -1305,8 +1408,6 @@
 
 
 (defun scope:bake2 (scope model)
-  (println model)
-  ;(println (symbol-value 'polygon scope))
   (let ((polygon (lambda (a b)
 				   (println 'polygon!)
 
@@ -1316,18 +1417,16 @@
 	  '(polygon submodel) nil
 	  '((eval-scoped0 (lisp:get-current-scope!!)
 		 (println submodel))) 
-  ;(eval-scoped scope (cdr model))
-  )))
+	  )))
+
+
 
 (defvar scope-3d
   (eval
    '(let ((polygon scope:polygon)
+		  (sdf2 scope:sdf0)
 		  (cache scope:cache-image)
 		  (bake2 (lambda (a b) (scope:bake2 a b)))
 		  )
 	 (lisp:get-current-scope))
    paint-scope))
-
-;(render-model2 nil)
-;(lisp:exit 0)
-;(load "sdf.lisp")

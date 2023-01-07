@@ -1961,6 +1961,9 @@ lisp_value print(lisp_value v){
   char buffer[100] = {0};
   int l = print2(NULL,0,  v);
   char * str = l >= 95 ? malloc(l + 1) : buffer;
+  if(str == NULL){
+	printf("Unable to allocate %i\n", l + 1);
+  }
   print2(str, l+ 1, v);
   printf("%s", str);
   if(l >= 95)
@@ -2885,10 +2888,11 @@ void setup_fpe_handler(){
 #ifndef WASM
 #include <sys/resource.h>
 void init_linux(){
+  
   // protect system from running out of resources due to a memory leak.
   // this is done by setting the soft/hard limit of virtual memory for the current
   // process to something relatively low.
-  rlim_t virtual_memory_limit = 1L * 1024L * 1024L * 1024L;
+  rlim_t virtual_memory_limit = 4L * 1024L * 1024L * 1024L;
   struct rlimit rl;
   rl.rlim_cur = virtual_memory_limit;
   rl.rlim_max = virtual_memory_limit;

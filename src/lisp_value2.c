@@ -33,6 +33,13 @@ inline bool is_t(lisp_value v){
 inline bool is_cons(lisp_value v){
   return v.type == LISP_CONS;
 }
+inline bool is_list(lisp_value v){
+  return v.type == LISP_CONS || v.type == LISP_NIL;
+}
+
+inline bool is_vector(lisp_value v){
+  return v.type == LISP_VECTOR;
+}
 
 inline bool is_integer(lisp_value v){
   return v.type == LISP_INTEGER;

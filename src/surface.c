@@ -1,7 +1,7 @@
 #include <iron/full.h>
 #include <iron/gl.h>
 #include "foxlisp.h"
-
+#include "foxgl.h"
 typedef enum{
 	     DITHER_NONE,
 	     DITHER_FLOYD_STEINBERG
@@ -469,9 +469,11 @@ static vec3 lv_vec3(lisp_value v){
                   lisp_value_as_rational(car(v)),
                   lisp_value_as_rational(cadr(v)),
                   lisp_value_as_rational(caddr(v)));
-                  
 }
 
+//static lisp_value vec3_lv(vec3 v){
+//  return new_cons(rational_lisp_value(v.x),new_cons(rational_lisp_value(v.y),new_cons(rational_lisp_value(v.z), nil)));
+//}
 static mat4 lisp_value_mat4(lisp_value v){
   mat4 * m = lisp_value_vector(v)->data;
   return *m;
@@ -1373,7 +1375,7 @@ void improve_mesh(mc_vertex_builder * bld){
   
   edge_lookup = lisp_malloc(sizeof(*edge_lookup));
   ht_create3(edge_lookup, 1, sizeof(face_edge), sizeof(int));
-  
+  printf("bld->count %i\n", bld->count);
   int id = 0;
   for(size_t trg = 0; trg < bld->count / 3; trg++){
 
@@ -1442,7 +1444,7 @@ void improve_mesh(mc_vertex_builder * bld){
   var sdf_userdata = bld->sdf->sdf_userdata;
   vec3 c;
 
-  if(true){
+  if(false){
  for(int i = 0; i < vertex_count; i++){
    vec3 v = optimize_point(bld->sdf, vertexes[i], 0.0001f);
    vertexes[i] = v;
@@ -1723,6 +1725,7 @@ f32 generic_sdf2(void * ud, vec3 p, vec3 * c){
   return generic_sdf(ud, p, c);
 
 }
+bool improve_meshes = false;
 void ht_empty(hash_table *ht);
 lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res, lisp_value model0, lisp_value offset){
   if(!is_nil(model0)){
@@ -1766,6 +1769,33 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res, lisp_value mo
     //var timestamp = timestampf();
     //for(int i = 0; i < 1000; i++){
     marching_cubes_sdf(&ctx2, center, scale);
+	if(!improve_meshes){
+	  var vec_v = make_vector(integer(builder.count * 3), float32(0.0));
+	  f32 * verts2 = vec_v.vector->data;
+	  var vec_c = make_vector(integer(builder.count * 3), float32(0.0));
+	  f32 * colors2 = vec_c.vector->data;
+	  memcpy(verts2, builder.verts, sizeof(float) * 3 * builder.count);
+	  var sdf = ctx2.sdf;
+	  var sdf_userdata = ctx2.sdf_userdata;
+	  	
+	  for(size_t i = 0; i < builder.count; i++){
+		vec3 * v2 = (vec3 *) (verts2 + i * 3);
+		vec3 vx_c;
+		sdf(sdf_userdata, *v2, &vx_c);
+		f32 * cp = colors2 + i * 3;
+		cp[0] = vx_c.x;
+		cp[1] = vx_c.y;
+		cp[2] = vx_c.z;
+	  }
+
+	  //memcpy(colors2, builder.colors, sizeof(float) * 3 * builder.count);
+	  dealloc(builder.verts);
+	  builder.verts = NULL;
+	  
+	  //dealloc(builder.colors);
+	  
+	  return new_cons(vec_v, vec_c);
+	}
       //builder.offset = 0;
       //}
     
@@ -1975,9 +2005,32 @@ lisp_value lisp_sdf_distance(lisp_value model, lisp_value p){
     return nil;
   }
   vec3 c;
-  vec3 p2 = lv_vec3(p);
+  vec3 p2 = is_list(p) ? lv_vec3(p) : lisp_value_vec3(p);
   return rational_lisp_value((double)generic_sdf(modelp, p2, &c));
 }
+
+lisp_value lisp_sdf_distance_gradient(lisp_value model, lisp_value p, lisp_value size ){
+  if(is_nil(model))
+    return nil;
+  void * modelp = get_physics_model_cached2(model);
+  if(modelp == NULL){
+    return nil;
+  }
+  f32 s = is_nil(size) ? 0.01f : (f32)lisp_value_as_rational(size);
+  vec3 c;
+  
+  vec3 p2 = is_list(p) ? lv_vec3(p) : lisp_value_vec3(p);
+  
+  var d0 = generic_sdf(modelp, p2, &c);
+
+  var dx = generic_sdf(modelp, vec3_add(vec3_new(s,0.0f,0.0f), p2), &c);
+  var dy = generic_sdf(modelp, vec3_add(vec3_new(0.0f,s,0.0f), p2), &c);
+  var dz = generic_sdf(modelp, vec3_add(vec3_new(0.0f,0.0f,s), p2), &c);
+
+  return vec3_lisp_value(vec3_normalize(vec3_sub(vec3_new(dx,dy,dz), vec3_new1(d0))));
+}
+
+
 void lrn(const char * l, int args, void * f);
 
 typedef struct{
@@ -2100,6 +2153,7 @@ lisp_value lisp_render_sdf_to_image(lisp_value model, lisp_value model_transform
 
 void sdf_register(){
   lrn("sdf:dist", 2, lisp_sdf_distance);
+  lrn("sdf:dist-gradient", 3, lisp_sdf_distance_gradient);
   lrn("sdf:render", 3, lisp_render_sdf_lods);
   lrn("sdf:to-image", 6, lisp_render_sdf_to_image);
 }

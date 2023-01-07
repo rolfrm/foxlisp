@@ -422,8 +422,12 @@ lisp_value lisp_rational(lisp_value value);
 lisp_value lisp_float32(lisp_value value);
 
 size_t lisp_type_size(lisp_type type);
+
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
+bool is_list(lisp_value a);
+bool is_vector(lisp_value a);
+
 lisp_value lisp_is_symbol(lisp_value a);
 lisp_value lisp_is_list(lisp_value a);
 lisp_value lisp_error(lisp_value v);

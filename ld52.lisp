@@ -10,7 +10,7 @@
   )
 (define should-exit nil)
 (println 'load-demo)
-(load "demo3.lisp")
+(load "ld52_model.lisp")
 (lisp:collect-garbage)
 (defvar +custom-events+ ())
 (defun push-event (event)
@@ -42,7 +42,6 @@
 (define sample2-loaded (audio:load-sample sample1))
 (define sample3-loaded (audio:load-sample sample1))
 (define sample4-loaded (audio:load-sample sample1))
-(defvar last-play 0.0)
 (defvar source (audio:new-source))
 (audio:source-queue source sample1-loaded)
 (audio:source-queue source sample2-loaded)
@@ -53,24 +52,23 @@
 (defvar phase 1.0)
 
 (defun update-audio ()
-  (lisp:collect-garbage)
-  
   (audio:update)
-  
-										;(println (audio:source-buffer-count source))
-(let ((new-buffer (audio:source-update source)))
+ 
+  (let ((new-buffer (audio:source-update source)))
   	(while new-buffer
-	  (set! phase (vec:sin sample1 phase (/ (* pi 2.0 (+ freq1 440.0)) 44100.0)))
 	  (audio:fill-buffer new-buffer sample1)
 	  (audio:source-queue source new-buffer)
-	  (set! last-play real-time)
-	  (incf freq1 5.0)
 	  (set! new-buffer (audio:source-update source))
+	  (println 'new-bufer)
 	  )
+   
 	))
+
+(update-audio)
+
 ;(audio:source-play source sample4-loaded)
 (defun update ()
-  ;(update-audio)
+										;(update-audio)
   	
   (incf real-time 0.1)
   (lisp:collect-garbage)
@@ -102,10 +100,14 @@
 (define win nil)
 (define swnk nil)
 (defun ld50:initialize()
+  (println 'load-window)
   (set! win (foxgl:create-window (integer 800) (integer 800)))
+  (println 'make-current)
   (foxgl:make-current win)
   (foxgl:load-font "DejaVuSans.ttf" (integer 22))
   (foxgl:set-title win window-title)
+  (println 'grap-mouse!)
+  ;(foxgl:window-cursor-mode win :disabled)
   )
 
 (defun lisp:print-stack-trace()

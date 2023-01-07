@@ -276,12 +276,13 @@
 (define lisp:descriptions (make-hashtable))
 
 (defun lisp:write-doc (item signature)
-  (hashtable-set! lisp:descriptions item signature)
+  ;(hashtable-set! lisp:descriptions item signature)
   )
 
 (defun lisp:describe (item)
-  (println (list 'describe item))
-  (hashtable-ref lisp:descriptions item))
+  ;(println (list 'describe item))
+  (hashtable-ref lisp:descriptions item)
+  )
 
 (lisp:write-doc make-hashtable '(make-hashtable weak-keys weak-values))
 (lisp:write-doc hashtable-set! '(hashtable-set! hashtable key value))

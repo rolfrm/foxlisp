@@ -3,6 +3,7 @@
 #include <iron/gl.h>
 #include <iron/utf8.h>
 #include "foxlisp.h"
+#include "foxgl.h"
 #include <GL/gl.h>
 #include <math.h>
 #undef POP
@@ -336,6 +337,20 @@ lisp_value math_mat4_perspective(lisp_value fov, lisp_value aspect, lisp_value n
   mat4 p = mat4_perspective(fov.rational, aspect.rational, near.rational, far.rational);
   return mat4_to_lisp(p);
 }
+
+
+lisp_value math_mat4_look_at(lisp_value lisp_eye, lisp_value lisp_center, lisp_value lisp_up){
+
+  var eye = lisp_value_vec3(lisp_eye);
+  var center = lisp_value_vec3(lisp_center);
+  var up = lisp_value_vec3(lisp_up);
+  
+  mat4 p = mat4_look_at(eye, center, up);
+  return mat4_to_lisp(p);
+}
+
+
+
            
 lisp_value math_mat4_orthographic(lisp_value _w, lisp_value _h, lisp_value _z){
   var w = lisp_value_as_rational(_w);
@@ -483,6 +498,19 @@ lisp_value lisp_window_size(lisp_value win){
   gl_window_get_size(win.native_pointer, &w, &h);
   return new_cons(integer(w), new_cons(integer(h), nil));
 }
+
+lisp_value lisp_gl_window_cursor_mode(lisp_value win, lisp_value mode){
+  TYPE_ASSERT(win, LISP_NATIVE_POINTER);
+  static lisp_value hidden = {0}, disabled = {0};
+  bool is_hidden = eq(mode, get_symbol_cached(&hidden, ":hidden"));
+  bool is_disabled = eq(mode, get_symbol_cached(&disabled, ":disabled"));
+
+  gl_window_show_cursor(win.native_pointer, is_hidden ? IRON_CURSOR_HIDDEN : is_disabled ? IRON_CURSOR_DISABLED : IRON_CURSOR_NORMAL);
+  return t;;
+}
+
+
+
 
 lisp_value foxgl_poll_events(){
   gl_window_poll_events();
@@ -947,6 +975,13 @@ float vec3_angle(vec3 v1, vec3 v2) {
 	 
   return angle;
 }
+
+lisp_value lisp_cross_vec3(lisp_value v1, lisp_value v2){
+  var a = lisp_value_vec3(v1);
+  var b = lisp_value_vec3(v2);
+  return vec3_lisp_value(vec3_mul_cross(a, b));
+}
+
 lisp_value foxgl_get_eigen_key(lisp_value transform){
   
   mat4 * m1 = transform.vector->data;
@@ -996,6 +1031,7 @@ void foxgl_register(){
   lrn("foxgl:set-title", 2, foxgl_set_title);
   lrn("foxgl:window-size", 1, lisp_window_size);
   lrn("foxgl:swap", 1, foxgl_swap);
+  lrn("foxgl:window-cursor-mode", 2, lisp_gl_window_cursor_mode);
   lrn("foxgl:viewport", 2, lisp_viewport);
   lrn("foxgl:poll-events", 0, foxgl_poll_events);
   lrn("foxgl:get-web-canvas-size", 0, foxgl_web_canvas_size);
@@ -1009,10 +1045,12 @@ void foxgl_register(){
   lrn("mat4:rotate", 3, math_mat4_rotate);
   lrn("mat4:perspective", 4, math_mat4_perspective);
   lrn("mat4:orthographic", 3, math_mat4_orthographic);
+  lrn("mat4:look-at", 3, math_mat4_look_at);
   lrn("mat4:invert", 1, math_mat4_invert);
   lrn("mat4:invert!", 1, math_mat4_invert_in_place);
   lrn("mat4:identity!", 1, math_mat4_identity_in_place);
   lrn("mat4:print", 1, math_mat4_print);
+  lrn("vec3:cross", 2, lisp_cross_vec3);
   lrn("vec2:len", 1, lisp_vec2_len);
 
   lrn("foxgl:timestamp", 0, foxgl_timestamp);
@@ -1052,6 +1090,7 @@ void foxgl_register(){
   lrn("foxgl:detect-collision-floor", 3, foxgl_detect_collision_floor);
   lrn("foxgl:get-error", 0, foxgl_error);
   lrn("foxgl:get-eigen-key", 1, foxgl_get_eigen_key);
+  
   tcp_register();
   foxal_register();
   sdf_register();
