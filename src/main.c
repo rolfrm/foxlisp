@@ -2627,7 +2627,7 @@ static bool lisp_value_full_compare(const void * _k1, const void * _k2, void * u
   const lisp_value * k1 = _k1, * k2 = _k2 ;
   return equals(*k1, *k2);
 }
-
+void ht_init(hash_table * ht);
 
 
 // TODO: add support for GCing >1 columns of the hashtable key.
@@ -2656,7 +2656,8 @@ lisp_value lisp_make_hashtable(lisp_value * args, int n){
   }
 
   hash_table * ht = lisp_malloc(sizeof(*ht));
-  ht_create3(ht, 1, sizeof(lisp_value) * keys, sizeof(lisp_value));
+  ht_create3(ht, 4, sizeof(lisp_value) * keys, sizeof(lisp_value));
+  
   ht_set_alloc(ht, lisp_malloc, lisp_free);
   if(full){
     ht->hash = lisp_value_full_hash;
@@ -2665,6 +2666,7 @@ lisp_value lisp_make_hashtable(lisp_value * args, int n){
   if(weak){
     ((void **) &ht->userdata)[0] = (void *) (size_t)LISP_HASHTABLE_WEAK_KEYS;  
   }
+  ht_init(ht);
   return hashtable_lisp_value(ht);
 }
 
@@ -2781,6 +2783,7 @@ lisp_value lisp_hashtable_keys(lisp_value _ht){
 static void iter_add_value(void * key, void * elem, void * user_data){
   UNUSED(key);
   lisp_value * ud = user_data;
+  printf("???\n");
   *ud = new_cons(((lisp_value *) elem)[0], *ud);
 }
 
@@ -2888,11 +2891,11 @@ void setup_fpe_handler(){
 #ifndef WASM
 #include <sys/resource.h>
 void init_linux(){
-  
+  return;
   // protect system from running out of resources due to a memory leak.
   // this is done by setting the soft/hard limit of virtual memory for the current
   // process to something relatively low.
-  rlim_t virtual_memory_limit = 4L * 1024L * 1024L * 1024L;
+  rlim_t virtual_memory_limit = 6L * 1024L * 1024L * 1024L;
   struct rlimit rl;
   rl.rlim_cur = virtual_memory_limit;
   rl.rlim_max = virtual_memory_limit;

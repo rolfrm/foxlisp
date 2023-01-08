@@ -294,10 +294,10 @@ static inline bool visit_cons(gc_context * gc, cons * c){
 }
 
 static inline void visit_hashtable(gc_context * gc, hash_table * table){
-  if(!mark_vector(gc, table)
-     && !mark_vector(gc, table->keys)
-     && !mark_vector(gc, table->elems)
-     && !mark_vector(gc, table->occupied)
+  if(!(mark_vector(gc, table)
+	   | mark_vector(gc, table->keys)
+	   | mark_vector(gc, table->elems)
+	   | mark_vector(gc, table->occupied))
      )
     return;
   

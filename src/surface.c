@@ -788,6 +788,27 @@ static void * get_physics_sdf2(lisp_value value){
     }
     return transform;
   }
+
+  if(lisp_value_eq(model_type, get_symbol("offset"))){
+    value = cdr(value);
+    sdf_transform * transform = alloc(sizeof(*transform));
+    transform->type = SDF_TYPE_TRANSFORM;
+	vec3 s = lv_vec3(car(value));
+	
+    mat4 m = mat4_translate(-s.x, -s.y, -s.z);;
+	
+    transform->inv_tform = m;
+    
+	value = cdr(value);
+    transform->model_count = lisp_length(value).integer;
+    transform->models = alloc0(sizeof(void *) * transform->model_count);
+    for(size_t i = 0; i < transform->model_count; i++){
+      transform->models[i] = get_physics_sdf2(car(value));
+      value = cdr(value);
+    }
+    return transform;
+  }
+  
   if(lisp_value_eq(model_type, get_symbol("rgb"))){
 
     sdf_color * rgb = alloc(sizeof(*rgb));
@@ -807,6 +828,7 @@ static void * get_physics_sdf2(lisp_value value){
     }
     return rgb;
   }
+  
   if(lisp_value_eq(model_type, get_symbol("soft"))){
     
     sdf_soft * soft = alloc(sizeof(*soft));
@@ -1148,6 +1170,50 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,lisp_value ph
   }
   return ctx.collision_detected ? t : nil;
 }
+
+lisp_value foxgl_detect_collision2(lisp_value obj1, lisp_value obj2, lisp_value tform2, lisp_value out_cons){
+
+  void * model1 = get_physics_model_cached2(obj1);
+  void * model2 = get_physics_model_cached2(obj2);
+  
+  mat4 tform = lisp_value_mat4(tform2);
+  vec3 p2 = vec3_new(0.5, 0.5, 0.5);
+  p2 = mat4_mul_vec3(tform, p2);
+  //tform = mat4_invert(tform);
+  sdf_transform a_t = {
+    .type = SDF_TYPE_TRANSFORM,
+	.inv_tform = tform,
+    .models = &model2,
+    .model_count = 1};
+   
+  cdf_ctx ctx = {
+    .sdf1 = generic_sdf,
+    .sdf2 = generic_sdf,
+    .userdata1 = model1,
+    .userdata2 = &a_t,
+    .threshold = 0.001,
+    .greatest_common_overlap = 100.0
+  };
+  cdf_ctx ctx2 = ctx;
+  //vec3 c;
+  //f32 a = generic_sdf(&a_t, p2, &c); 
+  //f32 b = generic_sdf(model2, p2, &c); 
+  //printf(">>>> %f %f\n", (double)a, (double)b);
+  
+  sdf_detect_collision(&ctx, p2, 100.0);
+  if(ctx.collision_detected && is_cons(out_cons)){
+    ctx2.threshold = 0.001;
+    
+    //describe_sdf(ctx.userdata1);
+    //describe_sdf(ctx.userdata2);
+    sdf_detect_max_overlap(&ctx2, p2, 100.0);
+    set_car(out_cons, rational_lisp_value((f64)ctx2.pt.x));
+    set_cdr(out_cons, rational_lisp_value((f64)ctx2.pt.z));
+
+  }
+  return ctx.collision_detected ? t : nil;
+}
+
 
 
 lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2, lisp_value model){
@@ -1787,13 +1853,8 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res, lisp_value mo
 		cp[1] = vx_c.y;
 		cp[2] = vx_c.z;
 	  }
-
-	  //memcpy(colors2, builder.colors, sizeof(float) * 3 * builder.count);
 	  dealloc(builder.verts);
 	  builder.verts = NULL;
-	  
-	  //dealloc(builder.colors);
-	  
 	  return new_cons(vec_v, vec_c);
 	}
       //builder.offset = 0;
@@ -2156,4 +2217,5 @@ void sdf_register(){
   lrn("sdf:dist-gradient", 3, lisp_sdf_distance_gradient);
   lrn("sdf:render", 3, lisp_render_sdf_lods);
   lrn("sdf:to-image", 6, lisp_render_sdf_to_image);
+  lrn("sdf:detect-collision", 4, foxgl_detect_collision2);
 }

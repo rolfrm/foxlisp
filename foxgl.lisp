@@ -1040,7 +1040,7 @@
 
 	(release-matrix current-transform)
 	))
-
+(defvar rotate:pi (/ (* 2.0 pi) 360.0)) 
 (defun scope:rotate (scope body)
   (let ((t0 (symbol-value 'current-transform scope))
 		(rot (unbind (car body) scope))
@@ -1048,9 +1048,9 @@
 		(current-transform (get-matrix)))
 	(math:*! current-transform current-transform t0)
 	(math:rotate! current-transform
-                  (* 2 pi (unbind (car rot) scope))
-                  (* 2 pi (or (unbind (cadr rot) scope) 0.0))
-                  (* 2 pi (or (unbind (caddr rot) scope) 0.0)))
+                  (* rotate:pi (unbind (car rot) scope))
+                  (* rotate:pi (or (unbind (cadr rot) scope) 0.0))
+                  (* rotate:pi (or (unbind (caddr rot) scope) 0.0)))
 	(lisp:with-scope-binding scope
 	  (lisp:get-current-scope!!)
 	  '(current-transform rest) nil
