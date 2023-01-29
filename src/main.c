@@ -1187,7 +1187,7 @@ void lisp_pin_args(cons * argslist, size_t cnt){
 	cons_arrays.arrays = realloc(cons_arrays.arrays, sizeof(cons_arrays.arrays[0]) * new_capacity);
 	cons_arrays.capacity = new_capacity;	
   }
-  if(cons_arrays.count > 1000){
+  if(cons_arrays.count > 2000){
 	raise_string("cons array leak");
   }
   var new = &cons_arrays.arrays[cons_arrays.count];
@@ -1463,13 +1463,21 @@ lisp_value lisp_eval_vector_set(lisp_scope * scope, lisp_value vec_form, lisp_va
 }
 
 lisp_value lisp_stack;
+int lisp_stack_size;
+const int lisp_max_stack_size = 2000;
 lisp_value lisp_eval_inner(lisp_scope * scope, lisp_value value);
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value){
-  
+  if(lisp_stack_size > lisp_max_stack_size){
+	 raise_string("Max stack size exceeded.");
+	 return nil;
+  }
   cons stk = {.car = value, .cdr = lisp_stack};
   lisp_stack = cons_lisp_value(&stk);
+  lisp_stack_size += 1;
+  
   var r = lisp_eval_inner(scope, value);
-  lisp_stack = stk.cdr;;
+  lisp_stack = stk.cdr;
+  lisp_stack_size -= 1;
   return r;
 }
 
@@ -1833,6 +1841,7 @@ lisp_value lisp_eval_file(const char * filepath){
   return r;
 }
 static int lisp_print_depth = 10;
+bool lisp_string_double_quotes = true;
 int print2(char * buffer, int l2, lisp_value v){
   char * initbuf = buffer;
   int l = 0;
@@ -1872,7 +1881,10 @@ int print2(char * buffer, int l2, lisp_value v){
   case LISP_RATIONAL:
     return snprintf(buffer, LEN1, "%g", v.rational);
   case LISP_STRING:
-    return snprintf(buffer, LEN1, "\"%s\"", v.string);
+	 if(lisp_string_double_quotes)
+		return snprintf(buffer, LEN1, "\"%s\"", v.string);
+	 else
+		return snprintf(buffer, LEN1, "%s", v.string);
   case LISP_SYMBOL:
     return snprintf(buffer, LEN1, "%s", symbol_name(v.integer));
   case LISP_FUNCTION:
@@ -1975,8 +1987,11 @@ lisp_value value_to_string(lisp_value v){
   int l = print2(NULL,0,  v);
   l += 100;
   char * str = lisp_malloc(l+ 1);
+  lisp_string_double_quotes = false;
   print2(str, l + 1, v);
-  return string_lisp_value(str);
+  var r = string_lisp_value(str);
+  lisp_string_double_quotes = true;
+  return r;
 }
 
 void lisp_register_value(const char * name, lisp_value value){
@@ -2296,6 +2311,12 @@ lisp_value println(lisp_value v){
   print(v);
   printf("\n");
   return v;
+}
+lisp_value lisp_println(lisp_value * values, int count){
+  for(int i = 0; i < count; i++)
+	 print(values[i]);
+  printf("\n");
+  return count == 0 ? nil : values[0];
 }
 
 lisp_value lisp_integer(lisp_value v){
@@ -2705,8 +2726,8 @@ lisp_value lisp_hashtable_setn(lisp_value * values, size_t count){
   if(count <= 2){
 	raise_string("not enough values for set");
 	return nil;
- 
   }
+  
   var _ht = values[0];
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
   hash_table * ht = lisp_value_hashtable(_ht);
@@ -2720,10 +2741,10 @@ lisp_value lisp_hashtable_getn(lisp_value * values, size_t count){
 	raise_string("not enough values for get");
 	return nil;
   }
+
   lisp_value ht = values[0];
   lisp_value value = {0};
-  //println(values[1]);
-				 
+ 				 
   if(ht_get(lisp_value_hashtable(ht), &values[1], &value))
     return value;
   return nil;
@@ -3044,7 +3065,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("max", -1, lisp_maximumn);
 
   lisp_register_native("print", 1, print);
-  lisp_register_native("println", 1, println);
+  lisp_register_native("println", -1, lisp_println);
   lisp_register_native("value->string", 1, value_to_string);
   //lisp_register_native("car", 1, car);
   //lisp_register_native("cdr", 1, cdr);
