@@ -98,7 +98,7 @@
 
 	))
 
-(defvar sphere '(sdf2 (:size 2 :resolution 0.05)
+(defvar sphere '(sdf2 (:size 2 :resolution 0.2)
 											 (rgb (1 1 1)
 											  (sphere 0.5))))
 

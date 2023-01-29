@@ -474,5 +474,5 @@ lisp_value lisp_read_string(const char * str);
 extern bool gc_unsafe_stack;
 
 // internals
-typedef struct __binary_io io_reader;
+//struct __binary_io;
 void on_read_cons(io_reader * rd, lisp_value c);

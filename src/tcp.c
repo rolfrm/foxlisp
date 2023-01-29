@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <microio.h>
 #include "foxlisp.h"
 #include <fcntl.h>
 #include <errno.h>

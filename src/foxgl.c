@@ -2,6 +2,7 @@
 #include <iron/full.h>
 #include <iron/gl.h>
 #include <iron/utf8.h>
+#include <microio.h>
 #include "foxlisp.h"
 #include "foxgl.h"
 #include <GL/gl.h>

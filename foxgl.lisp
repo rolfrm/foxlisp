@@ -949,24 +949,22 @@
 
 (defun eval-scoped0(scope form)
   (let ((head (car form)))
-
-	(let ((f (when (symbol? head) (symbol-value head scope))))
-	  
-	  (if (procedure? f)
-		  (f scope (cdr form))
-		  (eval-scoped scope form)))))
+	 (if (symbol? head)
+		  (let ((sub (symbol-value head scope)))
+			 
+			 (if (procedure? sub)
+				  (sub scope (cdr form))
+				  (let ((prevargs (symbol-value 'args scope)))
+					 (lisp:scope-set! scope 'args (cdr form))
+					 (eval-scoped0 scope sub)
+					 (lisp:scope-set! scope 'args prevargs)
+					 )))
+		  (eval-scoped scope form)
+		  )))
 
 (defun eval-scoped(scope body2)
   (for-each i body2
-	(let ((head (car i)))
-			  
-	  (let ((f (when (symbol? head) (symbol-value head scope))))
-		
-		(if (procedure? f)
-			(f scope (cdr i))
-			(if (cons? f)
-				(eval-scoped0 scope f)
-				(eval-scoped scope i)))))))
+				(eval-scoped0 scope i)))
 
 (defun scope:let(scope body)
   (let ((vars (car body))
@@ -997,12 +995,13 @@
 
 (defvar base-scope
   (let ((vars scope:let)
-		(print (lambda (scope body) (println (unbind (car body) scope))))
-		(for scope:for)
-		(ref scope:ref)
-		(bind scope:bind)
-		(ignore (lambda (s b) ))
-		)
+		  (print (lambda (scope body) (println (unbind (car body) scope))))
+		  (for scope:for)
+		  (ref scope:ref)
+		  (bind scope:bind)
+		  (args ())
+		  (ignore (lambda (s b) ))
+		  )
 	
 	(lisp:get-current-scope)))
 
@@ -1065,7 +1064,7 @@
 		(current-transform (get-matrix)))
 	(math:*! current-transform current-transform t0)
 	(math:scale! current-transform
-                  (unbind (car scale) scope)
+                  (or (unbind (car scale) scope) 1.0)
                   (or (unbind (cadr scale) scope) 1.0)
                   (or (unbind (caddr scale) scope) 1.0))
 	(lisp:with-scope-binding scope
@@ -1083,7 +1082,8 @@
    '(let ((translate scope:translate)
 		  (rotate scope:rotate)
 		  (scale scope:scale)
-		  (transform scope:transform)
+			 (transform scope:transform)
+			 (offset scope:translate)
 		  ) 
 	 (lisp:get-current-scope))
    base-scope))
@@ -1419,14 +1419,24 @@
 		 (println submodel))) 
 	  )))
 
+(defun scope:blit-text (scope model)
+
+  (let (
+		  (model-transform (symbol-value 'current-transform scope))
+		  )
+	 (foxgl:color scope:color)
+	 (foxgl:transform model-transform)
+	 (foxgl:blit-text (value->string (unbind (car model) scope)) model-transform)
+  ))
 
 
 (defvar scope-3d
   (eval
    '(let ((polygon scope:polygon)
-		  (sdf2 scope:sdf0)
-		  (cache scope:cache-image)
-		  (bake2 (lambda (a b) (scope:bake2 a b)))
-		  )
+			 (sdf2 scope:sdf0)
+			 (cache scope:cache-image)
+			 (bake2 (lambda (a b) (scope:bake2 a b)))
+			 (text-base scope:blit-text)
+			 )
 	 (lisp:get-current-scope))
    paint-scope))

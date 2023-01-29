@@ -1,4 +1,5 @@
 #include <iron/full.h>
+#include <microio.h>
 #include "foxlisp.h"
 extern lisp_context * current_context;
 
