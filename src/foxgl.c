@@ -820,6 +820,14 @@ lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
   return nil;
 }
 
+
+lisp_value foxgl_measure_text(lisp_value text){
+  type_assert(text, LISP_STRING);
+  var s = blit_measure_text(text.string);
+  return new_cons(rational_lisp_value(s.x), rational_lisp_value(s.y));
+}
+
+
 lisp_value foxgl_blend(lisp_value blend){
   if(!is_nil(blend)){
     glEnable(GL_BLEND);
@@ -900,7 +908,7 @@ lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform){
     tform = mat4_mul(btformi, tform);
     polygon = cdr(polygon);
     var points = lisp_value_vector(car(polygon));
-    var pointsf = (f32 *)points->data;;
+    var pointsf = (f32 *)points->data;
     polygon = cdr(polygon);
     var dims = lisp_value_integer(car(polygon));
     if(vdims != dims && vdims != 0){
@@ -911,38 +919,58 @@ lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform){
     var thiscnt = points->count / dims;
 
     var newcnt = vert_cnt + thiscnt + 2;
-    verts = realloc(verts, newcnt * dims * sizeof(f32));
+	 printf("%i %i %i\n", newcnt, dims, newcnt * dims * sizeof(f32));
+	 verts = realloc(verts, newcnt * dims * sizeof(f32));
     colors = realloc(colors, newcnt * 3 * sizeof(f32));
-    for(size_t i = 0; i < thiscnt; i++){
-      var index = i + vert_cnt + 1;
-      vec3 pt = vec3_new(pointsf[i * 3], pointsf[i*3 + 1], pointsf[i*3 + 2]);
-      var pt2 = mat4_mul_vec3(tform, pt);
-      var outv = verts + index * 3;
-      outv[0] = pt2.x;
-      outv[1] = pt2.y;
-      outv[2] = pt2.z;
-      var outc = colors + index * 3;
-      outc[0] = col2.x;
-      outc[1] = col2.y;
-      outc[2] = col2.z;
-    }
+	 if(vdims == 2){
+		for(size_t i = 0; i < thiscnt; i++){
+		  var index = i + vert_cnt + 1;
+		  vec3 pt = vec3_new(pointsf[i * 2], pointsf[i*2 + 1], 0);
+		  var pt2 = mat4_mul_vec3(tform, pt);
+		  var outv = verts + index * 2;
+		  outv[0] = pt2.x;
+		  outv[1] = pt2.y;
+		  
+		  var outc = colors + index * 3;
+		  outc[0] = col2.x;
+		  outc[1] = col2.y;
+		  outc[2] = col2.z;
+		}
+	 }else{
+		for(size_t i = 0; i < thiscnt; i++){
+		  var index = i + vert_cnt + 1;
+		  vec3 pt = vec3_new(pointsf[i * 3], pointsf[i*3 + 1], pointsf[i*3 + 2]);
+		  var pt2 = mat4_mul_vec3(tform, pt);
+		  var outv = verts + index * 3;
+		  outv[0] = pt2.x;
+		  outv[1] = pt2.y;
+		  outv[2] = pt2.z;
+		  var outc = colors + index * 3;
+		  outc[0] = col2.x;
+		  outc[1] = col2.y;
+		  outc[2] = col2.z;
+		}
+	 }
+
+	 for(int i = 0; i < vdims; i++){
+      verts[(vert_cnt) * vdims + i] = verts[(vert_cnt + 1) * vdims + i]; 
+      verts[(newcnt - 1) * vdims + i] = verts[(newcnt - 2) * vdims + i];
+     }
     
 
     for(int i = 0; i < 3; i++){
-      verts[(vert_cnt) * 3 + i] = verts[(vert_cnt + 1) * 3 + i]; 
       colors[(vert_cnt) * 3 + i] = colors[(vert_cnt + 1) * 3 + i]; 
-      verts[(newcnt - 1) * 3 + i] = verts[(newcnt - 2) * 3 + i];
       colors[(newcnt - 1) * 3 + i] = colors[(newcnt - 2) * 3 + i];  
     }
     
     vert_cnt = newcnt;
     polygons = cdr(polygons);
   }
-  var vec = make_vector(integer(vert_cnt * 3), float32(0.0));
+  var vec = make_vector(integer(vert_cnt * vdims), float32(0.0));
   f32 * verts2 = vec.vector->data;
   var vec2 = make_vector(integer(vert_cnt * 3), float32(0.0));
   f32 * colors2 = vec2.vector->data;
-  memcpy(verts2, verts, vert_cnt * 3 * sizeof(f32));
+  memcpy(verts2, verts, vert_cnt * vdims * sizeof(f32));
   memcpy(colors2, colors, vert_cnt * 3 * sizeof(f32));
   dealloc(colors);
   dealloc(verts);
@@ -1079,6 +1107,7 @@ void foxgl_register(){
   lrn("foxgl:bind-texture", 1, foxgl_bind_texture);
   lrn("foxgl:bind-textures", -1, foxgl_bind_textures);
   lrn("foxgl:blit-text", 2, foxgl_blit_text);
+  lrn("foxgl:measure-text", 1, foxgl_measure_text);
   lrn("foxgl:blend", 1, foxgl_blend);
   lrn("foxgl:depth", 1, foxgl_depth);
   lrn("foxgl:key-down?", 2, foxgl_key_down);

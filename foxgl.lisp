@@ -588,11 +588,11 @@
                                         ;(set! model nil)
            (foxgl:render-sub-models (cdr model))
            (let ((baked (foxgl:bake foxgl:baking-stack tform)))
-              (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil)
-                                        (foxgl:load-polygon (cdr baked) 3 nil nil)
-                                        )))
+             (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil)
+                                       (foxgl:load-polygon (cdr baked) 3 nil nil)
+                                       )))
               (hashtable-set foxgl:polygon-cache (cdr model) r)
-
+				 
              )
              
            (set! foxgl:baking nil)
@@ -650,8 +650,9 @@
     (plist-rest (cdr model) foxgl:render-model2))  
   )
 
+(defvar clone-mat4-identity (mat4-identity)) 
 (defun clone-mat4(mat)
-  (math:* (mat4-identity) mat))
+  (math:* clone-mat4-identity mat))
 
 (defun foxgl:build-sub-models (model)
   (plist-rest model foxgl:build-physics))
@@ -953,12 +954,19 @@
 		  (let ((sub (symbol-value head scope)))
 			 
 			 (if (procedure? sub)
+				  ;; if it is a function evaluate it as a function with scope.
 				  (sub scope (cdr form))
-				  (let ((prevargs (symbol-value 'args scope)))
-					 (lisp:scope-set! scope 'args (cdr form))
-					 (eval-scoped0 scope sub)
-					 (lisp:scope-set! scope 'args prevargs)
-					 )))
+				  (if (cons? sub)
+						;; if it is a cons evaluate it as a 'scope' function.
+						(let ((prevargs (symbol-value 'args scope)))
+						  (lisp:scope-set! scope 'args (cdr form))
+						  (eval-scoped0 scope sub)
+						  (lisp:scope-set! scope 'args prevargs)
+						  )
+						;; it is nothing special - default to recursing.
+						(eval-scoped scope (cdr form))
+		  				)))
+		  ;; default to recursing.
 		  (eval-scoped scope form)
 		  )))
 
@@ -1406,28 +1414,113 @@
 
 	))))
 
-
+(defvar scope:bake-cache (make-hashtable))
 (defun scope:bake2 (scope model)
-  (let ((polygon (lambda (a b)
-				   (println 'polygon!)
+  (let ((r (hashtable-ref scope:bake-cache model))
+		  (model-transform0 (symbol-value 'current-transform scope))
+		  )
+    (unless r
+		(let* ((baking-stack nil)
+				 (polygon (lambda (scope model2)
+								(println 'baking model2)
+		
+								(let ((model-transform (symbol-value 'current-transform scope))
+										(dims 2)
+										(poly (plookup model2 :2d-triangle-strip)))
+								  
+								  (unless poly
+									 (set! poly (plookup model2 :3d-triangle-strip))
+									 (set! dims 3)
+									 )
+								  
+								  (push! baking-stack
+											(list scope:color
+													(clone-mat4 model-transform)
+													(list-to-array poly) dims))
+								  
+								  )))
+				 (submodel model))
+		  (lisp:with-scope-binding scope (lisp:get-current-scope!!)
+			 '(polygon submodel) nil
+			 '((eval-scoped0 (lisp:get-current-scope!!) submodel)) 
+			 )
+		  (println 'backing-stack: (length baking-stack) baking-stack)
+		  (let ((baked (foxgl:bake baking-stack model-transform0)))
+          (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil)
+                                    (foxgl:load-polygon (cdr baked) 3 nil nil)
+                                    )))
+			 (println baked)
 
-				   (println b)))
-		(submodel model))
-	(lisp:with-scope-binding scope (lisp:get-current-scope!!)
-	  '(polygon submodel) nil
-	  '((eval-scoped0 (lisp:get-current-scope!!)
-		 (println submodel))) 
-	  )))
+			 (hashtable-set scope:bake-cache model r)
+			 )
+		  )
+		)
+
+	 (foxgl:color '(1 1 1 1))
+    (foxgl:transform model-transform0)
+	 (foxgl:blit-mode :triangle-strip-color)
+    (foxgl:blit-polygon (cdr r))
+    (foxgl:blit-mode nil)
+           
+	 ))
 
 (defun scope:blit-text (scope model)
-
-  (let (
-		  (model-transform (symbol-value 'current-transform scope))
-		  )
+  (let ((model-transform (symbol-value 'current-transform scope)))
 	 (foxgl:color scope:color)
 	 (foxgl:transform model-transform)
-	 (foxgl:blit-text (value->string (unbind (car model) scope)) model-transform)
-  ))
+	 (foxgl:blit-text (unbind (car model) scope) model-transform)
+	 ))
+
+(defun ui:measure-polygon (scope model)
+  
+  )
+(defvar ui:desired-size (cons 0.0 0.0))
+
+(defun ui:measure-text-base (scope model)
+  ;(println 'measure-text-base)
+  (let ((size (foxgl:measure-text (unbind (car model) scope))))
+													 ;(println size)
+	 ;(println (cons 'size size))
+	 (set! ui:desired-size size)
+	 ))
+
+(defun ui:measure-grid (scope model)
+  (set! ui:desired-size '(0.0 . 0.0))
+  (let ((desired-size (cons 0.0 0.0)))
+	 (for-each sub model
+				  (set! ui:desired-size '(0.0 . 0.0))
+				  (eval-scoped0 scope sub)
+				  (when (cons? ui:desired-size)
+					 (set-car! desired-size (max (car desired-size) (car ui:desired-size)))
+					 (set-cdr! desired-size (max (rational (cdr desired-size))
+														  (rational (cdr ui:desired-size))))
+					 )
+				  )
+	 (set! ui:desired-size desired-size)
+	 ))
+
+(defvar measure-scope
+  (eval
+	'(let ((polygon ui:measure-polygon)
+			 (grid ui:measure-grid)
+			 (text-base ui:measure-text-base)
+			 )
+	  (lisp:get-current-scope))))
+
+
+(defvar ui:grid:model nil)
+(defun ui:grid (scope model)
+  (let ((prevmodel ui:grid:model))
+	 (set! ui:grid:model model)
+	 (lisp:with-scope-binding scope measure-scope
+		'(polygon grid text-base) nil
+		'((ui:measure-grid (lisp:get-current-scope!!) ui:grid:model))
+		)
+	 (set! ui:grid:model prevmodel)
+	 )
+  (eval-scoped scope model)
+  )
+
 
 
 (defvar scope-3d
@@ -1437,6 +1530,7 @@
 			 (cache scope:cache-image)
 			 (bake2 (lambda (a b) (scope:bake2 a b)))
 			 (text-base scope:blit-text)
+			 (grid (lambda (a b) (ui:grid a b)))
 			 )
 	 (lisp:get-current-scope))
    paint-scope))

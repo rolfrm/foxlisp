@@ -1,11 +1,12 @@
 
-(defvar square-model '(polygon :2d-triangle-strip (0 0 1 0 0 1 1 1)))
+(defvar square-model '(polygon :3d-triangle-strip (0 0 0 1 0 0 0 1 0 1 1 0)))
 (defvar square
 	 '(scale (bind args)
 		(square-model)))
+
 (defvar text
-  '(offset (0 0.3 0)
-	 (scale (0.01 -0.01 0.1)
+  '(offset (0 0.0 0)
+	 (scale (0.01 0.01 0.1)
 	  (text-base (bind (car args)))
 			  )))
 

@@ -63,11 +63,11 @@
 	))
 
 (update-audio)
-
+ 
 ;(audio:source-play source sample4-loaded)
 (defun update ()
 										;(update-audio)
-  	
+  
   (incf real-time 0.1)
   (lisp:collect-garbage)
   (let ((s (foxgl:window-size win)))
@@ -91,6 +91,7 @@
     )
   (foxgl:swap win)
   (foxgl:poll-events)
+  ;(println (foxgl:measure-text "Hello world!\n112233"))
   )
 
 (define ld50:initialized nil)
