@@ -191,9 +191,9 @@
 
 (define foxgl:current-scope nil)
 (defun unbind(p scope)
-  (if (= (car p) 'bind)
-      (eval (cadr p) (or scope foxgl:current-scope))
-      p))
+  (loop (= (car p) 'bind)
+      (set! p (eval (cadr p) (or scope foxgl:current-scope))))
+  p)
 (defmacro !render-sub (modelx)
   `(progn
       (foxgl:render-sub-models ,modelx)
@@ -959,7 +959,7 @@
 				  (if (cons? sub)
 						;; if it is a cons evaluate it as a 'scope' function.
 						(let ((prevargs (symbol-value 'args scope)))
-						  (lisp:scope-set! scope 'args (cdr form))
+						  (lisp:scope-set! scope 'args (unbind (cdr form) scope))
 						  (eval-scoped0 scope sub)
 						  (lisp:scope-set! scope 'args prevargs)
 						  )
@@ -1422,8 +1422,6 @@
     (unless r
 		(let* ((baking-stack nil)
 				 (polygon (lambda (scope model2)
-								(println 'baking model2)
-		
 								(let ((model-transform (symbol-value 'current-transform scope))
 										(dims 2)
 										(poly (plookup model2 :2d-triangle-strip)))
@@ -1468,7 +1466,7 @@
   (let ((model-transform (symbol-value 'current-transform scope)))
 	 (foxgl:color scope:color)
 	 (foxgl:transform model-transform)
-	 (foxgl:blit-text (unbind (car model) scope) model-transform)
+	 (foxgl:blit-text (unbind (car model) scope) model-transform 100.0)
 	 ))
 
 (defun ui:measure-polygon (scope model)
@@ -1477,10 +1475,7 @@
 (defvar ui:desired-size (cons 0.0 0.0))
 
 (defun ui:measure-text-base (scope model)
-  ;(println 'measure-text-base)
   (let ((size (foxgl:measure-text (unbind (car model) scope))))
-													 ;(println size)
-	 ;(println (cons 'size size))
 	 (set! ui:desired-size size)
 	 ))
 

@@ -811,19 +811,43 @@ lisp_value foxgl_bind_textures(lisp_value * tex, size_t count){
 }
 
 
-lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix){
-  type_assert(text, LISP_STRING);
+int print2(char * buffer, int l2, lisp_value v);
+
+lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix, lisp_value max_width2){
+  char buffer[100] = {0};
+  char * text2 = NULL;
+  if(lisp_value_type(text) != LISP_STRING){
+	 int l = print2(NULL, 0, text);
+	 char * str = l >= 95 ? malloc(l + 1) : buffer;
+	 print2(str, l+ 1, text);
+	 text2 = str;
+  }else {
+	 text2 = text.string;
+  }
+  
   type_assert(matrix, LISP_VECTOR);
   mat4 * m1 = matrix.vector->data;
-  blit3d_text(blit3d_current_context, mat4_identity(), *m1, text.string);
-
+  f32 max_width = f32_infinity;
+  if(!is_nil(max_width2)){
+	 max_width = lisp_value_rational(max_width2);
+  }
+  blit3d_text2(blit3d_current_context, mat4_identity(), *m1, text2, max_width);
   return nil;
 }
 
-
 lisp_value foxgl_measure_text(lisp_value text){
-  type_assert(text, LISP_STRING);
-  var s = blit_measure_text(text.string);
+  char buffer[100] = {0};
+  char * text2 = NULL;
+  if(lisp_value_type(text) != LISP_STRING){
+	 int l = print2(NULL, 0, text);
+	 char * str = l >= 95 ? malloc(l + 1) : buffer;
+	 print2(str, l+ 1, text);
+	 text2 = str;
+  }else {
+	 text2 = text.string;
+  }
+
+  var s = blit_measure_text(text2);
   return new_cons(rational_lisp_value(s.x), rational_lisp_value(s.y));
 }
 
@@ -955,9 +979,8 @@ lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform){
 	 for(int i = 0; i < vdims; i++){
       verts[(vert_cnt) * vdims + i] = verts[(vert_cnt + 1) * vdims + i]; 
       verts[(newcnt - 1) * vdims + i] = verts[(newcnt - 2) * vdims + i];
-     }
+	 }
     
-
     for(int i = 0; i < 3; i++){
       colors[(vert_cnt) * 3 + i] = colors[(vert_cnt + 1) * 3 + i]; 
       colors[(newcnt - 1) * 3 + i] = colors[(newcnt - 2) * 3 + i];  
@@ -1106,7 +1129,7 @@ void foxgl_register(){
   lrn("foxgl:framebuffer-depth-texture", 1, foxgl_framebuffer_depth_texture);
   lrn("foxgl:bind-texture", 1, foxgl_bind_texture);
   lrn("foxgl:bind-textures", -1, foxgl_bind_textures);
-  lrn("foxgl:blit-text", 2, foxgl_blit_text);
+  lrn("foxgl:blit-text", 3, foxgl_blit_text);
   lrn("foxgl:measure-text", 1, foxgl_measure_text);
   lrn("foxgl:blend", 1, foxgl_blend);
   lrn("foxgl:depth", 1, foxgl_depth);

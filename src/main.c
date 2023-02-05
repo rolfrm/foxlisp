@@ -1975,10 +1975,11 @@ lisp_value print(lisp_value v){
   char * str = l >= 95 ? malloc(l + 1) : buffer;
   if(str == NULL){
 	printf("Unable to allocate %i\n", l + 1);
+	return integer(0);
   }
   print2(str, l+ 1, v);
   printf("%s", str);
-  if(l >= 95)
+  if(str != buffer)
     free(str);
   return integer(l);
 }
