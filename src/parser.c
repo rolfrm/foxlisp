@@ -3,6 +3,7 @@
 #include <microio.h>
 #include <iron/full.h>
 #include "foxlisp.h"
+#include "foxlisp_internal.h"
 
 
 // like new_cons, but marks the code location as well.

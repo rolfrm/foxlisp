@@ -13,10 +13,10 @@
 #endif
 
 #include "foxlisp.h"
-lisp_value lisp_read_stream(io_reader * rd);
+
+#include "foxlisp_internal.h"
 #include "lisp_value2.c"
 
-extern bool debug_set;
 bool debug_enabled = false;
 
 bool tracing = false;
@@ -43,7 +43,6 @@ lisp_value read_cons_file = {0};
 void print_call_stack();
 static lisp_value current_error = {0};
 static lisp_value current_error_stack = {0};
-static bool is_in_lisp;
 
 static inline bool lisp_is_in_error(){
   return !is_nil(current_error);
@@ -58,11 +57,6 @@ void raise_string(const char * str){
   current_error_stack = copy_cons(lisp_stack);
 }
 
-lisp_value new_stack_cons(cons * c, lisp_value a, lisp_value b){
-  c->car = a;
-  c->cdr = b;
-  return (lisp_value){.type = LISP_CONS, .cons = c};
-}
 
 lisp_value lisp_error(lisp_value value){
   current_error = value;
@@ -89,27 +83,6 @@ bool elem_type_assert(lisp_value vector, lisp_type type){
 
 #define ASSERT(x) if(!(x)){raise_string("!!! " #x "\n"); }
 
-bool _string_eq(lisp_value a, lisp_value b){
-  var a_type = lisp_value_type(a);
-  if(a_type != lisp_value_type(b)) return false;
-  if(a_type != LISP_STRING) return false;
-  var as = lisp_value_string(a);
-  var bs = lisp_value_string(b);
-  if(strlen(as) != strlen(bs)) return false;
-  return strncmp(as, bs, strlen(as)) == 0;
-}
-
-lisp_value string_eq(lisp_value a, lisp_value b){
-  return bool_lisp_value(_string_eq(a, b));
-}
-
-lisp_value lisp_is_list(lisp_value a){
-  return bool_lisp_value(is_nil(a) || is_cons(a));
-}
-
-lisp_value lisp_is_cons(lisp_value a){
-  return bool_lisp_value(is_cons(a));
-}
 
 lisp_scope * lisp_scope_new(lisp_scope * super){
   lisp_scope * s = lisp_malloc(sizeof(*super));
@@ -2884,11 +2857,8 @@ void load_modules(){
 }
 
 void web_update(){
-  is_in_lisp = true;
-  
   var sym = get_symbol("lisp:*web-update*");
   lisp_eval(current_context->globals, new_cons(sym, nil));
-  is_in_lisp = false;
 }
 
 void sig_handler(int signum){
@@ -2910,24 +2880,6 @@ void setup_fpe_handler(){
   sigaction (SIGFPE, &new_action, &old_action);
 }
 
-#ifndef WASM
-#include <sys/resource.h>
-void init_linux(){
-  return;
-  // protect system from running out of resources due to a memory leak.
-  // this is done by setting the soft/hard limit of virtual memory for the current
-  // process to something relatively low.
-  rlim_t virtual_memory_limit = 6L * 1024L * 1024L * 1024L;
-  struct rlimit rl;
-  rl.rlim_cur = virtual_memory_limit;
-  rl.rlim_max = virtual_memory_limit;
-  if (setrlimit(RLIMIT_AS, &rl) != 0) {
-   ERROR("setrlimit");
-   raise(SIGINT);
-  }
-}
-#endif
-
 void test_gc();
 void test_sdf();
 int main(int argc, char ** argv){
@@ -2937,9 +2889,6 @@ int main(int argc, char ** argv){
       return 0;
     }
   }
-
-
-  
   
   current_context = lisp_context_new();
 
@@ -2953,11 +2902,9 @@ int main(int argc, char ** argv){
   
   setup_fpe_handler();
   
-  is_in_lisp = true;
   lisp_register_value("lisp:*test-enabled*", nil);
   
 #ifndef WASM
-  init_linux();
   for(int i = 1; i < argc; i++){
     if(strcmp(argv[i], "--test") == 0){
       lisp_register_value("lisp:*test-enabled*", t);
@@ -2983,7 +2930,6 @@ int main(int argc, char ** argv){
     println(current_error);
     
   }
-  is_in_lisp = false;
   return 0;
 }
 
@@ -3000,12 +2946,6 @@ void lisp_invoke_string(const char * code){
 
 #endif
 
-#include<pthread.h>
-pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
-  pthread_t thread = {0};
-  pthread_create(&thread, NULL, f, data);
-  return thread;
-}
 lisp_value lisp_debug(lisp_value v){
   debug_enabled = !is_nil(v);
   return nil;
@@ -3034,6 +2974,7 @@ lisp_context * lisp_context_new(){
   lisp_context * ctx = lisp_context_new_bare();
   current_context = ctx;
 
+  //setup const symbols
   rest_sym = get_symbol("&rest");
   if_sym = get_symbol("if");
   quote_sym = get_symbol("quote");
@@ -3044,16 +2985,18 @@ lisp_context * lisp_context_new(){
   unquote_splice_sym = get_symbol("unquote-splicing");
   fpe_sym = get_symbol("floating-point-error");
   current_error_sym = get_symbol("lisp:+current-error+");
+
+
   lisp_scope_create_value(current_context->globals, get_symbol("nil"), nil);
   lisp_scope_create_value(current_context->globals, get_symbol("t"), t);
-  
+
+  load_lisp_base();
   lisp_register_native("lisp:count-allocated", 0, lisp_count_allocated);
   lisp_register_native("lisp:exit", 0, lisp_exit);
   lisp_register_native("lisp:trace", 1, lisp_trace);
   lisp_register_native("integer?", 1, lisp_is_integer);
   lisp_register_native("number?", 1, lisp_is_number);
   lisp_register_native("rational?", 1, lisp_is_rational);
-  lisp_register_native("cons?", 1, lisp_is_cons);
   //lisp_register_native("+", -1, lisp_addn);
   //lisp_register_native("-", -1, lisp_subn);
   //lisp_register_native("*", -1, lisp_muln);
@@ -3087,7 +3030,6 @@ lisp_context * lisp_context_new(){
   lisp_register_native("equal?", -1, lisp_equals);
   //lisp_register_native("=", -1, lisp_value_eqn);
   lisp_register_native("/=", -1, lisp_neqn);
-  lisp_register_native("string=", 2, string_eq);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
   lisp_register_native("rational", 1, lisp_rational);

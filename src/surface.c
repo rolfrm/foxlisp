@@ -308,6 +308,11 @@ static void emit_pt(void * userdata, vec3 p, vec3 c){
   sft_context * ud = userdata;
   ud->count += 1;
 }
+lisp_value new_stack_cons(cons * c, lisp_value a, lisp_value b){
+  c->car = a;
+  c->cdr = b;
+  return (lisp_value){.type = LISP_CONS, .cons = c};
+}
 
 f32 lisp_sdf_func(void * data, vec3 pt, vec3 * color){
   lisp_value * v = data;

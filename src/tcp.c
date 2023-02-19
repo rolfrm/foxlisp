@@ -158,7 +158,12 @@ void * lisp_perform_work(void * args){
   return NULL;
 }
 #ifndef WASM
-pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data);
+
+pthread_t foxlisp_create_thread(void * (* f)(void * data), void * data){
+  pthread_t thread = {0};
+  pthread_create(&thread, NULL, f, data);
+  return thread;
+}
 
 
 lisp_value thread_start(lisp_value func){

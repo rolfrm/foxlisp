@@ -365,7 +365,6 @@ lisp_value lisp_length(lisp_value lst);
 const char * lisp_type_to_string(lisp_type t);
 
 lisp_value new_cons(lisp_value a, lisp_value b);
-lisp_value new_stack_cons(cons * c, lisp_value a, lisp_value b);
 lisp_value copy_cons(lisp_value a);
 
 lisp_value car(lisp_value v);
@@ -473,6 +472,3 @@ lisp_value lisp_read_string(const char * str);
 #define CHECK_ERROR() if(lisp_error_state()) return nil;
 extern bool gc_unsafe_stack;
 
-// internals
-//struct __binary_io;
-void on_read_cons(io_reader * rd, lisp_value c);
