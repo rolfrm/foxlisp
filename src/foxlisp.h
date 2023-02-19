@@ -329,6 +329,7 @@ lisp_value lisp_unpin(void * p);
 void lisp_pin_args(cons * argslist, size_t cnt);
 void lisp_unpin_args(cons * argslist, size_t cnt);
 
+bool equals(lisp_value v1, lisp_value v2);
 //
 void foxlist_thread_init();
 // mark an sweep garbage collector
@@ -361,7 +362,6 @@ lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
 lisp_value println_shallow(lisp_value v);
-lisp_value lisp_len(lisp_value cons_list);
 lisp_value lisp_length(lisp_value cons_list);
 size_t list_length(lisp_value cons_list);
 const char * lisp_type_to_string(lisp_type t);

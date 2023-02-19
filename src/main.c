@@ -2039,39 +2039,6 @@ bool equals(lisp_value v1, lisp_value v2){
     }
 }
 
-lisp_value lisp_equals(lisp_value * values, int n){
-  if(n == 0) return nil;
-  for(int i = 1; i < n; i++){
-    if(!equals(values[i - 1], values[i]))
-      return nil;
-  }
-  return t;
-}
-
-
-lisp_value lisp_value_eqn(lisp_value * values, int count){
-  for(int i = 1; i < count; i++)
-    if(!lisp_value_eq(values[i-1], values[i]))
-      return nil;
-  return t;
-}
-
-lisp_value lisp_neqn(lisp_value * values, int count){
-  for(int i = 0; i < count; i++)
-    for(int j = i + 1; j < count; j++)
-      if(lisp_value_eq(values[i], values[j]))
-        return nil;
-  return t;
-}
-
-lisp_value lisp_len(lisp_value a){
-  int64_t i = 0;
-  while(is_cons(a)){
-    i += 1;
-    a = cdr(a);
-  }
-  return integer_lisp_value(i);
-}
 
 lisp_value println(lisp_value v){
   print(v);
@@ -2738,11 +2705,11 @@ lisp_context * lisp_context_new(){
   lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);
   lisp_register_native("lisp:trace-allocations", 1, lisp_trace_allocations);
   lisp_register_native("lisp:debug", 1, lisp_debug);
+  lisp_register_native("lisp:all-symbols", 0, lisp_all_symbols);
+
   lisp_register_native("copy-list", 1, copy_cons);
   lisp_register_native("copy-list-deep", 1, copy_cons_deep);
   
-  lisp_register_native("equal?", -1, lisp_equals);
-  lisp_register_native("/=", -1, lisp_neqn);
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
   lisp_register_native("rational", 1, lisp_rational);
@@ -2760,8 +2727,7 @@ lisp_context * lisp_context_new(){
   lisp_register_native("string->vector", 1, string_to_vector);
   lisp_register_native("string-starts-with", 2, string_starts_with);
   
-  lisp_register_native("lisp:all-symbols", 0, lisp_all_symbols);
-
+  
   lisp_register_native("make-hashtable", -1, lisp_make_hashtable);
   lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
   lisp_register_native("hashtable-set", 3, lisp_hashtable_set);
