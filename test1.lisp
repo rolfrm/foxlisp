@@ -233,14 +233,14 @@
    
 (assert (eq (- 0 5) -5))
 
-(println (all-symbols))
+(println (lisp:all-symbols))
 (assert (string-starts-with "asd" "as"))
 (assert-not (string-starts-with "dsa" "as"))
 (println (string-starts-with (symbol->string 'list) "li"))
 
 (assert (equals? '(6 5 4 3 2 1) (reverse! '(1 2 3 4 5 6))))
 
-(println (take (lambda (x) (string-starts-with (symbol->string x) "lis")) (all-symbols)))
+(println (take (lambda (x) (string-starts-with (symbol->string x) "lis")) (lisp:all-symbols)))
 (assert (equals? '(1 2 3) (take (lambda (x) (> x 0)) '(-1 1 -2 2 -3 3))))
 
 (define exception-handled nil)

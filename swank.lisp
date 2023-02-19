@@ -46,7 +46,7 @@
       `(:ok (:compilation-result nil t 0.0 nil nil)))))
 
 (defun swank:completions (prefix _)
-  (let ((matching (take (lambda (x) (string-starts-with (symbol->string x) prefix)) (all-symbols))))
+  (let ((matching (take (lambda (x) (string-starts-with (symbol->string x) prefix)) (lisp:all-symbols))))
     (println `(:ok (,(map matching symbol->string) ,(if (cdr matching) prefix (when matching (symbol->string (car matching)))))))))
 
 

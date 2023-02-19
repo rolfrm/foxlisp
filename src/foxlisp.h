@@ -75,6 +75,7 @@ typedef enum {
               LISP_ADD,
               LISP_SUB,
               LISP_MUL,
+              LISP_DIV,
               LISP_CONV_FLOAT32,
               LISP_VECTOR_LENGTH,
               LISP_VECTOR_REF,
@@ -360,8 +361,9 @@ lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
 lisp_value println(lisp_value v);
 lisp_value println_shallow(lisp_value v);
-lisp_value lisp_len(lisp_value lst);
-lisp_value lisp_length(lisp_value lst);
+lisp_value lisp_len(lisp_value cons_list);
+lisp_value lisp_length(lisp_value cons_list);
+size_t list_length(lisp_value cons_list);
 const char * lisp_type_to_string(lisp_type t);
 
 lisp_value new_cons(lisp_value a, lisp_value b);
@@ -374,7 +376,7 @@ lisp_value set_cdr(lisp_value cons, lisp_value new_car);
 lisp_value cadr(lisp_value v);
 lisp_value cddr(lisp_value v);
 lisp_value pop(lisp_value * v);
-lisp_value lisp_append(lisp_value a, lisp_value b);
+lisp_value list_append(lisp_value a, lisp_value b);
 void * lisp_malloc(size_t s);
 void * lisp_realloc(void * p, size_t s);
 void lisp_free(void * p);
