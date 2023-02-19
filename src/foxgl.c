@@ -329,7 +329,6 @@ lisp_value math_mat4_identity_in_place(lisp_value m){
   return nil;
 }
 
-
 lisp_value math_mat4_perspective(lisp_value fov, lisp_value aspect, lisp_value near, lisp_value far){
   TYPE_ASSERT(fov, LISP_RATIONAL);
   TYPE_ASSERT(aspect, LISP_RATIONAL);
@@ -338,7 +337,6 @@ lisp_value math_mat4_perspective(lisp_value fov, lisp_value aspect, lisp_value n
   mat4 p = mat4_perspective(fov.rational, aspect.rational, near.rational, far.rational);
   return mat4_to_lisp(p);
 }
-
 
 lisp_value math_mat4_look_at(lisp_value lisp_eye, lisp_value lisp_center, lisp_value lisp_up){
 
@@ -350,9 +348,6 @@ lisp_value math_mat4_look_at(lisp_value lisp_eye, lisp_value lisp_center, lisp_v
   return mat4_to_lisp(p);
 }
 
-
-
-           
 lisp_value math_mat4_orthographic(lisp_value _w, lisp_value _h, lisp_value _z){
   var w = lisp_value_as_rational(_w);
   var h = lisp_value_as_rational(_h);
@@ -391,7 +386,6 @@ lisp_value mat4_to_lisp (mat4 a){
   return vec;
 }
 
-
 lisp_value math_mat4_invert(lisp_value mat){
   var m = lisp_to_mat4(mat);
   m = mat4_invert(m);
@@ -403,7 +397,6 @@ lisp_value math_mat4_invert_in_place(lisp_value mat){
   *m = mat4_invert(*m);
   return nil;
 }
-
 
 lisp_value math_mat4_print(lisp_value a){
   type_assert(a, LISP_VECTOR);
@@ -467,11 +460,13 @@ lisp_value foxgl_create_window(lisp_value w, lisp_value h){
   TYPE_ASSERT(h, LISP_INTEGER);
   return native_pointer(gl_window_open(w.integer, h.integer));
 }
+
 lisp_value foxgl_make_current(lisp_value win){
   TYPE_ASSERT(win, LISP_NATIVE_POINTER);
   gl_window_make_current(win.native_pointer);
   return nil;
 }
+
 lisp_value foxgl_set_title(lisp_value win, lisp_value title){
   TYPE_ASSERT(win, LISP_NATIVE_POINTER);
   gl_window_set_title(win.native_pointer, title.string);
@@ -507,11 +502,8 @@ lisp_value lisp_gl_window_cursor_mode(lisp_value win, lisp_value mode){
   bool is_disabled = eq(mode, get_symbol_cached(&disabled, ":disabled"));
 
   gl_window_show_cursor(win.native_pointer, is_hidden ? IRON_CURSOR_HIDDEN : is_disabled ? IRON_CURSOR_DISABLED : IRON_CURSOR_NORMAL);
-  return t;;
+  return t;
 }
-
-
-
 
 lisp_value foxgl_poll_events(){
   gl_window_poll_events();
@@ -1056,6 +1048,57 @@ lisp_value foxgl_get_eigen_key(lisp_value transform){
   return integer_lisp_value(scaled1 ^ scaled2 ^ scaled3);
 }
 
+static lisp_value bind_symbol;
+
+lisp_value foxgl_unbind(lisp_value p, lisp_value scope){
+  while(eq(get_symbol_cached(&bind_symbol, "bind"), car(p))){
+	 if(is_scope(scope))
+		p = lisp_eval(scope.scope, cadr(p));
+	 else
+		p = lisp_eval(lisp_get_root_scope(), cadr(p));
+  }
+  return p;
+}
+
+lisp_value foxgl_eval_scoped0(lisp_value scope, lisp_value form);
+lisp_value foxgl_eval_scoped(lisp_value scope, lisp_value form){
+  while(!is_nil(form)){
+	 var v = car(form);
+	 form = cdr(form);
+	 foxgl_eval_scoped0(scope, v);
+  }
+  return nil;
+}
+
+lisp_value foxgl_eval_scoped0(lisp_value scope, lisp_value form){
+  static lisp_value args;
+  var head = car(form);
+  // is the form something special?
+  if(is_symbol(head)){
+	 var scope2 = is_scope(scope) ?  scope.scope : lisp_get_root_scope() ;
+	 
+	 var sub = lisp_scope_get_value(scope2, head);
+	 if(is_function(sub)){
+		// if it is a function evaluate it as a function with scope.
+				  
+		lisp_eval_function2(scope2, sub.function, scope, cdr(form));   
+		return nil;
+	 }
+	 if(is_cons(sub)){
+		// if it is a cons evaluate it as a 'scope' function.
+		var prevargs = lisp_scope_get_value(scope2, get_symbol_cached(&args, "args"));
+		lisp_scope_set_value(scope2, args, foxgl_unbind(cdr(form), scope));
+		foxgl_eval_scoped0(scope, sub);
+		lisp_scope_set_value(scope2, args, prevargs);
+		return nil;
+	 }	
+  }
+  
+  // it is nothing special - default to recursing.
+  foxgl_eval_scoped(scope, form);
+  return nil;
+}
+
 lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2);
 lisp_value foxgl_detect_collision_floor(lisp_value obj1, lisp_value obj2);
 lisp_value sdf_marching_cubes(lisp_value model);
@@ -1143,6 +1186,11 @@ void foxgl_register(){
   lrn("foxgl:detect-collision-floor", 3, foxgl_detect_collision_floor);
   lrn("foxgl:get-error", 0, foxgl_error);
   lrn("foxgl:get-eigen-key", 1, foxgl_get_eigen_key);
+
+  lrn("unbind", 2, foxgl_unbind);
+
+  lrn("eval-scoped0", 2, foxgl_eval_scoped0);
+  lrn("eval-scoped", 2, foxgl_eval_scoped);
   
   tcp_register();
   foxal_register();

@@ -102,50 +102,18 @@ typedef struct __attribute__((__packed__))
 }lisp_local_index;
 
 typedef enum{
-  LISP_SPECIAL = 0,
-  LISP_RATIONAL2 = 1,
-  LISP_INTEGER2 = 2,
-  LISP_POINTER = 3
-}lisp_value_tag1;
-
-typedef enum{
-  LISP_NIL2 = 0,
-  LISP_T2 = 1,
-  LISP_SYMBOL2 = 2,
-  LISP_BUILTIN2 = 3,
-  LISP_BYTE_2 = 4,
-  LISP_FLOAT32_2 = 5,
-  LISP_INTEGER32_2=6,
-  LISP_GLOBAL_INDEX2 = 7,
-  LISP_LOCAL_INDEX2 = 8
-}lisp_value_tag2;
-
-typedef enum{
   LISP_HASHTABLE_WEAK_KEYS = 1,
   LISP_HASHTABLE_WEAK_VALUES = 2
   
 }lisp_hashtable_flags;
 
-typedef struct __attribute__((__packed__)){
-  lisp_value_tag1 tag: 2;
-  int64_t tagged_pointer : 62;
-}lisp_value2;
-
-
-typedef struct __attribute__((__packed__)) {
-  union{
-    int64_t value;
-    struct {
-      lisp_value_tag2 tag2 : 4;
-      int64_t value2 : 58;
-    };
-  };
-}lisp_value3;
-
-
 typedef struct{
   union{
-    lisp_type type;
+	 struct{
+		lisp_type type : 32;
+
+		int macro_expanded : 1;
+	 };
     u64 reserved;
   };
   union{
@@ -227,14 +195,6 @@ typedef struct{
   size_t count;
 }lisp_array;
 
-typedef struct{
-  lisp_type type;
-  void * data;
-  size_t count;
-  size_t elem_size;
-  lisp_value2 default_value;
-}lisp_vector2;
-
 // internal structs
 typedef struct{
   cons * array;
@@ -261,7 +221,7 @@ extern lisp_value unquote_sym;
 extern lisp_value unquote_splice_sym;
 extern lisp_value else_sym;
 extern size_t conses_allocated;
-extern lisp_value lisp_stack;
+//extern lisp_value lisp_stack;
 // lisp value
 bool is_nil(lisp_value v);
 bool is_t(lisp_value v);
@@ -271,6 +231,7 @@ bool is_float(lisp_value a);
 bool is_float32(lisp_value a);
 bool is_string(lisp_value a);
 bool is_symbol(lisp_value a);
+bool is_scope(lisp_value v);
 bool is_regular_symbol(lisp_value a);
 bool is_function(lisp_value a);
 bool is_function_macro(lisp_value a);
@@ -357,6 +318,10 @@ lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
 
 lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body);
 
+
+// lets add more of these:
+lisp_value lisp_eval_function2(lisp_scope * scope, lisp_function * f, lisp_value arg1, lisp_value arg2);
+  
 int64_t get_symbol_id(const char * s);
 lisp_value print(lisp_value v);
 lisp_value get_symbol(const char * s);
@@ -423,11 +388,13 @@ lisp_value lisp_rational(lisp_value value);
 lisp_value lisp_float32(lisp_value value);
 
 size_t lisp_type_size(lisp_type type);
+lisp_value lisp_type_of(lisp_value v);
 
 bool eq(lisp_value a, lisp_value b);
 bool is_nil(lisp_value a);
 bool is_list(lisp_value a);
 bool is_vector(lisp_value a);
+bool is_function(lisp_value v);
 
 lisp_value lisp_is_symbol(lisp_value a);
 lisp_value lisp_is_list(lisp_value a);
@@ -441,6 +408,7 @@ bool elem_type_assert(lisp_value vector, lisp_type type);
 lisp_scope * lisp_scope_new(lisp_scope * super);
 void lisp_scope_stack(lisp_scope *stack_scope, lisp_scope * super, cons * argsbuffer, size_t cnt);
 bool lisp_scope_try_get_value(lisp_scope * scope, lisp_value sym, lisp_value * out);
+lisp_value lisp_scope_get_value(lisp_scope * scope, lisp_value sym);
 lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 lisp_scope * lisp_context_get_root_scope();

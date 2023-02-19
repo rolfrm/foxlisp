@@ -9,6 +9,7 @@
 #include <dlfcn.h>
 
 #include "foxlisp.h"
+#include "foxlisp_internal.h"
 #ifdef WASM
 #define VALGRIND_MAKE_MEM_NOACCESS(x, y);
 #define VALGRIND_MAKE_MEM_DEFINED(x, y);
@@ -65,7 +66,6 @@ struct __array_header{
 #endif
   array_header * next;
   size_t mark;
-  
   
 };
 
@@ -665,7 +665,6 @@ void gc_collect_garbage(lisp_context * lisp){
   gc_recover_unmarked(gc);
 }
 
-extern lisp_context * current_context;
 bool gc_unsafe_stack = false;
 lisp_value new_cons(lisp_value _car, lisp_value _cdr){
   //bool gc_run = false;
