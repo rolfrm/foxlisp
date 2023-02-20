@@ -1435,19 +1435,20 @@
 													(list-to-array poly) dims))
 								  
 								  )))
+				 ;; disable sub-level baking
+				 ;; reusing the sub-level baking might make things faster
+				 ;; but this is easier.
 				 (bake2 nil)
 				 (submodel model))
 		  (lisp:with-scope-binding scope (lisp:get-current-scope!!)
 											'(polygon submodel bake2) nil
 											'((eval-scoped0 (lisp:get-current-scope!!) submodel)) 
 											)
-		  ;(println 'backing-stack: (length baking-stack) baking-stack)
 		  (let ((baked (foxgl:bake baking-stack model-transform0)))
           (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil)
                                     (foxgl:load-polygon (cdr baked) 3 nil nil)
                                     )))
-			 ;(println baked)
-
+		
 			 (hashtable-set scope:bake-cache model r)
 			 )
 		  )
