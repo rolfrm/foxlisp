@@ -694,7 +694,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr){
         pool_size *= 4;
         parent = &(*parent)->next;
       }
-	  if(pool_size > 1024  * 32){
+	  if(pool_size > 1024  * 64){
 		printf("Pool size %i\n", (int)pool_size);
 		raise(SIGINT);
 	  }

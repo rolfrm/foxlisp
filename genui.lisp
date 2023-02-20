@@ -34,8 +34,8 @@
 
 
 (defvar stars '(scale (0.5 0.5 0.5)
-					 (for i (-2.2 0.0 2.2)
-					  (for j (-2.2 0.0 2.2)
+					 (for i (-6.6 -4.4 -2.2 0.0 2.2 4.4 6.6)
+					  (for j (-6.6 -4.4 -2.2 0.0 2.2 4.4 6.6)
 						(translate ((bind i) (bind j) 0)
 									  (rgb (1 1 1)
 											 (rotate (0 0 (bind (* real-time 3.0)))
@@ -45,6 +45,7 @@
 						))
 					 ))
 
+(defvar baked-stars '(bake2 (stars)))
 
 
 (defvar calculated-width 0.0)
@@ -60,11 +61,7 @@
 																	  (rgb (1 0 0)
 						 (square 1.1 2)
 						 (square 2 1.1)
-						 (for i (1 2 3 4 5 7 8 9 6 5 4)
-								(for j (2 3 4 5 5 6 7 8)
-									  (for k (1 2 3 4 5 6 7)
-											 (for z (3 4 5 6 6 8 9)
-													(scale (bind (println (* i j k z))))))))
+		
 						 (offset (-0.175 -0.175 0)
 									(rgb (0 1 0)
 										  (square 1.5 1.5))))
@@ -79,8 +76,9 @@
 								
 								)
 							  ))
-                     (offset (0 0 0.0)
-									  (stars)
+														(offset (0 0 0.0)
+									(rotate (0 0 (bind real-time))	 
+									  (baked-stars))
 									  (rgb (0 0 0)
 											 (text (bind '(1 2 3 4 5 6 7 8 9 10 11 22 33))))
 									  ))
