@@ -354,6 +354,14 @@ lisp_value set_car(lisp_value cons, lisp_value value){
   return old;
 }
 
+lisp_value set_cons(lisp_value cons, lisp_value car, lisp_value cdr){
+  TYPE_ASSERT(cons, LISP_CONS);
+  var c = lisp_value_cons(cons);
+  c->car = car;
+  c->cdr = cdr;
+  return nil;
+}
+
 size_t list_length(lisp_value lst){
   size_t l = 0;
   while(is_cons(lst)){
@@ -1174,7 +1182,6 @@ static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * 
       things = nil;
   }
 
-  
   cons args3[argcnt];
   memset(args3, 0, sizeof(args3[0]) * (argcnt));
         
@@ -1203,7 +1210,7 @@ static inline lisp_value lisp_eval_function(lisp_scope * scope, lisp_function * 
         println(arg);
         raise_string("(4) arg name must be a symbol");
         scope->sub_scope = prev_scope;
-		lisp_unpin_args(args0, argcnt);
+		  lisp_unpin_args(args0, argcnt);
 
         return nil;
       }
@@ -2333,6 +2340,8 @@ lisp_context * lisp_context_new(){
   lisp_register_native("cadr", 1, cadr);
   lisp_register_native("set-car!", 2, set_car);
   lisp_register_native("set-cdr!", 2, set_cdr);
+  lisp_register_native("set-cons!", 3, set_cons);
+  
   lisp_register_native("length", 1, lisp_length);
   lisp_register_native("lisp:collect-garbage", 0, lisp_collect_garbage);
   lisp_register_native("lisp:get-allocated", 0, lisp_get_allocated);

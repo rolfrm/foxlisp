@@ -821,13 +821,21 @@ lisp_value foxgl_blit_text(lisp_value text, lisp_value matrix, lisp_value max_wi
   mat4 * m1 = matrix.vector->data;
   f32 max_width = f32_infinity;
   if(!is_nil(max_width2)){
-	 max_width = lisp_value_rational(max_width2);
+	 vec3 p0 = {0};
+	 vec3 p1 = {0};
+	 p1.x = lisp_value_as_rational(max_width2);
+	 p0 = mat4_mul_vec3(*m1, p0);
+	 p1 = mat4_mul_vec3(*m1, p1);
+	 var d = vec3_len(vec3_sub(p0, p1));
+	 max_width = d * 100.0f;
+	 
   }
+  
   blit3d_text2(blit3d_current_context, mat4_identity(), *m1, text2, max_width);
   return nil;
 }
 
-lisp_value foxgl_measure_text(lisp_value text){
+lisp_value foxgl_measure_text(lisp_value text, lisp_value out_cons){
   char buffer[100] = {0};
   char * text2 = NULL;
   if(lisp_value_type(text) != LISP_STRING){
@@ -840,7 +848,13 @@ lisp_value foxgl_measure_text(lisp_value text){
   }
 
   var s = blit_measure_text(text2);
-  return new_cons(rational_lisp_value(s.x), rational_lisp_value(s.y));
+  if(!is_cons(out_cons)){
+	 out_cons = new_cons(rational_lisp_value(s.x), rational_lisp_value(s.y));
+  }else{
+	 set_car(out_cons, rational_lisp_value(s.x));
+	 set_cdr(out_cons, rational_lisp_value(s.y));
+  }
+  return out_cons;
 }
 
 
@@ -935,7 +949,6 @@ lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform){
     var thiscnt = points->count / dims;
 
     var newcnt = vert_cnt + thiscnt + 2;
-	 printf("%i %i %i\n", newcnt, dims, newcnt * dims * sizeof(f32));
 	 verts = realloc(verts, newcnt * dims * sizeof(f32));
     colors = realloc(colors, newcnt * 3 * sizeof(f32));
 	 if(vdims == 2){
@@ -1173,7 +1186,7 @@ void foxgl_register(){
   lrn("foxgl:bind-texture", 1, foxgl_bind_texture);
   lrn("foxgl:bind-textures", -1, foxgl_bind_textures);
   lrn("foxgl:blit-text", 3, foxgl_blit_text);
-  lrn("foxgl:measure-text", 1, foxgl_measure_text);
+  lrn("foxgl:measure-text", 2, foxgl_measure_text);
   lrn("foxgl:blend", 1, foxgl_blend);
   lrn("foxgl:depth", 1, foxgl_depth);
   lrn("foxgl:key-down?", 2, foxgl_key_down);

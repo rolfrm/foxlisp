@@ -1298,10 +1298,10 @@
         (set! foxgl:sdf-stack nil)
 		  (let ((r (hashtable-ref foxgl:polygon-cache model)))
 			 (unless r
-				(let* ((model2 (println (foxgl:build-sdf (cdr model) foxgl:current-scope)) )
+				(let* ((model2 (foxgl:build-sdf (cdr model) foxgl:current-scope) )
 						 
 						 (poly
-                    (foxgl:sdf-marching-cubes size resolution model2 (println position))
+                    (foxgl:sdf-marching-cubes size resolution model2  position)
 							))
 				  (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil)
 													 (foxgl:load-polygon (cdr poly) 3 nil nil)
@@ -1463,10 +1463,12 @@
 	 ))
 
 (defun scope:blit-text (scope model)
-  (let ((model-transform (symbol-value 'current-transform scope)))
+  (let ((model-transform (symbol-value 'current-transform scope))
+		  (max-width (or (symbol-value 'max-width scope) 100.0)))
+				 
 	 (foxgl:color scope:color)
 	 (foxgl:transform model-transform)
-	 (foxgl:blit-text (unbind (car model) scope) model-transform 100.0)
+	 (foxgl:blit-text (unbind (car model) scope) model-transform max-width)
 	 ))
 
 (defun ui:measure-polygon (scope model)
@@ -1475,23 +1477,18 @@
 (defvar ui:desired-size (cons 0.0 0.0))
 
 (defun ui:measure-text-base (scope model)
-  (let ((size (foxgl:measure-text (unbind (car model) scope))))
-	 (set! ui:desired-size size)
-	 ))
+  (foxgl:measure-text (unbind (car model) scope) ui:desired-size))
 
 (defun ui:measure-grid (scope model)
-  (set! ui:desired-size '(0.0 . 0.0))
-  (let ((desired-size (cons 0.0 0.0)))
+  (let ((desired-w 0.0)
+		  (desired-h 0.0))
 	 (for-each sub model
-				  (set! ui:desired-size '(0.0 . 0.0))
+				  (set-cons! ui:desired-size 0.0 0.0)
 				  (eval-scoped0 scope sub)
-				  (when (cons? ui:desired-size)
-					 (set-car! desired-size (max (car desired-size) (car ui:desired-size)))
-					 (set-cdr! desired-size (max (rational (cdr desired-size))
-														  (rational (cdr ui:desired-size))))
-					 )
+				  (set! desired-w (max desired-w (car ui:desired-size)))
+				  (set! desired-h (max desired-h (cdr ui:desired-size)))
 				  )
-	 (set! ui:desired-size desired-size)
+	 (set-cons! ui:desired-size desired-w desired-h)
 	 ))
 
 (defvar measure-scope
