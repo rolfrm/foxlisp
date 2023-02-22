@@ -2141,8 +2141,36 @@ lisp_value lisp_type_of(lisp_value v){
 }
 
 lisp_value lisp_load(lisp_value v){
+  static const char * current_loading;
+  static const char * paths[] = {"lisp"};
   TYPE_ASSERT(v, LISP_STRING);
-  return lisp_eval_file(lisp_value_string(v));
+  char buf[200] = {0};
+  var str = lisp_value_string(v);
+  if(!file_exists(str)){
+	 for(size_t i = 0; i < array_count(paths); i++){
+	 	sprintf(buf, "%s/%s", paths[i], str);
+		if(file_exists(buf))
+		  str = buf;
+	 }
+  }
+  
+  if(!file_exists(str) && current_loading != NULL){
+	 int idx = str_index_of_last(current_loading, '/');
+	 if(idx != -1){
+		memcpy(buf, current_loading, idx + 1);
+		memcpy(buf + idx + 1, str, strlen(str) + 1);
+		if(file_exists(buf)){
+		  str = buf;
+		}
+	 }
+  }
+  
+  var prev_loading = current_loading;
+  current_loading = str;
+  printf("loading %s\n", str);
+  var result = lisp_eval_file(str);
+  current_loading = prev_loading;
+  return result;
 }
 
 size_t lisp_type_size(lisp_type type){
@@ -2247,8 +2275,10 @@ int main(int argc, char ** argv){
   for(int i = 1; i < argc; i++){
     if(strcmp(argv[i], "--test") == 0){
       lisp_register_value("lisp:*test-enabled*", t);
-    }else
-      lisp_eval_file(argv[i]);
+    }else{
+		
+      lisp_load(string_lisp_value(argv[i]));
+	 }
   }
 #endif
 
