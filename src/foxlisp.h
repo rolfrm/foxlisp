@@ -239,7 +239,7 @@ bool is_function_native(lisp_value a);
 bool is_macro_builtin(lisp_value a);
 bool is_float_type(lisp_type t);
 f64 lisp_value_rational(lisp_value v);
-lisp_value rational_lisp_value(double o);
+lisp_value rational_lisp_value(double o);;
 int64_t lisp_value_as_integer(lisp_value v);
 f64 lisp_value_as_rational(lisp_value v);
 lisp_value string_lisp_value(const char * str);
@@ -374,9 +374,12 @@ lisp_context * lisp_context_new_bare();
 lisp_value make_vector(lisp_value len, lisp_value _default);
 lisp_value vector_length(lisp_value v);
 lisp_value vector_ref(lisp_value _vector, lisp_value k);
+lisp_value vector_ref_2(lisp_vector * vector, int i);
 lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
 lisp_value vector_elem_type(lisp_value vector);
 lisp_value vector_copy(lisp_value vector);
+void * vector_data_pointer(lisp_value vector);
+
 lisp_value integer(int64_t v);
 lisp_value rational(double v);
 lisp_value float32(float v);
@@ -436,9 +439,10 @@ lisp_value lisp_read_string(const char * str);
 #define cadddddddr(x) car(cdddddddr(x))
 
 #define TYPE_ASSERT(v, t) if(!type_assert(v, t)) return nil;
+#define TYPE_ASSERT2(v, t) ASSERT(type_assert(v, t));
 #define RETURN_ERROR(err) {lisp_error(err); return nil;}
 #define RAISE(err) {raise_string(err); return nil;}
-#define EXPR_ASSERT(expr) if(!expr){RAISE("AssertError: '" #expr "'" " returned false");}
+#define EXPR_ASSERT(expr) if(!(expr)){RAISE("AssertError: '" #expr "'" " returned false");}
 #define CHECK_ERROR() if(lisp_error_state()) return nil;
 extern bool gc_unsafe_stack;
 

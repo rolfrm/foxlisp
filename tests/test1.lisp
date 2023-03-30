@@ -529,4 +529,6 @@
 (println (hashtable-values keystable))
 ;(println (hashtable-count keystable))
 ;(println (hashtable-values keystable))
+(println lisp:executable-path)
+
 (println "Tests Passed")

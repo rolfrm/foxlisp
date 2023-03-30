@@ -368,6 +368,27 @@ mat4 lisp_to_mat4(lisp_value a){
   return mat4_identity();
 }
 
+vec3 lisp_value_vec3(lisp_value v3){
+  if(lisp_value_type(v3) != LISP_VECTOR)
+    return vec3_zero;
+  lisp_vector * v = v3.vector;
+  var x = lisp_value_as_rational(vector_ref_2(v, 0));
+  var y = lisp_value_as_rational(vector_ref_2(v, 1));
+  var z = lisp_value_as_rational(vector_ref_2(v, 2));
+  
+  vec3 r = {.x = x, .y = y, .z = z};
+  return r;
+}
+
+lisp_value vec3_lisp_value(vec3 v){
+  var v0 = make_vector(integer_lisp_value(3), float32_lisp_value(v.x));
+  f32 * v0_data = vector_data_pointer(v0);
+  for(int i = 0; i < 3; i++) 
+    v0_data[i] = v.data[i];
+  return nil;
+}
+
+
 mat4 * lisp_to_mat4_ptr(lisp_value a){
   type_assert(a, LISP_VECTOR);
   type_assert(a.vector->default_value, LISP_FLOAT32);
