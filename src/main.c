@@ -2274,10 +2274,13 @@ lisp_value lisp_trace(lisp_value v) {
   return nil;
 }
 
+void awsm_register();
+
 void load_modules() {
   gc_register();
   foxgl_register();
   lisp_process_module_init();
+  awsm_register();
 }
 
 void web_update() {
