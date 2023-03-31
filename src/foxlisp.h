@@ -138,6 +138,7 @@ void lisp_pop_scope(lisp_scope * scope);
 struct __native_function{
   void * fptr;
   int nargs; // -1: infinite number of arguments.
+  bool eval_args;
 };
 
 struct _cons {
@@ -175,12 +176,7 @@ struct __lisp_function{
   lisp_value code;
   lisp_value args;
   int nargs;
-};
-
-struct __alien_function {
-  void * func;
-  lisp_value return_example;
-  lisp_value arg_example;
+  bool eval_args;
 };
 
 struct __lisp_vector{
@@ -416,8 +412,11 @@ lisp_value lisp_scope_set_value(lisp_scope * scope, lisp_value sym, lisp_value v
 lisp_value lisp_scope_create_value(lisp_scope * scope, lisp_value sym, lisp_value value);
 lisp_scope * lisp_context_get_root_scope();
 lisp_scope * lisp_get_root_scope();
+
 void lisp_register_value(const char * name, lisp_value value);
 void lisp_register_native(const char * name, int nargs, void * fptr);
+void lisp_register_native_noeval(const char *name, int nargs, void *fptr);
+
 
 lisp_value lisp_read_string(const char * str);
 

@@ -47,7 +47,7 @@ static lisp_value read_current_files = {0};
 static lisp_value current_toplevel = {0};
 
 static int lisp_stack_size;
-const int lisp_max_stack_size = 2000;
+const int lisp_max_stack_size = 3000;
 static t_cons_arrays cons_arrays = {0};
 
 #undef ASSERT
@@ -1002,6 +1002,7 @@ lisp_value lisp_eval_lambda(lisp_scope *scope, lisp_value args,
   lisp_function *f = lisp_malloc(sizeof(*f));
   f->code = body;
   f->args = args;
+  f->eval_args = true;
   scope = lisp_scope_unstack(scope);
   f->closure = scope;
   return (lisp_value){.type = LISP_FUNCTION, .function = f};
@@ -1082,7 +1083,7 @@ lisp_value lisp_eval_native_functions(lisp_scope *scope, native_function *n,
   void *pin = lisp_pin_array(&pin_array);
   lisp_value arglist = arg_form;
   for (size_t i = 0; i < argcnt; i++) {
-    args[i] = lisp_eval(scope, car(arglist));
+    args[i] = n->eval_args ? lisp_eval(scope, car(arglist)) : car(arglist);
     arglist = cdr(arglist);
     if (lisp_is_in_error()) {
       lisp_unpin(pin);
@@ -1191,7 +1192,9 @@ void lisp_unpin_args(cons *argslist, size_t cnt) {
 static inline lisp_value lisp_eval_function(lisp_scope *scope, lisp_function *f,
                                             size_t argcnt, lisp_value args_form,
                                             bool eval_arguments) {
-
+  if(!f->eval_args){
+    eval_arguments = false;
+  }
   // these args needs to be gc_pinned
   cons args0[argcnt];
   memset(args0, 0, sizeof(args0));
@@ -2048,6 +2051,16 @@ void lisp_register_native(const char *name, int nargs, void *fptr) {
   native_function *nf = lisp_malloc(sizeof(*nf));
   nf->nargs = nargs;
   nf->fptr = fptr;
+  nf->eval_args = true;
+  lisp_value v = {.type = LISP_FUNCTION_NATIVE, .nfunction = nf};
+  lisp_register_value(name, v);
+}
+
+void lisp_register_native_noeval(const char *name, int nargs, void *fptr) {
+  native_function *nf = lisp_malloc(sizeof(*nf));
+  nf->nargs = nargs;
+  nf->fptr = fptr;
+  nf->eval_args = false;
   lisp_value v = {.type = LISP_FUNCTION_NATIVE, .nfunction = nf};
   lisp_register_value(name, v);
 }
@@ -2104,13 +2117,8 @@ lisp_value lisp_rational(lisp_value v) {
 }
 
 lisp_value rational(double v) { return rational_lisp_value(v); }
-
 double as_rational(lisp_value v) { return lisp_value_as_rational(v); }
-
-lisp_value float32(float v) {
-  return float32_lisp_value(v);
-  ;
-}
+lisp_value float32(float v) {return float32_lisp_value(v);}
 
 lisp_value lisp_float32(lisp_value v) {
   return float32_lisp_value(lisp_value_as_rational(v));
@@ -2275,12 +2283,13 @@ lisp_value lisp_trace(lisp_value v) {
 }
 
 void awsm_register();
-
+void table_register();
 void load_modules() {
   gc_register();
   foxgl_register();
   lisp_process_module_init();
   awsm_register();
+  table_register();
 }
 
 void web_update() {
