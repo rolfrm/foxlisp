@@ -1956,6 +1956,17 @@ int print2(char *buffer, int l2, lisp_value v) {
     return snprintf(buffer, LEN1, "[Local Index (%i,%i)]",
                     v.local_index.scope_level, v.local_index.scope_index);
   case LISP_CONS: {
+    let firstcar = car(v);
+    if(lisp_value_type(firstcar) == LISP_TYPESPEC){
+      // this is a generic object.
+      var print = firstcar.typespec->print;
+      
+      if(!is_nil(print)){
+        var code = new_cons(print, new_cons(new_cons(quote_sym, new_cons(v, nil)), nil));
+        var o2 = lisp_eval(current_context->globals, code);
+        return print2(buffer, LEN1, o2);
+      }
+    }
     int l = 0;
     l = snprintf(buffer, LEN1, "(");
     var first = true;
@@ -2005,6 +2016,8 @@ int print2(char *buffer, int l2, lisp_value v) {
     snprintf(OBUF, LEN1, "[lisp_array %i]",
              (int)((lisp_array *)lisp_value_pointer)->count);
     return l;
+  case LISP_TYPESPEC:
+    return snprintf(buffer, LEN1, "type: %s", symbol_name(v.typespec->name.symbol));
   }
   return 0;
 }
@@ -2132,6 +2145,31 @@ lisp_value byte(unsigned char v) { return byte_lisp_value(v); }
 
 lisp_value native_pointer(void *ptr) { return native_pointer_lisp_value(ptr); }
 
+lisp_value typespec_new(lisp_value name){
+  lisp_typespec ts = {0};
+  ts.name = name;
+  lisp_value r = {.type = LISP_TYPESPEC, .typespec = gc_clone(&ts, sizeof(ts))};
+  return r;
+}
+lisp_value typespec_set_construct(lisp_value ts, lisp_value construct){
+  TYPE_ASSERT(ts, LISP_TYPESPEC);
+  ts.typespec->construct = construct;
+  return nil;
+} 
+
+lisp_value typespec_set_print(lisp_value ts, lisp_value print){
+  TYPE_ASSERT(ts, LISP_TYPESPEC);
+  ts.typespec->print = print;
+  return nil;
+} 
+lisp_value typespec_create_instance(lisp_value * args, size_t argcnt){
+  EXPR_ASSERT(argcnt > 0);
+  var ts = args[0];
+  TYPE_ASSERT(ts, LISP_TYPESPEC);
+  let ctor = ts.typespec->construct;
+  return lisp_eval(current_context->globals, new_cons(ctor, nil));
+}
+
 lisp_value lisp_read(lisp_value v) {
   if (!is_string(v))
     return v;
@@ -2190,6 +2228,8 @@ const char *lisp_type_to_string(lisp_type t) {
     return "LISP_VALUE_SET";
   case LISP_ARRAY:
     return "LISP_ARRAY";
+  case LISP_TYPESPEC:
+    return "LISP_TYPESPEC";  
   }
   raise_string("Unknown type:\n");
 
@@ -2446,7 +2486,10 @@ lisp_context *lisp_context_new() {
   lisp_register_native("rational", 1, lisp_rational);
   lisp_register_native("byte", 1, lisp_byte);
   lisp_register_native("type-of", 1, lisp_type_of);
-
+  lisp_register_native("typespec-new", 1, typespec_new);
+  lisp_register_native("typespec-set-construct!", 2, typespec_set_construct);
+  lisp_register_native("typespec-set-print!", 2, typespec_set_print);
+  lisp_register_native("typespec-instance", -1, typespec_create_instance);
   lisp_register_native("read-string", 1, lisp_read);
   lisp_register_native("load", 1, lisp_load);
 

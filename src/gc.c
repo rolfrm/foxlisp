@@ -367,6 +367,7 @@ static inline void visit_value(gc_context *gc, lisp_value val) {
     case LISP_GLOBAL_CONS_ARRAYS: // maybe an error
     case LISP_VALUE_SET:          // maybe an error?
     case LISP_ARRAY:
+    case LISP_TYPESPEC:
 
       return;
     case LISP_NIL:
@@ -441,6 +442,16 @@ static inline void visit_value(gc_context *gc, lisp_value val) {
     }
 
   } break;
+  case LISP_TYPESPEC:{
+    var typespec = val.typespec;
+    if(mark_vector(gc, typespec)){
+      visit_value(gc, typespec->print);
+      visit_value(gc, typespec->destruct);
+      visit_value(gc, typespec->generic_lookup);
+      visit_value(gc, typespec->name);
+      visit_value(gc, typespec->construct);
+    }
+  }
   }
 }
 

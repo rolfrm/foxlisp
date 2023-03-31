@@ -28,16 +28,10 @@ typedef enum {
 		// internal
 		LISP_GLOBAL_CONS_ARRAYS,
 		LISP_VALUE_SET,
-		LISP_ARRAY
+		LISP_ARRAY,
+		LISP_TYPESPEC
 }lisp_type;
 
-// assuming 5 tags:
-// 00: extended / special NIL/ T/ global index / local index
-// 00 continued: byte, float32, integer32, macro builtin CONS
-// 00   
-// 01: fixnum
-// 10: float
-// 11: pointer
 typedef enum {
 				  LISP_IF = 1,
 				  LISP_QUOTE = 2,
@@ -93,6 +87,7 @@ typedef native_function lisp_native_function;
 typedef struct __alien_function alien_function;
 typedef struct __lisp_vector lisp_vector;
 typedef struct __lisp_scope lisp_scope;
+typedef struct __lisp_typespec lisp_typespec;
 
 typedef struct __attribute__((__packed__))
 {
@@ -131,6 +126,7 @@ typedef struct{
 	 lisp_scope * scope;
 	 lisp_local_index local_index;
 	 void * pointer;
+	 lisp_typespec * typespec; 
   };
 }lisp_value;
 void lisp_push_scope(lisp_scope * scope);
@@ -204,6 +200,18 @@ typedef struct {
   size_t capacity;
 }t_cons_arrays;
 
+struct __lisp_typespec{
+    lisp_value name;
+    // print function
+    lisp_value print;
+    // construct function
+    lisp_value construct;
+    // destruct function
+    lisp_value destruct;
+    // generic function lookup.
+    lisp_value generic_lookup;
+    
+};
 
 // globals
 extern lisp_value nil;
@@ -444,4 +452,3 @@ lisp_value lisp_read_string(const char * str);
 #define EXPR_ASSERT(expr) if(!(expr)){RAISE("AssertError: '" #expr "'" " returned false");}
 #define CHECK_ERROR() if(lisp_error_state()) return nil;
 extern bool gc_unsafe_stack;
-
