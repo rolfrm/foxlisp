@@ -2157,6 +2157,12 @@ lisp_value typespec_set_construct(lisp_value ts, lisp_value construct){
   return nil;
 } 
 
+lisp_value typespec_set_destruct(lisp_value ts, lisp_value destruct){
+  TYPE_ASSERT(ts, LISP_TYPESPEC);
+  ts.typespec->destruct = destruct;
+  return nil;
+} 
+
 lisp_value typespec_set_print(lisp_value ts, lisp_value print){
   TYPE_ASSERT(ts, LISP_TYPESPEC);
   ts.typespec->print = print;
@@ -2423,6 +2429,12 @@ lisp_value lisp_debug(lisp_value v) {
   return nil;
 }
 
+bool trace_cons = false;
+lisp_value set_trace_cons(lisp_value v){
+  trace_cons = !is_nil(v);
+  return nil;
+}
+
 lisp_context *lisp_context_new_bare() {
   lisp_context *ctx = alloc0(sizeof(ctx[0]));
   ctx->gc = gc_context_new();
@@ -2480,6 +2492,7 @@ lisp_context *lisp_context_new() {
   lisp_register_native("lisp:trace-allocations", 1, lisp_trace_allocations);
   lisp_register_native("lisp:debug", 1, lisp_debug);
   lisp_register_native("lisp:all-symbols", 0, lisp_all_symbols);
+  lisp_register_native("lisp:set-trace-cons", 1, set_trace_cons);
 
   lisp_register_native("panic", 1, lisp_error);
   lisp_register_native("integer", 1, lisp_integer);
@@ -2489,6 +2502,7 @@ lisp_context *lisp_context_new() {
   lisp_register_native("typespec-new", 1, typespec_new);
   lisp_register_native("typespec-set-construct!", 2, typespec_set_construct);
   lisp_register_native("typespec-set-print!", 2, typespec_set_print);
+  lisp_register_native("typespec-set-destruct!", 2, typespec_set_destruct);
   lisp_register_native("typespec-instance", -1, typespec_create_instance);
   lisp_register_native("read-string", 1, lisp_read);
   lisp_register_native("load", 1, lisp_load);

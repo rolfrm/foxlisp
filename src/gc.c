@@ -50,7 +50,6 @@ struct _cons_buffer {
   cons *buffer;
   u8 *gc_mark;
   size_t size;
-  // size_t used;
 };
 
 typedef struct __array_header array_header;
@@ -506,7 +505,6 @@ static inline void recover_cons(cons_buffer *buf, ssize_t i) {
   if (buf->gc_mark[i] == false) {
     buf->buffer[i].cdr.cons = buf->free_cons;
     buf->buffer[i].car = nil;
-    // ASSERT(is_heap_ptr(buf->buffer + i));
     buf->free_cons = buf->buffer + i;
   }
 }
@@ -529,10 +527,63 @@ static void recover_pool(cons_buffer *buf) {
     }
   }
 }
+static inline void cons_call_destructors(cons_buffer *buf, ssize_t i) {
+  if (buf->gc_mark[i] == false) {
+    cons * c = &buf->buffer[i];
+    if(c->car.type == LISP_TYPESPEC){
+      var destruct = c->car.typespec->destruct;
+      if(!is_nil(destruct)){
+        var c2 = cons_lisp_value(c);
+        var code = new_cons(quote_sym, new_cons(c2, nil));
+        lisp_eval(current_context->globals, new_cons(destruct, new_cons(code, nil)));
+      } 
+    }
+  }
+}
+
+static void gc_call_destructors(cons_buffer * buf){
+  while (buf != NULL){
+  
+  u64 *marks = (u64 *)buf->gc_mark;
+  size_t mark_count = buf->size / 8;
+  for (size_t j = 0; j < mark_count; j++) {
+    // 02020202... - the GC mark when a full block is all marked
+    // 2 is the stage 2 GC mark.
+    if (marks[j] == 0x0202020202020202L)
+      continue;
+
+    size_t i2 = j * 8;
+    for (size_t i = 0; i < 8; i += 1) {
+      cons_call_destructors(buf, i2 + i);
+    }
+  }
+    buf = buf->next;
+
+}
+}
+
+static void iter_cons(cons_buffer * buf){
+  while (buf != NULL){
+  size_t mark_count = buf->size;
+  for (size_t j = 0; j < mark_count; j++) {
+    cons * c = &buf->buffer[j];
+    if(c->car.type == LISP_TYPESPEC){
+      printf("TYPESPEC FOUND\n");
+    }
+  }
+  buf = buf->next;
+  }
+}
+
 
 void gc_recover_unmarked(gc_context *gc) {
+  // call destructors
+  
+  gc_call_destructors(gc->cons_pool);
+  
+  // recover cons.
   var buf = gc->cons_pool;
-
+  iter_cons(buf);
   while (buf != NULL) {
     cons *c = buf->free_cons;
     while (c != NULL) {
@@ -659,7 +710,12 @@ void gc_collect_garbage(lisp_context *lisp) {
 }
 
 bool gc_unsafe_stack = false;
+extern bool trace_cons;
 lisp_value new_cons(lisp_value _car, lisp_value _cdr) {
+  if(trace_cons){
+    printf("new cons\n");
+    raise(SIGINT);  
+  }
   // bool gc_run = false;
   // start:
   var ctx = current_context->gc;
