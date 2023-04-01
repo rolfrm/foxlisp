@@ -1513,6 +1513,22 @@ lisp_value lisp_eval(lisp_scope *scope, lisp_value value) {
   return r;
 }
 
+lisp_value lisp_eval_quoted2(lisp_scope * scope, lisp_value a1, lisp_value a2){
+  cons args[4] = {0};
+  args[0].car = a1;
+  args[0].cdr = cons_lisp_value(&args[1]);
+  args[1].car = cons_lisp_value(&args[2]);
+  args[2].car = quote_sym;
+  args[2].cdr = cons_lisp_value(&args[3]);
+  args[3].car = a2;
+  return lisp_eval(scope, cons_lisp_value(args));
+}
+lisp_value lisp_eval1(lisp_scope * scope, lisp_value a1){
+  cons args[1] = {0};
+  args[0].car = a1;
+  return lisp_eval(scope, cons_lisp_value(args));
+}
+
 static inline lisp_value lookup_local_index(lisp_scope *scope,
                                             lisp_local_index index) {
   while (index.scope_level > 0) {
@@ -1962,8 +1978,7 @@ int print2(char *buffer, int l2, lisp_value v) {
       var print = firstcar.typespec->print;
       
       if(!is_nil(print)){
-        var code = new_cons(print, new_cons(new_cons(quote_sym, new_cons(v, nil)), nil));
-        var o2 = lisp_eval(current_context->globals, code);
+        var o2 = lisp_eval_quoted2(current_context->globals, print, v);
         return print2(buffer, LEN1, o2);
       }
     }
@@ -2173,7 +2188,7 @@ lisp_value typespec_create_instance(lisp_value * args, size_t argcnt){
   var ts = args[0];
   TYPE_ASSERT(ts, LISP_TYPESPEC);
   let ctor = ts.typespec->construct;
-  return lisp_eval(current_context->globals, new_cons(ctor, nil));
+  return lisp_eval1(current_context->globals, ctor);
 }
 
 lisp_value lisp_read(lisp_value v) {

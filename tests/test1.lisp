@@ -536,9 +536,10 @@
       (destruct-called nil)
       (print-called nil)
   )
-(typespec-set-construct! test-type (lambda () (set! new-called t)(cons test-type '123)))
+(typespec-set-construct! test-type (lambda () (set! new-called t)
+  (cons test-type '1234)))
 (typespec-set-destruct! test-type (lambda (x) (set! destruct-called t)))
-(typespec-set-print! test-type (lambda (x) (set! print-called t) '123))
+(typespec-set-print! test-type (lambda (x) (assert (eq (cdr x) 1234)) (set! print-called t) (cdr x)))
 (let ((item (typespec-instance test-type)))
   (println item)
 )
@@ -548,8 +549,5 @@
   (assert print-called)
   (println (list new-called destruct-called print-called))
 )
-    
-
-
 
 (println "Tests Passed")

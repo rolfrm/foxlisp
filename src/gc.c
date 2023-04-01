@@ -534,8 +534,7 @@ static inline void cons_call_destructors(cons_buffer *buf, ssize_t i) {
       var destruct = c->car.typespec->destruct;
       if(!is_nil(destruct)){
         var c2 = cons_lisp_value(c);
-        var code = new_cons(quote_sym, new_cons(c2, nil));
-        lisp_eval(current_context->globals, new_cons(destruct, new_cons(code, nil)));
+        lisp_eval_quoted2(current_context->globals, destruct, c2);
       } 
     }
   }
@@ -562,20 +561,6 @@ static void gc_call_destructors(cons_buffer * buf){
 }
 }
 
-static void iter_cons(cons_buffer * buf){
-  while (buf != NULL){
-  size_t mark_count = buf->size;
-  for (size_t j = 0; j < mark_count; j++) {
-    cons * c = &buf->buffer[j];
-    if(c->car.type == LISP_TYPESPEC){
-      printf("TYPESPEC FOUND\n");
-    }
-  }
-  buf = buf->next;
-  }
-}
-
-
 void gc_recover_unmarked(gc_context *gc) {
   // call destructors
   
@@ -583,7 +568,6 @@ void gc_recover_unmarked(gc_context *gc) {
   
   // recover cons.
   var buf = gc->cons_pool;
-  iter_cons(buf);
   while (buf != NULL) {
     cons *c = buf->free_cons;
     while (c != NULL) {

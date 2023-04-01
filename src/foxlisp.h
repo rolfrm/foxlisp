@@ -319,7 +319,10 @@ void * gc_clone(const void * mem, size_t s);
 void * nogc_clone(const void * mem, size_t s);
 // functions
 lisp_value lisp_eval(lisp_scope * scope, lisp_value value);
-
+// eval: (a1)
+lisp_value lisp_eval1(lisp_scope * scope, lisp_value a1);
+// eval: (a1 (quote a2))
+lisp_value lisp_eval_quoted2(lisp_scope * scope, lisp_value a1, lisp_value a2);
 lisp_value lisp_eval_progn(lisp_scope * scope, lisp_value body);
 
 
