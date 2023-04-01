@@ -529,6 +529,27 @@
 (println (hashtable-values keystable))
 ;(println (hashtable-count keystable))
 ;(println (hashtable-values keystable))
-(println lisp:executable-path)
+;(println lisp:executable-path)
+
+(let ((test-type (typespec-new 'test))
+      (new-called nil)
+      (destruct-called nil)
+      (print-called nil)
+  )
+(typespec-set-construct! test-type (lambda () (set! new-called t)(cons test-type '123)))
+(typespec-set-destruct! test-type (lambda (x) (set! destruct-called t)))
+(typespec-set-print! test-type (lambda (x) (set! print-called t) '123))
+(let ((item (typespec-instance test-type)))
+  (println item)
+)
+  (lisp:collect-garbage)
+  (assert new-called)
+  (assert destruct-called)
+  (assert print-called)
+  (println (list new-called destruct-called print-called))
+)
+    
+
+
 
 (println "Tests Passed")
