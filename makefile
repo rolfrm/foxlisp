@@ -20,7 +20,7 @@ $(TARGET): $(LIB_OBJECTS) libiron.a
 	$(CC) $(LDFLAGS) $(LIB_OBJECTS) -lpthread libiron.a $(LIBS) -ldl  -o $(TARGET)
 
 .FORCE:
-iron/libiron.so: .FORCE
+iron/libiron.a: .FORCE
 	make -C iron
 
 libiron.a: iron/libiron.a
