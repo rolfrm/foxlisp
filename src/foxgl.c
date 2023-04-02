@@ -398,7 +398,7 @@ lisp_value vec3_lisp_value(vec3 v) {
   f32 *v0_data = vector_data_pointer(v0);
   for (int i = 0; i < 3; i++)
     v0_data[i] = v.data[i];
-  return nil;
+  return v0;
 }
 
 mat4 *lisp_to_mat4_ptr(lisp_value a) {

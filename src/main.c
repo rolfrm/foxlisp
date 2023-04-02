@@ -78,7 +78,6 @@ bool type_assert(lisp_value val, lisp_type type) {
     sprintf(buffer, "Invalid type, expected %s, but got %s\n",
             lisp_type_to_string(type),
             lisp_type_to_string(lisp_value_type(val)));
-    raise(SIGINT);
     raise_string(nogc_clone(buffer, strlen(buffer) + 1));
     return false;
   }
