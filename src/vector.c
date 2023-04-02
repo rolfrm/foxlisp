@@ -132,8 +132,9 @@ static lisp_value vector_insert(lisp_value vector, lisp_value index, lisp_value 
   size_t elem_size = lisp_type_size(lisp_value_type(vec->default_value));
   
   vec->data = realloc(vec->data, elem_size * (vec->count + 1));
-  memmove(vec->data + (l + 1) * ( elem_size), vec->data + (l) * ( elem_size), (vec->count - l) * elem_size);
-  vec->count += l;
+  if(l != vec->count)
+    memmove(vec->data + (l + 1) * ( elem_size), vec->data + (l) * ( elem_size), (vec->count - l) * elem_size);
+  vec->count += 1;
   vector_set(vector, index, arg);
   return nil;
   

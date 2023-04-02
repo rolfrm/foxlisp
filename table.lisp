@@ -51,6 +51,8 @@
     (table-push-row tab1 1 2.3 4.5)
     (table-push-row tab1 2 3.1 2.2)
     (table-insert-row tab1 1 4 4.0 4.0)
+    (table-insert-row tab1 3 5 5.0 5.0)
+    (table-insert-row tab1 0 5 5.0 5.0)
     (table-push-row hp-tab 2 10)
     (println tab1 " " hp-tab)
     )
