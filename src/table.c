@@ -11,14 +11,6 @@ typedef struct {
 
 } table;
 
-lisp_value get_tabletypespec(){
-  lisp_typespec ts = {
-    .name = get_symbol("table"),
-    .print = get_symbol("print_table")
-  };
-  return nil;
-}
-
 lisp_value deftable(lisp_value *v, size_t count) {
   UNUSED(v);
   UNUSED(count);
