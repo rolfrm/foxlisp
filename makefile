@@ -11,7 +11,7 @@ BCLIBS = -s USE_GLFW=3 -s WASM=1 -s USE_WEBGL2=1 -lm -lglfw3 -lGL -lopenal
 BCFLAGS = -DWASM -emit-llvm
 BCLDFLAGS= -s ALLOW_MEMORY_GROWTH=1
 ALL= $(TARGET)
-CFLAGS = -Isrc/  -I. -Iinclude/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings  -DUSE_VALGRIND -DDEBUG -Wextra -Wall -ffast-math -Werror -Wdouble-promotion
+CFLAGS = -Isrc/  -I. -Iinclude/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -DDEBUG -Wextra -Wall -ffast-math -Werror -Wdouble-promotion
 
 all: libmicroio.a
 all: $(TARGET)

@@ -13,9 +13,12 @@
 #ifdef WASM
 #define VALGRIND_MAKE_MEM_NOACCESS(x, y) ;
 #define VALGRIND_MAKE_MEM_DEFINED(x, y) ;
-#else
+#elif USE_VALGRIND
 #include "valgrind/memcheck.h"
 #define GCDEBUG
+#else
+#define VALGRIND_MAKE_MEM_NOACCESS(x, y) ;
+#define VALGRIND_MAKE_MEM_DEFINED(x, y) ;
 #endif
 
 static void *heap_start = NULL;
