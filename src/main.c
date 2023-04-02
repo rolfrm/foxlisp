@@ -2321,7 +2321,7 @@ lisp_value lisp_signature(lisp_value func) {
   return nil;
 }
 
-void it_symbols(void *k1, void *k2, void *target) {
+static void it_symbols(void *k1, void *k2, void *target) {
   UNUSED(k1);
   lisp_value *val = target;
   const int64_t *sym = k2;

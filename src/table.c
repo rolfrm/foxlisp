@@ -10,6 +10,15 @@ typedef struct {
   lisp_type *column_type;
 
 } table;
+
+lisp_value get_tabletypespec(){
+  lisp_typespec ts = {
+    .name = get_symbol("table"),
+    .print = get_symbol("print_table")
+  };
+  return nil;
+}
+
 lisp_value deftable(lisp_value *v, size_t count) {
   UNUSED(v);
   UNUSED(count);
@@ -24,6 +33,8 @@ lisp_value deftable(lisp_value *v, size_t count) {
   table tb = {0};
   tb.column_count = column_count;
   tb.name = name;
+  
+  
 
   return new_cons(get_symbol("table"),
                   native_pointer_lisp_value(iron_clone(&tb, sizeof(tb))));

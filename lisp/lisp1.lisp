@@ -176,11 +176,22 @@
   `(let ((,var ,lookup))
      (when ,var ,@body)))
 
-(defun list-to-array (list)
+(defun list-to-array (list map)
   (let ((i 0)
-        (v (make-vector (length list) (float32 0.0))))
+        (v (make-vector (length list) (float32 0))))
+    
     (while list
       (vector-set! v i (float32 (car list)))
+      (set! list (cdr list))
+      (set! i (+ i 1)))
+    v
+    ))
+(defun list->vector (list map)
+  (let ((i 0)
+        (v (make-vector (length list))))
+    
+    (while list
+      (vector-set! v i (car list))
       (set! list (cdr list))
       (set! i (+ i 1)))
     v
