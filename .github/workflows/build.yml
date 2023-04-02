@@ -15,6 +15,6 @@ jobs:
       with:
         submodules: true
     - name: install packages
-      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libopenal-dev
+      run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libopenal-dev libglfw3-dev
     - name: make
       run: make
