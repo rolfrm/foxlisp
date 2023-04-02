@@ -351,8 +351,9 @@ static inline void visit_value(gc_context *gc, lisp_value val) {
   case LISP_SCOPE:
     mark_scope(gc, val.scope);
     break;
-
+  case LISP_NATIVE_VECTOR:
   case LISP_VECTOR:
+  
     if (!mark_vector(gc, val.vector))
       return;
     if (!mark_vector(gc, val.vector->data))
@@ -380,6 +381,7 @@ static inline void visit_value(gc_context *gc, lisp_value val) {
     case LISP_FUNCTION_NATIVE:
     case LISP_STRING:
     case LISP_MACRO_BUILTIN:
+    case LISP_NATIVE_VECTOR:
     case LISP_VECTOR:
     case LISP_NATIVE_POINTER:
     case LISP_SCOPE:

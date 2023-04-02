@@ -1922,6 +1922,7 @@ int print2(char *buffer, int l2, lisp_value v) {
     return snprintf(buffer, LEN1, "%lli", (long long)v.integer);
   case LISP_BYTE:
     return snprintf(buffer, LEN1, "%i", (u8)v.integer);
+  case LISP_NATIVE_VECTOR:
   case LISP_VECTOR: {
     int l = 0;
     l = snprintf(buffer, LEN1, "#(");
@@ -2227,6 +2228,8 @@ const char *lisp_type_to_string(lisp_type t) {
     return "MACRO_BUILTIN";
   case LISP_NATIVE_POINTER:
     return "NATIVE_POINTER";
+  case LISP_NATIVE_VECTOR:
+    return "NATIVE_VECTOR";
   case LISP_VECTOR:
     return "VECTOR";
   case LISP_BYTE:

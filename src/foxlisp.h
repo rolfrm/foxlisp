@@ -12,7 +12,10 @@ typedef enum {
   LISP_FUNCTION_NATIVE = 9,
   LISP_MACRO_BUILTIN = 10,
   LISP_NATIVE_POINTER = 11,
+  // An indexable array of values from a pool allocator.
   LISP_VECTOR,
+  // An indexable array of values, allocated on the heap.
+  LISP_NATIVE_VECTOR,
   LISP_BYTE,
   LISP_FLOAT32,
   LISP_HASHTABLE,
@@ -258,6 +261,7 @@ lisp_value allocated_pointer_lisp_value(void *ptr);
 lisp_value lisp_pointer_to_lisp_value(lisp_value *ptr);
 lisp_vector *lisp_value_vector(lisp_value val);
 lisp_value vector_lisp_value(lisp_vector *vector);
+lisp_value native_vector_lisp_value(lisp_vector *vector);
 lisp_type lisp_value_type(lisp_value val);
 lisp_value symbol_lisp_value(lisp_symbol sym);
 lisp_symbol lisp_value_symbol(lisp_value val);
@@ -378,6 +382,7 @@ lisp_context *lisp_context_new();
 lisp_context *lisp_context_new_bare();
 
 lisp_value make_vector(lisp_value len, lisp_value _default);
+lisp_value make_native_vector(lisp_value len, lisp_value _default);
 lisp_value vector_length(lisp_value v);
 lisp_value vector_ref(lisp_value _vector, lisp_value k);
 lisp_value vector_ref_2(lisp_vector *vector, int i);

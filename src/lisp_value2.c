@@ -31,7 +31,14 @@ inline bool is_list(lisp_value v) {
   return v.type == LISP_CONS || v.type == LISP_NIL;
 }
 
-inline bool is_vector(lisp_value v) { return v.type == LISP_VECTOR; }
+inline bool is_vector(lisp_value x){
+  switch(lisp_value_type(x)){
+    case LISP_VECTOR:
+    case LISP_NATIVE_VECTOR:
+      return true;
+    default: return false;
+  }
+}
 
 inline bool is_integer(lisp_value v) { return v.type == LISP_INTEGER; }
 
@@ -111,7 +118,7 @@ inline int64_t lisp_value_integer_checked(lisp_value v) {
   return v.integer;
 }
 inline lisp_vector *lisp_value_vector_checked(lisp_value v) {
-  if (v.type != LISP_VECTOR) {
+  if (is_vector(v) == false) {
     raise_string("argument is not a vector");
     return NULL;
   }
@@ -132,6 +139,10 @@ inline lisp_vector *lisp_value_vector(lisp_value val) {
 
 inline lisp_value vector_lisp_value(lisp_vector *vector) {
   return (lisp_value){.type = LISP_VECTOR, .vector = vector};
+}
+
+inline lisp_value native_vector_lisp_value(lisp_vector *vector) {
+  return (lisp_value){.type = LISP_NATIVE_VECTOR, .vector = vector};
 }
 
 inline lisp_type lisp_value_type(lisp_value val) { return val.type; }

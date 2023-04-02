@@ -7,6 +7,7 @@ lisp_value make_vector(lisp_value len, lisp_value _default) {
   TYPE_ASSERT(len, LISP_INTEGER);
   size_t l = lisp_value_integer(len);
   size_t elem_size = lisp_type_size(_default.type);
+  
   void *data = lisp_malloc(l * elem_size);
 
   lisp_vector *vector = lisp_malloc(sizeof(*vector));
@@ -15,6 +16,25 @@ lisp_value make_vector(lisp_value len, lisp_value _default) {
   vector->elem_size = elem_size;
   vector->default_value = _default;
   lisp_value v = vector_lisp_value(vector);
+  for (size_t i = 0; i < l; i++)
+    vector_set(v, integer_lisp_value(i), _default);
+
+  return v;
+}
+
+lisp_value make_native_vector(lisp_value len, lisp_value _default) {
+  TYPE_ASSERT(len, LISP_INTEGER);
+  size_t l = lisp_value_integer(len);
+  size_t elem_size = lisp_type_size(_default.type);
+  
+  void *data = alloc0(l * elem_size);
+
+  lisp_vector *vector = lisp_malloc(sizeof(*vector));
+  vector->data = data;
+  vector->count = l;
+  vector->elem_size = elem_size;
+  vector->default_value = _default;
+  lisp_value v = native_vector_lisp_value(vector);
   for (size_t i = 0; i < l; i++)
     vector_set(v, integer_lisp_value(i), _default);
 
@@ -43,7 +63,7 @@ lisp_value vector_ref_2(lisp_vector *vector, int i) {
 }
 
 lisp_value vector_ref(lisp_value _vector, lisp_value k) {
-  TYPE_ASSERT(_vector, LISP_VECTOR);
+  EXPR_ASSERT(is_vector(_vector));
   TYPE_ASSERT(k, LISP_INTEGER);
   var vector = lisp_value_vector(_vector);
   var i = lisp_value_integer(k);
@@ -51,7 +71,7 @@ lisp_value vector_ref(lisp_value _vector, lisp_value k) {
 }
 
 lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value) {
-  TYPE_ASSERT(_vector, LISP_VECTOR);
+  EXPR_ASSERT(is_vector(_vector));
   TYPE_ASSERT(k, LISP_INTEGER);
   var i = (size_t)lisp_value_integer(k);
   var vector = lisp_value_vector(_vector);
@@ -77,14 +97,23 @@ lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value) {
 }
 
 static lisp_value vector_resize(lisp_value vector, lisp_value k) {
-  TYPE_ASSERT(vector, LISP_VECTOR);
+  let type = lisp_value_type(vector);
+  EXPR_ASSERT(type == LISP_VECTOR || type == LISP_NATIVE_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
-
+  bool is_native = type == LISP_NATIVE_VECTOR;
   size_t l = (size_t)lisp_value_integer(k);
   var vec0 = lisp_value_vector(vector);
+  size_t elem_size = lisp_type_size(lisp_value_type(vec0->default_value));
+  
+  if(is_native){
+    vec0->data = realloc(vec0->data, elem_size * l);
+    ssize_t l2 = l - vec0->count;
+    if(l2 > 0)
+      memset(vec0->data + vec0->count * elem_size, 0, l2);
+    vec0->count = l;
+    return vector;
+  }
   lisp_vector *vec = lisp_malloc(sizeof(*vec));
-  *vec = *vec0;
-  size_t elem_size = lisp_type_size(lisp_value_type(vec->default_value));
 
   void *new_data = lisp_malloc(l * elem_size);
   size_t prevCount = MIN(l, vec->count);
@@ -160,6 +189,7 @@ void *vector_data_pointer(lisp_value vector) {
 
 void load_vector_module() {
   lisp_register_native("make-vector", 2, make_vector);
+  lisp_register_native("make-native-vector", 2, make_native_vector);
   lisp_register_native("vector-element-type", 1, vector_elem_type);
   lisp_register_native("vector-native-element-pointer", 2,
                        vector_native_element_pointer);
