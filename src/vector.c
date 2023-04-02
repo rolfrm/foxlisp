@@ -26,7 +26,7 @@ lisp_value vector_length(lisp_value v) {
   return integer(lisp_value_vector(v)->count);
 }
 
-lisp_value vector_ref_2(lisp_vector * vector, int i){
+lisp_value vector_ref_2(lisp_vector *vector, int i) {
   var v = vector->default_value;
   void *src = vector->data + i * vector->elem_size;
   void *dst;

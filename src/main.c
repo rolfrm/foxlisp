@@ -1060,7 +1060,7 @@ lisp_value lisp_eval_define(lisp_scope *scope, lisp_value sym,
     return nil;
   }
   var value2 = lisp_eval(scope, value);
-  
+
   if (lisp_is_in_error())
     return nil;
   lisp_scope_create_value(scope, sym, value2);
@@ -1156,7 +1156,7 @@ lisp_value lisp_eval_native_functions(lisp_scope *scope, native_function *n,
   }
   gc_unsafe_stack = false;
   lisp_unpin(pin);
-  
+
   return r;
 }
 
@@ -1194,7 +1194,7 @@ void lisp_unpin_args(cons *argslist, size_t cnt) {
 static inline lisp_value lisp_eval_function(lisp_scope *scope, lisp_function *f,
                                             size_t argcnt, lisp_value args_form,
                                             bool eval_arguments) {
-  if(!f->eval_args){
+  if (!f->eval_args) {
     eval_arguments = false;
   }
   // these args needs to be gc_pinned
@@ -1515,7 +1515,7 @@ lisp_value lisp_eval(lisp_scope *scope, lisp_value value) {
   return r;
 }
 
-lisp_value lisp_eval_quoted2(lisp_scope * scope, lisp_value a1, lisp_value a2){
+lisp_value lisp_eval_quoted2(lisp_scope *scope, lisp_value a1, lisp_value a2) {
   cons args[4] = {0};
   args[0].car = a1;
   args[0].cdr = cons_lisp_value(&args[1]);
@@ -1525,7 +1525,7 @@ lisp_value lisp_eval_quoted2(lisp_scope * scope, lisp_value a1, lisp_value a2){
   args[3].car = a2;
   return lisp_eval(scope, cons_lisp_value(args));
 }
-lisp_value lisp_eval1(lisp_scope * scope, lisp_value a1){
+lisp_value lisp_eval1(lisp_scope *scope, lisp_value a1) {
   cons args[1] = {0};
   args[0].car = a1;
   return lisp_eval(scope, cons_lisp_value(args));
@@ -1975,11 +1975,11 @@ int print2(char *buffer, int l2, lisp_value v) {
                     v.local_index.scope_level, v.local_index.scope_index);
   case LISP_CONS: {
     let firstcar = car(v);
-    if(lisp_value_type(firstcar) == LISP_TYPESPEC){
+    if (lisp_value_type(firstcar) == LISP_TYPESPEC) {
       // this is a generic object.
       var print = firstcar.typespec->print;
-      
-      if(!is_nil(print)){
+
+      if (!is_nil(print)) {
         var o2 = lisp_eval_quoted2(current_context->globals, print, v);
         return print2(buffer, LEN1, o2);
       }
@@ -2034,7 +2034,8 @@ int print2(char *buffer, int l2, lisp_value v) {
              (int)((lisp_array *)lisp_value_pointer)->count);
     return l;
   case LISP_TYPESPEC:
-    return snprintf(buffer, LEN1, "type: %s", symbol_name(v.typespec->name.symbol));
+    return snprintf(buffer, LEN1, "type: %s",
+                    symbol_name(v.typespec->name.symbol));
   }
   return 0;
 }
@@ -2140,7 +2141,6 @@ lisp_value lisp_integer(lisp_value v) {
 
 lisp_value lisp_byte(lisp_value v) {
   return byte_lisp_value(lisp_value_as_integer(v));
-  
 }
 
 lisp_value lisp_rational(lisp_value v) {
@@ -2149,7 +2149,7 @@ lisp_value lisp_rational(lisp_value v) {
 
 lisp_value rational(double v) { return rational_lisp_value(v); }
 double as_rational(lisp_value v) { return lisp_value_as_rational(v); }
-lisp_value float32(float v) {return float32_lisp_value(v);}
+lisp_value float32(float v) { return float32_lisp_value(v); }
 
 lisp_value lisp_float32(lisp_value v) {
   return float32_lisp_value(lisp_value_as_rational(v));
@@ -2163,30 +2163,30 @@ lisp_value byte(unsigned char v) { return byte_lisp_value(v); }
 
 lisp_value native_pointer(void *ptr) { return native_pointer_lisp_value(ptr); }
 
-lisp_value typespec_new(lisp_value name){
+lisp_value typespec_new(lisp_value name) {
   lisp_typespec ts = {0};
   ts.name = name;
   lisp_value r = {.type = LISP_TYPESPEC, .typespec = gc_clone(&ts, sizeof(ts))};
   return r;
 }
-lisp_value typespec_set_construct(lisp_value ts, lisp_value construct){
+lisp_value typespec_set_construct(lisp_value ts, lisp_value construct) {
   TYPE_ASSERT(ts, LISP_TYPESPEC);
   ts.typespec->construct = construct;
   return nil;
-} 
+}
 
-lisp_value typespec_set_destruct(lisp_value ts, lisp_value destruct){
+lisp_value typespec_set_destruct(lisp_value ts, lisp_value destruct) {
   TYPE_ASSERT(ts, LISP_TYPESPEC);
   ts.typespec->destruct = destruct;
   return nil;
-} 
+}
 
-lisp_value typespec_set_print(lisp_value ts, lisp_value print){
+lisp_value typespec_set_print(lisp_value ts, lisp_value print) {
   TYPE_ASSERT(ts, LISP_TYPESPEC);
   ts.typespec->print = print;
   return nil;
-} 
-lisp_value typespec_create_instance(lisp_value * args, size_t argcnt){
+}
+lisp_value typespec_create_instance(lisp_value *args, size_t argcnt) {
   EXPR_ASSERT(argcnt > 0);
   var ts = args[0];
   TYPE_ASSERT(ts, LISP_TYPESPEC);
@@ -2253,7 +2253,7 @@ const char *lisp_type_to_string(lisp_type t) {
   case LISP_ARRAY:
     return "LISP_ARRAY";
   case LISP_TYPESPEC:
-    return "LISP_TYPESPEC";  
+    return "LISP_TYPESPEC";
   }
   raise_string("Unknown type:\n");
 
@@ -2352,7 +2352,7 @@ void load_modules() {
   gc_register();
   foxgl_register();
   lisp_process_module_init();
-  //awsm_register();
+  // awsm_register();
   table_register();
 }
 
@@ -2448,7 +2448,7 @@ lisp_value lisp_debug(lisp_value v) {
 }
 
 bool trace_cons = false;
-lisp_value set_trace_cons(lisp_value v){
+lisp_value set_trace_cons(lisp_value v) {
   trace_cons = !is_nil(v);
   return nil;
 }

@@ -444,9 +444,9 @@ static inline void visit_value(gc_context *gc, lisp_value val) {
     }
 
   } break;
-  case LISP_TYPESPEC:{
+  case LISP_TYPESPEC: {
     var typespec = val.typespec;
-    if(mark_vector(gc, typespec)){
+    if (mark_vector(gc, typespec)) {
       visit_value(gc, typespec->print);
       visit_value(gc, typespec->destruct);
       visit_value(gc, typespec->generic_lookup);
@@ -532,43 +532,42 @@ static void recover_pool(cons_buffer *buf) {
 }
 static inline void cons_call_destructors(cons_buffer *buf, ssize_t i) {
   if (buf->gc_mark[i] == false) {
-    cons * c = &buf->buffer[i];
-    if(c->car.type == LISP_TYPESPEC){
+    cons *c = &buf->buffer[i];
+    if (c->car.type == LISP_TYPESPEC) {
       var destruct = c->car.typespec->destruct;
-      if(!is_nil(destruct)){
+      if (!is_nil(destruct)) {
         var c2 = cons_lisp_value(c);
         lisp_eval_quoted2(current_context->globals, destruct, c2);
-      } 
+      }
     }
   }
 }
 
-static void gc_call_destructors(cons_buffer * buf){
-  while (buf != NULL){
-  
-  u64 *marks = (u64 *)buf->gc_mark;
-  size_t mark_count = buf->size / 8;
-  for (size_t j = 0; j < mark_count; j++) {
-    // 02020202... - the GC mark when a full block is all marked
-    // 2 is the stage 2 GC mark.
-    if (marks[j] == 0x0202020202020202L)
-      continue;
+static void gc_call_destructors(cons_buffer *buf) {
+  while (buf != NULL) {
 
-    size_t i2 = j * 8;
-    for (size_t i = 0; i < 8; i += 1) {
-      cons_call_destructors(buf, i2 + i);
+    u64 *marks = (u64 *)buf->gc_mark;
+    size_t mark_count = buf->size / 8;
+    for (size_t j = 0; j < mark_count; j++) {
+      // 02020202... - the GC mark when a full block is all marked
+      // 2 is the stage 2 GC mark.
+      if (marks[j] == 0x0202020202020202L)
+        continue;
+
+      size_t i2 = j * 8;
+      for (size_t i = 0; i < 8; i += 1) {
+        cons_call_destructors(buf, i2 + i);
+      }
     }
-  }
     buf = buf->next;
-
-}
+  }
 }
 
 void gc_recover_unmarked(gc_context *gc) {
   // call destructors
-  
+
   gc_call_destructors(gc->cons_pool);
-  
+
   // recover cons.
   var buf = gc->cons_pool;
   while (buf != NULL) {
@@ -699,9 +698,9 @@ void gc_collect_garbage(lisp_context *lisp) {
 bool gc_unsafe_stack = false;
 extern bool trace_cons;
 lisp_value new_cons(lisp_value _car, lisp_value _cdr) {
-  if(trace_cons){
+  if (trace_cons) {
     printf("new cons\n");
-    raise(SIGINT);  
+    raise(SIGINT);
   }
   // bool gc_run = false;
   // start:
