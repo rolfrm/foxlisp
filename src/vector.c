@@ -124,6 +124,21 @@ static lisp_value vector_resize(lisp_value vector, lisp_value k) {
   return vector_lisp_value(vec);
 }
 
+static lisp_value vector_insert(lisp_value vector, lisp_value index, lisp_value arg) {
+  TYPE_ASSERT(vector, LISP_NATIVE_VECTOR);
+  TYPE_ASSERT(index, LISP_INTEGER);
+  size_t l = (size_t)lisp_value_integer(index);
+  var vec = lisp_value_vector(vector);
+  size_t elem_size = lisp_type_size(lisp_value_type(vec->default_value));
+  
+  vec->data = realloc(vec->data, elem_size * (vec->count + 1));
+  memmove(vec->data + (l + 1) * ( elem_size), vec->data + (l) * ( elem_size), (vec->count - l) * elem_size);
+  vec->count += l;
+  vector_set(vector, index, arg);
+  return nil;
+  
+}
+
 lisp_value vector_elem_type(lisp_value vector) {
   TYPE_ASSERT(vector, LISP_VECTOR);
   return lisp_type_of(lisp_value_vector(vector)->default_value);
@@ -201,4 +216,5 @@ void load_vector_module() {
   lisp_register_native("vector->string", 1, vector_to_string);
   lisp_register_native("string->vector", 1, string_to_vector);
   lisp_register_native("vector?", 1, lisp_is_vector);
+  lisp_register_native("vector-insert!", 3, vector_insert);
 }
