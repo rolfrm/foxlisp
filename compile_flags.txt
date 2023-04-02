@@ -1,0 +1,5 @@
+-Isrc
+-Ilibmicroio/include
+-Iinclude/
+-std=gnu11
+-I.
