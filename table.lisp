@@ -2,17 +2,54 @@
 
 (defvar table-type (typespec-new 'table))
 
-(defun table-new (name columns)
-    (let ((table (list name (map columns cdr) (map columns (lambda (col) (make-vector 1 (cadr col)))))))
-        (cons table-type (list->vector table))
-        ))
+(defun list-to-native-vector (list)
+    (let ((i 0)
+        (v (make-native-vector (length list))))
+    
+    (while list
+      (vector-set! v i (car list))
+      (set! list (cdr list))
+      (set! i (+ i 1)))
+    v
+    ))
 
+(defun table-new (name columns)
+    (let ((table (list name (map columns cdr) (list-to-native-vector (map columns (lambda (col) (make-native-vector 0 (cadr col))))))))
+        (cons table-type (list-to-native-vector table))
+        ))
+(defun table-columns (table)
+    (println table)
+    (vector-ref (cdr table) 2)
+    )
+(defun table-rows (table)
+   (vector-length (println (vector-ref (table-columns table) 0))))
+    
 (defun is-table (table) (eq (car table) table-type))
 
 (typespec-set-print! table-type 
     (lambda (x) (cdr x)))
 
 (println (table-new 'entities '((entity 0)(x 0.0) (y 0.0))))
+(defun table-insert-row (table &rest args)
+    (println 'inserting-row)
+    (let ((rowcnt (table-rows table)))
+       (println 'insert! rowcnt (table-columns table))
+    (for-each col (table-columns table)
+        (set! col (vector-resize col (+ rowcnt 1)))
+        (vector-set! col rowcnt (car args))
+        (println '??? col)
+        (set! args (cdr args))
+        
+        )
+    ))
+(let ((tab1 (table-new 'entities '((entity 0)(x 0.0) (y 0.0))))
+     (hp-tab (table-new 'entities '((entity 0) (hp 0))))
+    )
+    (table-insert-row tab1 1 2.3 4.5)
+    (table-insert-row tab1 2 3.1 2.2)
+    (table-insert-row hp-tab 2 10)
+    (println tab1 " " hp-tab)
+    )
 (println "HELLO")
 (defun gen-table()
     nil)

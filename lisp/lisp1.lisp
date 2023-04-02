@@ -197,6 +197,8 @@
     v
     ))
 
+
+
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))
 
@@ -355,11 +357,21 @@
 (defmacro for-each (arg list &rest body)
   `(let ((lst ,list)
          (,arg nil))
+    (if (vector? lst)
+      (let ((it 0) (cnt (vector-length lst)))
+        (loop (< it cnt)
+          (set! ,arg (vector-ref lst it))
+          ,@body
+          (incf it 1)
+          )
+        )
     (loop lst
          (set! ,arg (car lst))
-         (progn ,@body)
+         ,@body
          (set! lst (cdr lst))
-         )))
+         )  
+      )
+    ))
 
 (define pi 3.141592653589793)
 (define pi_2 (/ pi 2.0))

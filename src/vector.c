@@ -42,7 +42,7 @@ lisp_value make_native_vector(lisp_value len, lisp_value _default) {
 }
 
 lisp_value vector_length(lisp_value v) {
-  TYPE_ASSERT(v, LISP_VECTOR);
+  EXPR_ASSERT(is_vector(v));
   return integer(lisp_value_vector(v)->count);
 }
 
@@ -187,6 +187,10 @@ void *vector_data_pointer(lisp_value vector) {
   return ptr;
 }
 
+lisp_value lisp_is_vector(lisp_value value){
+  return is_vector(value) ? t : nil;
+}
+
 void load_vector_module() {
   lisp_register_native("make-vector", 2, make_vector);
   lisp_register_native("make-native-vector", 2, make_native_vector);
@@ -196,4 +200,5 @@ void load_vector_module() {
   lisp_register_native("vector-resize", 2, vector_resize);
   lisp_register_native("vector->string", 1, vector_to_string);
   lisp_register_native("string->vector", 1, string_to_vector);
+  lisp_register_native("vector?", 1, lisp_is_vector);
 }
