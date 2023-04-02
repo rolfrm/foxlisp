@@ -1060,6 +1060,7 @@ lisp_value lisp_eval_define(lisp_scope *scope, lisp_value sym,
     return nil;
   }
   var value2 = lisp_eval(scope, value);
+  
   if (lisp_is_in_error())
     return nil;
   lisp_scope_create_value(scope, sym, value2);
@@ -1155,6 +1156,7 @@ lisp_value lisp_eval_native_functions(lisp_scope *scope, native_function *n,
   }
   gc_unsafe_stack = false;
   lisp_unpin(pin);
+  
   return r;
 }
 
@@ -2138,6 +2140,7 @@ lisp_value lisp_integer(lisp_value v) {
 
 lisp_value lisp_byte(lisp_value v) {
   return byte_lisp_value(lisp_value_as_integer(v));
+  
 }
 
 lisp_value lisp_rational(lisp_value v) {
@@ -2349,7 +2352,7 @@ void load_modules() {
   gc_register();
   foxgl_register();
   lisp_process_module_init();
-  awsm_register();
+  //awsm_register();
   table_register();
 }
 
