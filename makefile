@@ -7,7 +7,7 @@ LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 BCOBJECTS =$(LIB_SOURCES:.c=.bc)
 LDFLAGS= -L. $(OPT) -ffast-math	# -flto
 LIBS= libmicroio.a -lm -lGL -lglfw3 -lX11 -lopenal -lpng
-BCLIBS = -s USE_GLFW=3 -s WASM=1 -s USE_WEBGL2=1 -lm -lglfw3 -lGL -lopenal
+BCLIBS = -s USE_GLFW=3 -s WASM=1 -s USE_WEBGL2=1 -lm -lglfw -lGL -lopenal
 BCFLAGS = -DWASM -emit-llvm
 BCLDFLAGS= -s ALLOW_MEMORY_GROWTH=1
 ALL= $(TARGET)
