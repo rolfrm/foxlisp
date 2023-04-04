@@ -14,7 +14,9 @@
     ))
 
 (defun table-new (name columns)
-    (let ((table (list name (map columns cdr) (list-to-native-vector (map columns (lambda (col) (make-native-vector 0 (cadr col))))))))
+    (let ((table (list name 
+                       (list->vector (map columns car)) 
+                       (list-to-native-vector (map columns (lambda (col) (make-native-vector 0 (cadr col))))))))
         (cons table-type (list-to-native-vector table))
         ))
 
@@ -44,17 +46,48 @@
         (set! args (cdr args))
         )
     ))
-    
+(defun table-insert-row2 (table index args)
+    (let ((rowcnt (table-rows table)))
+    (for-each col (table-columns table)
+        (vector-insert! col index (car args))
+        (set! args (cdr args))
+        )
+    ))
+
+(defun table-insert (table &rest args)
+    (let ((index (table-insert-index table (car args))))
+        (println index " " (car args))
+        (table-insert-row2 table index args)
+        )
+    )
+
 (let ((tab1 (table-new 'entities '((entity 0)(x 0.0) (y 0.0))))
-     (hp-tab (table-new 'entities '((entity 0) (hp 0))))
+     (active-entities (table-new 'active-entities '((entity 0))'))
+     (hp-tab (table-new 'hp '((entity 0) (hp 0))))
+     (hp-lookup (table-new 'hp-lookup '((entity 0) (hp 0))))
     )
     (table-push-row tab1 1 2.3 4.5)
     (table-push-row tab1 2 3.1 2.2)
-    (table-insert-row tab1 1 4 4.0 4.0)
-    (table-insert-row tab1 3 5 5.0 5.0)
-    (table-insert-row tab1 0 5 5.0 5.0)
+    (table-insert tab1 4 4.0 4.0)
+    (table-insert tab1 10 4.0 4.0)
+    (table-insert tab1 3 4.0 4.0)
+    (table-insert tab1 -3 4.0 4.0)
+    (table-insert tab1 3 3.0 3.0)
+    (table-insert active-entities 4)
+    (table-insert active-entities 3)
+    (table-insert active-entities 2)
     (table-push-row hp-tab 2 10)
-    (println tab1 " " hp-tab)
+    (table-push-row hp-tab 3 -5)
+    (table-push-row hp-tab 10 -10)
+    
+    (select-into active-entities hp-tab hp-lookup)
+    (table:iter hp-lookup 
+        (println (lisp:scope-vars (lisp:get-current-scope!!)))
+        (println (cons hp entity))
+        )
+    
+    
+    (println tab1 " " hp-tab " " active-entities " " hp-lookup)
     )
 (println "HELLO")
 (defun gen-table()
@@ -74,3 +107,4 @@
     (insert t1 2 1.4 1.0)
     (println t1)
     )
+    

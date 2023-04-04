@@ -96,7 +96,7 @@ lisp_value vector_set(lisp_value _vector, lisp_value k, lisp_value value) {
   return nil;
 }
 
-static lisp_value vector_resize(lisp_value vector, lisp_value k) {
+lisp_value vector_resize(lisp_value vector, lisp_value k) {
   let type = lisp_value_type(vector);
   EXPR_ASSERT(type == LISP_VECTOR || type == LISP_NATIVE_VECTOR);
   TYPE_ASSERT(k, LISP_INTEGER);
@@ -195,9 +195,12 @@ static lisp_value vector_native_element_pointer(lisp_value vector,
   void *ptr = vec->data + lisp_value_integer(k) * vec->elem_size;
   return native_pointer_lisp_value(ptr);
 }
-
+lisp_type vector_element_type(lisp_value vector){
+  ASSERT(is_vector(vector));
+  return vector.vector->default_value.type;
+}
 void *vector_data_pointer(lisp_value vector) {
-  TYPE_ASSERT2(vector, LISP_VECTOR);
+  ASSERT(is_vector(vector));
   var vec = lisp_value_vector(vector);
   void *ptr = vec->data;
   return ptr;

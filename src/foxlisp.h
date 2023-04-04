@@ -87,7 +87,6 @@ typedef struct __lisp_function lisp_function;
 typedef struct __native_function native_function;
 typedef native_function lisp_native_function;
 
-typedef struct __alien_function alien_function;
 typedef struct __lisp_vector lisp_vector;
 typedef struct __lisp_scope lisp_scope;
 typedef struct __lisp_typespec lisp_typespec;
@@ -121,7 +120,6 @@ typedef struct {
     char *string;
     lisp_function *function;
     native_function *nfunction;
-    alien_function *alien_func;
     lisp_builtin builtin;
     void *native_pointer;
     lisp_vector *vector;
@@ -137,6 +135,8 @@ struct __native_function {
   void *fptr;
   int nargs; // -1: infinite number of arguments.
   bool eval_args;
+  bool macro_like;
+  
 };
 
 struct _cons {
@@ -389,7 +389,10 @@ lisp_value vector_ref_2(lisp_vector *vector, int i);
 lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
 lisp_value vector_elem_type(lisp_value vector);
 lisp_value vector_copy(lisp_value vector);
+lisp_value vector_resize(lisp_value vector, lisp_value k);
+
 void *vector_data_pointer(lisp_value vector);
+lisp_type vector_element_type(lisp_value vector);
 
 lisp_value integer(int64_t v);
 lisp_value rational(double v);
@@ -435,6 +438,7 @@ lisp_scope *lisp_get_root_scope();
 void lisp_register_value(const char *name, lisp_value value);
 void lisp_register_native(const char *name, int nargs, void *fptr);
 void lisp_register_native_noeval(const char *name, int nargs, void *fptr);
+void lisp_register_native_macrolike(const char *name, lisp_value (*fptr)(lisp_scope*,lisp_value));
 
 lisp_value lisp_read_string(const char *str);
 

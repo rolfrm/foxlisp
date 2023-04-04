@@ -1074,6 +1074,10 @@ lisp_value lisp_eval_native_functions(lisp_scope *scope, native_function *n,
     raise_string("function is null");
     return nil;
   }
+  if(n->macro_like){
+      lisp_value (* f)(lisp_scope *, lisp_value) = n->fptr;
+      return f(scope, arg_form);
+  }
 
   size_t argcnt2 = argcnt;
   if (n->nargs != -1)
@@ -2087,6 +2091,13 @@ void lisp_register_native(const char *name, int nargs, void *fptr) {
   lisp_register_value(name, v);
 }
 
+void lisp_register_native_macrolike(const char *name, lisp_value (*fptr)(lisp_scope*,lisp_value)){
+  native_function *nf = lisp_malloc(sizeof(*nf));
+  nf->fptr = fptr;
+  nf->macro_like = true;
+  lisp_value v = {.type = LISP_FUNCTION_NATIVE, .nfunction = nf};
+  lisp_register_value(name, v);
+}
 void lisp_register_native_noeval(const char *name, int nargs, void *fptr) {
   native_function *nf = lisp_malloc(sizeof(*nf));
   nf->nargs = nargs;
