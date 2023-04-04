@@ -80,7 +80,7 @@
     (table-push-row hp-tab 3 -5)
     (table-push-row hp-tab 10 -10)
     
-    (table:select active-entities hp-tab hp-lookup (< hp 0))
+    (table:select active-entities hp-tab hp-lookup (< hp 100))
     (table:iter hp-lookup 
         (println (cons hp entity))
         (set! hp (- hp 1))

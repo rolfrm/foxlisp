@@ -105,7 +105,7 @@ lisp_value table_select_into2(lisp_scope * scope, lisp_value argforms){
   lisp_value data_table = lisp_eval(scope, cadr(argforms));
   lisp_value output_table = lisp_eval(scope, caddr(argforms));
   lisp_value pred = cadddr(argforms);
-  UNUSED(pred);
+  
   var keys = table_key_column(key_table);
   var keys2 = table_key_column(data_table);
   
@@ -113,15 +113,46 @@ lisp_value table_select_into2(lisp_scope * scope, lisp_value argforms){
   var keys1_ptr = vector_data_pointer(keys);
   var keys2_ptr = vector_data_pointer(keys2);
   
+  var out_columns = table_columns(output_table);
+  var in_columns = table_columns(data_table);
+  
+  
   ssize_t indexes[key_rows];
   i64_finds(keys2_ptr, keys1_ptr, indexes, key_rows, keys2.vector->count);
   size_t new_rows = 0;
-  for(size_t i = 0; i < key_rows; i++){
-    if(indexes[i] >= 0)
-      new_rows += 1;
+  if(! is_nil(pred)){
+    var column_count = (size_t) vector_length(in_columns).integer;
+    var column_names = table_column_names(data_table);
+    lisp_scope iter_scope[1] = {0};
+    cons args3[column_count];
+  
+    for(size_t i = 0; i < column_count; i++){
+     args3[i].car = vector_ref(column_names, integer(i));
+    }
+    lisp_scope_stack(iter_scope, scope, args3, column_count);
+  
+    for(size_t i = 0; i < key_rows; i++){
+     if(indexes[i] >= 0){
+        for(size_t j = 0; j < column_count; j++){
+          args3[j].cdr = vector_ref(vector_ref(in_columns, integer(j)), integer(indexes[i]));
+        }
+        if(is_nil(lisp_eval(iter_scope, pred))){
+          indexes[i] = -1;
+        }else{
+          new_rows += 1;
+        }
+     }
+    }
+    
+  }else{
+    for(size_t i = 0; i < key_rows; i++){
+     if(indexes[i] >= 0)
+       new_rows += 1;
+    }
   }
-  var out_columns = table_columns(output_table);
-  var in_columns = table_columns(data_table);
+  
+  
+  
   var cc = vector_length(out_columns).integer;
   lisp_value columns[cc];
   lisp_value incolumns[cc];
@@ -130,12 +161,16 @@ lisp_value table_select_into2(lisp_scope * scope, lisp_value argforms){
     incolumns[i] = vector_ref(in_columns, integer(i));
     vector_resize(columns[i], integer(new_rows));
   }
-  
-  for(size_t i = 0; i < new_rows; i++){
+  size_t l = 0;
+  for(size_t i = 0; i < key_rows; i++){
     int j = indexes[i];
-    for(int k = 0; k < cc; k++){
-      vector_set(columns[k], integer(i), vector_ref(incolumns[k], integer(j)));
+    if(j == -1){
+      continue;
     }
+    for(int k = 0; k < cc; k++){
+      vector_set(columns[k], integer(l), vector_ref(incolumns[k], integer(j)));
+    }
+    l += 1;
   }
    
   return nil;
