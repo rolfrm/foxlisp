@@ -552,5 +552,7 @@
   (vector-set! nvec 10 10)
   (println (vector-resize nvec 30))
   )
+(defun test-varacic-perf (&rest args))
+(dotimes! n 100000 (test-varacic-perf 10 10 10))
 
 (println "Tests Passed")

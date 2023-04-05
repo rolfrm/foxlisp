@@ -89,6 +89,7 @@ struct __gc_context {
   gc_stage stage;
   int iteration;
   bool request_gc;
+  size_t allocations_counter1;
 };
 
 struct __lisp_set {
@@ -572,7 +573,6 @@ void gc_recover_unmarked(gc_context *gc) {
   // call destructors
 
   gc_call_destructors(gc->cons_pool);
-
   // recover cons.
   var buf = gc->cons_pool;
   while (buf != NULL) {
@@ -713,7 +713,7 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr) {
   // bool gc_run = false;
   // start:
   var ctx = current_context->gc;
-  
+  ctx->allocations_counter1 += 1;
   while (true) {
     cons_buffer *pool = ctx->cons_pool;
     while (pool != NULL) {
@@ -724,12 +724,13 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr) {
         found->car = _car;
         found->cdr = _cdr;
         pool->used += 1;
-        if(pool->next == NULL &&(pool->size - pool->used) < 32 ){
-            ctx->request_gc = true;
+        if(pool->next == NULL && (pool->size - pool->used) < 32 && ctx->allocations_counter1 > 32 ){
+          // if this happens, we should start thinking about collecting garbage.
+          // also allocate if it is more than 32 allocations since the last one.
+          ctx->request_gc = true;
+          ctx->allocations_counter1 = 0;
         }
         
-        // var index = (size_t)(found - pool->buffer);
-        // pool->used = MAX(pool->used, index);
         return cons_lisp_value(found);
       } else {
         pool = pool->next;
