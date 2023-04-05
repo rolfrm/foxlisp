@@ -302,6 +302,7 @@ bool equals(lisp_value v1, lisp_value v2);
 void foxlist_thread_init();
 // mark an sweep garbage collector
 void gc_collect_garbage(lisp_context *context);
+void maybe_gc(lisp_context * ctx);
 
 // the three functions bellow are called by gc_collect_garbage
 // clear the GC marks

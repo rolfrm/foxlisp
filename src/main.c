@@ -565,6 +565,7 @@ lisp_value lisp_eval_quasiquoted(lisp_scope *scope, lisp_value value) {
     if (lisp_value_eq(fst, unquote_splice_sym))
       return lisp_eval(scope, cadr(value));
 
+  
     return lisp_eval_quasiquoted_sub(scope, value);
   }
   default:
@@ -1508,6 +1509,7 @@ lisp_value lisp_eval(lisp_scope *scope, lisp_value value) {
     raise_string("Max stack size exceeded.");
     return nil;
   }
+  maybe_gc(current_context);
   cons stk = {.car = value, .cdr = lisp_stack};
   lisp_stack = cons_lisp_value(&stk);
   lisp_stack_size += 1;
@@ -1855,6 +1857,7 @@ lisp_value lisp_eval_stream(io_reader *rd) {
     gc_unsafe_stack = true;
 
     var code = lisp_read_stream(rd);
+    
     gc_unsafe_stack = p;
 
     if (off == rd->offset || is_nil(code))
@@ -1875,7 +1878,9 @@ lisp_value lisp_eval_stream(io_reader *rd) {
       code = next_code;
     }
 
+    current_toplevel = cons_lisp_value(&toplevel);
     next_toplevel = code;
+    lisp_collect_garbage(current_context);
     result = lisp_eval(current_context->globals, code);
     current_toplevel = toplevel.car;
 

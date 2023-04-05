@@ -88,7 +88,7 @@
     (table-push-row hp-tab b -5)
     (table-push-row hp-tab d -10)
     (println "generating rows")
-    (dotimes! i 10000
+    (dotimes! i 1000
         (table-push-row tab1 (gen-id) (+ 1.0 i) (- 2.13 i))
         
         )

@@ -53,6 +53,7 @@ struct _cons_buffer {
   cons *buffer;
   u8 *gc_mark;
   size_t size;
+  size_t used;
 };
 
 typedef struct __array_header array_header;
@@ -87,6 +88,7 @@ struct __gc_context {
   array_pool array_pool[3 * 1024 + 1];
   gc_stage stage;
   int iteration;
+  bool request_gc;
 };
 
 struct __lisp_set {
@@ -511,6 +513,7 @@ static inline void recover_cons(cons_buffer *buf, ssize_t i) {
     buf->buffer[i].cdr.cons = buf->free_cons;
     buf->buffer[i].car = nil;
     buf->free_cons = buf->buffer + i;
+    buf->used -= 1;
   }
 }
 
@@ -682,6 +685,7 @@ void gc_clear_weak(lisp_context *lisp) {
 }
 
 void gc_collect_garbage(lisp_context *lisp) {
+  
   var gc = lisp->gc;
   gc_clear(gc);
   gc_mark(lisp);
@@ -698,15 +702,18 @@ void gc_collect_garbage(lisp_context *lisp) {
 }
 
 bool gc_unsafe_stack = false;
-extern bool trace_cons;
-lisp_value new_cons(lisp_value _car, lisp_value _cdr) {
-  if (trace_cons) {
-    printf("new cons\n");
-    raise(SIGINT);
+void maybe_gc(lisp_context * ctx){
+  if(gc_unsafe_stack == false && ctx->gc->request_gc){
+    gc_collect_garbage(ctx);
+    ctx->gc->request_gc = false;
   }
+}
+
+lisp_value new_cons(lisp_value _car, lisp_value _cdr) {
   // bool gc_run = false;
   // start:
   var ctx = current_context->gc;
+  
   while (true) {
     cons_buffer *pool = ctx->cons_pool;
     while (pool != NULL) {
@@ -716,6 +723,11 @@ lisp_value new_cons(lisp_value _car, lisp_value _cdr) {
         pool->free_cons = found->cdr.cons;
         found->car = _car;
         found->cdr = _cdr;
+        pool->used += 1;
+        if(pool->next == NULL &&(pool->size - pool->used) < 32 ){
+            ctx->request_gc = true;
+        }
+        
         // var index = (size_t)(found - pool->buffer);
         // pool->used = MAX(pool->used, index);
         return cons_lisp_value(found);
