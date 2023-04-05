@@ -45,7 +45,11 @@ void i64_finds(const i64 * column, const i64 * keys, ssize_t * indexes, size_t c
 
 // keys must be sorted
 void i64_insert_index(const i64 * column, const i64 * keys, size_t * indexes, size_t cnt, size_t rows){
+     if(cnt == 0) return;
      size_t j = 0;
+     if(rows == 0 || column[rows - 1] < keys[0]){
+       j = rows;
+     }
      for(size_t i = 0; i < cnt; i++){
        while(j < rows && i64_cmp(column + j, keys + i) < 0){
          j++;
@@ -151,8 +155,6 @@ lisp_value table_select_into2(lisp_scope * scope, lisp_value argforms){
     }
   }
   
-  
-  
   var cc = vector_length(out_columns).integer;
   lisp_value columns[cc];
   lisp_value incolumns[cc];
@@ -175,43 +177,6 @@ lisp_value table_select_into2(lisp_scope * scope, lisp_value argforms){
    
   return nil;
 }
-
-lisp_value table_select_into(lisp_value key_table, lisp_value data_table, lisp_value output_table){
-  var keys = table_key_column(key_table);
-  var keys2 = table_key_column(data_table);
-  
-  var key_rows = table_rows(key_table);
-  var keys1_ptr = vector_data_pointer(keys);
-  var keys2_ptr = vector_data_pointer(keys2);
-  
-  ssize_t indexes[key_rows];
-  i64_finds(keys2_ptr, keys1_ptr, indexes, key_rows, keys2.vector->count);
-  size_t new_rows = 0;
-  for(size_t i = 0; i < key_rows; i++){
-    if(indexes[i] >= 0)
-      new_rows += 1;
-  }
-  var out_columns = table_columns(output_table);
-  var in_columns = table_columns(data_table);
-  var cc = vector_length(out_columns).integer;
-  lisp_value columns[cc];
-  lisp_value incolumns[cc];
-  for(int i = 0; i < cc; i++){
-    columns[i] = vector_ref(out_columns, integer(i));
-    incolumns[i] = vector_ref(in_columns, integer(i));
-    vector_resize(columns[i], integer(new_rows));
-  }
-  
-  for(size_t i = 0; i < new_rows; i++){
-    int j = indexes[i];
-    for(int k = 0; k < cc; k++){
-      vector_set(columns[k], integer(i), vector_ref(incolumns[k], integer(j)));
-    }
-  }
-   
-  return nil;
-}
-
 
 lisp_value table_print(lisp_value table){
    var rows = table_rows(table);
@@ -258,7 +223,6 @@ void table_register() {
   
   lisp_register_native_macrolike("table:iter", table_iter);
   lisp_register_native("table-insert-index", 2, table_insert_index); 
-  lisp_register_native("select-into", 4, table_select_into); 
   lisp_register_native_macrolike("table:select", table_select_into2);
   
   lisp_register_native("table:clear", 1, table_clear);

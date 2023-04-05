@@ -356,7 +356,7 @@ static inline void visit_value(gc_context *gc, lisp_value val) {
   
     if (!mark_vector(gc, val.vector))
       return;
-    if (!mark_vector(gc, val.vector->data))
+    if (val.type != LISP_NATIVE_VECTOR && !mark_vector(gc, val.vector->data))
       return;
     switch (val.vector->default_value.type) {
     case LISP_INTEGER:
