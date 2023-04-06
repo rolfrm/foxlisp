@@ -84,6 +84,19 @@ bool type_assert(lisp_value val, lisp_type type) {
   return true;
 }
 
+bool type_assert_extra(lisp_value val, lisp_type type, const char * variable) {
+  if (lisp_value_type(val) != type) {
+    char buffer[1000];
+    sprintf(buffer, "%s: Invalid type, expected %s, but got %s\n",
+            variable,
+            lisp_type_to_string(type),
+            lisp_type_to_string(lisp_value_type(val)));
+    raise_string(nogc_clone(buffer, strlen(buffer) + 1));
+    return false;
+  }
+  return true;
+}
+
 bool elem_type_assert(lisp_value vector, lisp_type type) {
   return type_assert(lisp_value_vector(vector)->default_value, type);
 }

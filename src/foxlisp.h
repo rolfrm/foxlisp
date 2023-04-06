@@ -421,6 +421,7 @@ bool lisp_error_state();
 
 void raise_string(const char *str);
 bool type_assert(lisp_value val, lisp_type type);
+bool type_assert_extra(lisp_value val, lisp_type type, const char * variable);
 bool elem_type_assert(lisp_value vector, lisp_type type);
 
 lisp_scope *lisp_scope_new(lisp_scope *super);
@@ -461,7 +462,7 @@ lisp_value lisp_read_string(const char *str);
 #define cadddddddr(x) car(cdddddddr(x))
 
 #define TYPE_ASSERT(v, t)                                                      \
-  if (!type_assert(v, t))                                                      \
+  if (!type_assert_extra(v, t, #v))                                                      \
     return nil;
 #define TYPE_ASSERT2(v, t) ASSERT(type_assert(v, t));
 #define RETURN_ERROR(err)                                                      \

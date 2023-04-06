@@ -42,7 +42,7 @@
 (assert (= 8.0 (* 2 2 2.0)))
 
 (assert (= 10 (funcall + 1 9)))
-
+(assert (eq 1 '1)) ; '1 is the number 1.
 (define x 4)
 (set! x 9)
 
@@ -553,6 +553,7 @@
   (println (vector-resize nvec 30))
   )
 (defun test-varacic-perf (&rest args))
-(dotimes! n 100000 (test-varacic-perf 10 10 10))
+;; just verify that this does not cause us to run out of memory. (max cell limit.)
+(dotimes! n 1000000 (test-varacic-perf 10 10 10))
 
 (println "Tests Passed")
