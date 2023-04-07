@@ -1076,10 +1076,13 @@
 		  (rest (cdr body))
 		  (current-transform (get-matrix)))
 	 (math:*! current-transform current-transform t0)
-	 (math:scale! current-transform
-                 (or (unbind (car scale) scope) 1.0)
-                 (or (unbind (cadr scale) scope) 1.0)
-                 (or (unbind (caddr scale) scope) 1.0))
+	 (if (number? scale)
+		  (math:scale! current-transform scale scale scale)
+	 
+		  (math:scale! current-transform
+							(or (unbind (car scale) scope) 1.0)
+							(or (unbind (cadr scale) scope) 1.0)
+							(or (unbind (caddr scale) scope) 1.0)))
 	 (lisp:with-scope-binding scope
 		(lisp:get-current-scope!!)
 		'(current-transform rest) nil

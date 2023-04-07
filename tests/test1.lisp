@@ -554,6 +554,8 @@
   )
 (defun test-varacic-perf (&rest args))
 ;; just verify that this does not cause us to run out of memory. (max cell limit.)
+(assert (number? 1.0))
+(assert (number? 1))
 (dotimes! n 1000000 (test-varacic-perf 10 10 10))
 
 (println "Tests Passed")
