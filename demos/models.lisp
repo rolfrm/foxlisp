@@ -43,6 +43,9 @@
 (define upcube
     '(translate (-0.5 0 -0.5)
                (ref cube-model)))
+(define downcube
+    '(translate (-0.5 -1 -0.5)
+               (ref cube-model)))
 
 (define cube1 cube-model)
 

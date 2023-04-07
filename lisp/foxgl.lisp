@@ -991,7 +991,12 @@
 					(eval-scoped (lisp:get-current-scope!!) rest)
 					(set! evalues (cdr evalues))))				 
 		  )))
-
+(defun scope:if0 (scope body)
+  (let ((r (eval (car body) scope)))
+	 (when r
+		(eval-scoped scope (cdr body))
+		)))
+		  
 (defun scope:ref (scope body)
   (let ((ref (car body)))
 	 (eval-scoped0 scope (symbol-value ref scope))))
@@ -1005,6 +1010,7 @@
 		  (print (lambda (scope body) (println (unbind (car body) scope))))
 		  (for scope:for)
 		  (ref scope:ref)
+		  (scope:if scope:if0)
 		  (bind scope:bind)
 		  (args ())
 		  (ignore (lambda (s b) ))
