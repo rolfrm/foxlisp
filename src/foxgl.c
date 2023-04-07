@@ -88,13 +88,28 @@ lisp_value math_tan2(lisp_value a, lisp_value b) {
       atan2(lisp_value_as_rational(a), lisp_value_as_rational(b)));
 }
 
-lisp_value math_random(lisp_value range) {
-  if (range.type == LISP_INTEGER) {
-    return integer(randu32((u32)range.integer));
+lisp_value math_random(lisp_value * values, size_t count) {
+  if(count == 0){
+    return integer(randu32(0xFFFFFFFF));
   }
-  if (range.type == LISP_RATIONAL || range.type == LISP_FLOAT32)
-    return rational(randf64() * range.rational);
-  return nil;
+  if(count == 1){
+    var range = values[0];
+    if (range.type == LISP_INTEGER)
+     return integer(randu32((u32)range.integer));
+  
+    if (range.type == LISP_RATIONAL || range.type == LISP_FLOAT32)
+      return rational(randf64() * range.rational);
+  }
+  if(count == 2){
+    var min = values[0];
+    var max = values[1];
+    EXPR_ASSERT(min.type == max.type);
+    if (min.type == LISP_INTEGER)
+       return integer(randu32((u32)max.integer - min.integer + 1) + min.integer);
+    if (min.type == LISP_RATIONAL || min.type == LISP_FLOAT32)
+       return rational(randf64()*(max.rational - min.rational) + min.rational);
+  }
+  EXPR_ASSERT(false);
 }
 
 lisp_value foxgl_load_font(lisp_value str, lisp_value size) {
@@ -1173,7 +1188,7 @@ void foxgl_register() {
   lrn("math:pow", 2, math_pow);
   lrn("math:sqrt", 1, math_sqrt);
   lrn("math:sqrtf", 1, math_sqrtf);
-  lrn("math:random", 1, math_random);
+  lrn("math:random", -1, math_random);
   lrn("math:mod", 2, math_mod);
   lrn("math:tan", 1, math_tan);
   lrn("math:tan2", 2, math_tan2);
