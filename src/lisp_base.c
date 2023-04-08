@@ -185,20 +185,78 @@ static inline lisp_value lisp_binn(lisp_value *values, int count,
   return t;
 }
 
-static void minimumf(f64 *a, f64 *b) { *a = MIN(*b, *a); }
-
-static void minimumi(i64 *a, i64 *b) { *a = MIN(*b, *a); }
-
-static lisp_value lisp_minimumn(lisp_value *values, int count) {
-  return lisp_procn(values, count, minimumf, minimumi);
+static int i64_cmp(i64 a, i64 b){
+  if(a < b) return -1;
+  if(a > b) return 1;
+  return 0;
+}
+static int i64_f64_cmp(i64 a, f64 b){
+  if(a < b) return -1;
+  if(a > b) return 1;
+  return 0;
+}
+static int f64_cmp(f64 a, f64 b){
+  if(a < b) return -1;
+  if(a > b) return 1;
+  return 0;
 }
 
-static void maximumf(f64 *a, f64 *b) { *a = MAX(*b, *a); }
+static int lisp_cmp(lisp_value * v1, lisp_value * v2){
+  switch(v1->type){
+    case LISP_BYTE:
+    case LISP_INTEGER32:  
+    case LISP_INTEGER:
+    {
+      switch(v2->type){
+        case LISP_BYTE:
+        case LISP_INTEGER:
+        case LISP_INTEGER32:  
+          return i64_cmp(v1->integer, v2->integer);
+        case LISP_RATIONAL:
+        case LISP_FLOAT32:
+          return i64_f64_cmp(v1->integer, v2->rational);
+        default:break;
+      }
+      break;
+    }
+    case LISP_FLOAT32:
+    case LISP_RATIONAL:
+    switch(v2->type){
+        case LISP_BYTE:
+        case LISP_INTEGER32:  
+        case LISP_INTEGER:
+          return -i64_f64_cmp(v2->integer, v1->rational);
+          
+        case LISP_FLOAT32:
+        case LISP_RATIONAL:
+          return f64_cmp(v1->rational, v2->rational);
+        default:break;
+      }
+    default:break;
+  }
+  return 0;
+}
 
-static void maximumi(i64 *a, i64 *b) { *a = MAX(*b, *a); }
+static lisp_value lisp_max(lisp_value *values, int count) {
+  if(count == 0) return nil;
+  lisp_value v1 = values[0];
+  for(int i = 1; i < count; i++){
+    lisp_value it = values[i];
+    if(lisp_cmp(&v1, &it) < 0)
+      v1 = it;
+  }
+  return v1;
+}
 
-static lisp_value lisp_maximumn(lisp_value *values, int count) {
-  return lisp_procn(values, count, maximumf, maximumi);
+static lisp_value lisp_min(lisp_value *values, int count) {
+  if(count == 0) return nil;
+  lisp_value v1 = values[0];
+  for(int i = 1; i < count; i++){
+    lisp_value it = values[i];
+    if(lisp_cmp(&v1, &it) > 0)
+      v1 = it;
+  }
+  return v1;
 }
 
 static bool lessf(f64 a, f64 b) { return a < b; }
@@ -346,8 +404,8 @@ void load_lisp_base() {
   lisp_register_native(">=", -1, lisp_greatereqn);
   lisp_register_native("/=", -1, lisp_neqn);
   lisp_register_native("equal?", -1, lisp_equals);
-  lisp_register_native("min", -1, lisp_minimumn);
-  lisp_register_native("max", -1, lisp_maximumn);
+  lisp_register_native("min", -1, lisp_min);
+  lisp_register_native("max", -1, lisp_max);
   lisp_register_native("sin", 1, lisp_sin);
   lisp_register_native("cos", 1, lisp_cos);
   lisp_register_native("abs", 1, lisp_abs);
