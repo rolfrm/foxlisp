@@ -180,8 +180,122 @@
                 (scale (0.25 0.25 0.25)
                        (upcube))))
 	 ))
-(defvar cube upcube)
-(defvar cylinder cube-2)
+
+(defun generate-cylinder-triangle-strip (segments radius height)
+  (let* ((angle-step (/ (* 2 pi) segments))
+         (vertices '()))
+    ;; Generate side triangle strip
+    (dotimes! i segments
+      (let* ((angle1 (* i angle-step))
+             (angle2 (* (mod (+ 1 i) segments) angle-step))
+             (x1 (* radius (cos angle1)))
+             (z1 (* radius (sin angle1)))
+             (x2 (* radius (cos angle2)))
+             (z2 (* radius (sin angle2))))
+        (set! vertices (concat vertices (list x1 0 z1 x1 height z1 x2 0 z2)))
+        (set! vertices (concat vertices (list x2 0 z2 x1 height z1 x2 height z2)))))
+    ;; Add degenerate triangle
+    (let* ((angle1 (* segments angle-step))
+           (x1 (* radius (cos angle1)))
+           (z1 (* radius (sin angle1))))
+      (set! vertices (concat vertices (list x1 0 z1 x1 0 z1))))
+    ;; Generate top and bottom triangle strip
+    (dotimes! i segments
+      (let* ((angle1 (* i angle-step))
+             (angle2 (* (mod (+ 1 i) segments) angle-step))
+             (x1 (* radius (cos angle1)))
+             (z1 (* radius (sin angle1)))
+             (x2 (* radius (cos angle2)))
+             (z2 (* radius (sin angle2))))
+        (set! vertices (concat vertices (list x1 0 z1 0 0 0 x2 0 z2)))
+        (set! vertices (concat vertices (list x1 height z1 x2 height z2 0 0 height)))))
+    vertices))
+
+(defun generate-cone-triangle-strip (segments radius height)
+  (let* ((angle-step (/ (* 2 pi) segments))
+         (vertices '()))
+    ;; Generate side triangle strip
+    (dotimes! i segments
+      (let* ((angle1 (* i angle-step))
+             (angle2 (* (mod (+ 1 i) segments) angle-step))
+             (x1 (* radius (cos angle1)))
+             (z1 (* radius (sin angle1)))
+             (x2 (* radius (cos angle2)))
+             (z2 (* radius (sin angle2))))
+        (set! vertices (concat vertices (list x1 0 z1 0 height 0 x2 0 z2)))))
+    ;; Add degenerate triangle
+    (let* ((angle1 (* segments angle-step))
+           (x1 (* radius (cos angle1)))
+           (z1 (* radius (sin angle1))))
+      (set! vertices (concat vertices (list x1 0 z1 x1 0 z1))))
+    ;; Generate bottom triangle strip
+    (dotimes! i segments
+      (let* ((angle1 (* i angle-step))
+             (angle2 (* (mod (+ 1 i) segments) angle-step))
+             (x1 (* radius (cos angle1)))
+             (z1 (* radius (sin angle1)))
+             (x2 (* radius (cos angle2)))
+             (z2 (* radius (sin angle2))))
+        (set! vertices (concat vertices (list x1 0 z1 0 0 0 x2 0 z2)))))
+    vertices))
+
+(defun generate-pyramid-triangle-strip (base-side-length height)
+  (let* ((half-base (/ base-side-length 2))
+         (vertices '()))
+    ;; Generate side triangle strip
+    (set! vertices (concat vertices (list
+                                     ;; Base
+                                     (- 0 half-base) 0 half-base
+                                     ;; Apex
+                                     0 height 0
+                                     ;; Base
+                                     half-base 0 half-base
+                                     ;; Apex
+                                     0 height 0
+                                     ;; Base
+                                     half-base 0 (- 0 half-base)
+                                     ;; Apex
+                                     0 height 0
+                                     ;; Base
+                                     (- 0 half-base) 0 (- 0 half-base)
+                                     ;; Apex
+                                     0 height 0
+                                     ;; Base
+                                     (- 0 half-base) 0 half-base)))
+    ;; Add degenerate triangle
+    (set! vertices (concat vertices (list (- 0 half-base) 0 half-base (- 0 half-base) 0 half-base)))
+    ;; Generate bottom triangle strip
+    (set! vertices (concat vertices (list
+                                     ;; Base
+                                     (- 0 half-base) 0 half-base
+                                     ;; Center
+                                     0 0 0
+                                     ;; Base
+                                     half-base 0 half-base
+                                     ;; Center
+                                     0 0 0
+                                     ;; Base
+                                     half-base 0 (- 0 half-base)
+                                     ;; Center
+                                     0 0 0
+                                     ;; Base
+                                     (- 0 half-base) 0 (- 0 half-base)
+                                     ;; Center
+                                     0 0 0
+                                     ;; Base
+                                     (- 0 half-base) 0 half-base)))
+    vertices))
+
+
+(println 'cylinder (generate-cylinder-triangle-strip 10 1.0 1))
+
+(defvar cube cube-2)
+(defvar cone `(polygon :3d-triangle-strip ,(generate-cone-triangle-strip 10 1.0 1.0)))
+
+(defvar cylinder `(polygon :3d-triangle-strip ,(generate-cylinder-triangle-strip 10 1.0 1)))
+
+(defvar pyramid `(polygon :3d-triangle-strip ,(generate-pyramid-triangle-strip 1.0 1.0)))
+
 (defvar elephant
   '(union ;; Elephant model
   ;; Body
@@ -317,6 +431,20 @@
       (cube))))
 ))
 
+(defvar duck-toy2
+  '(offset (0 -0.5 0)
+	 (rgb (1 1 0)   ; yellow color
+     (sphere)
+      (offset (0 0.5 0) (scale (0.7 0.3 0.7) (sphere1)))
+      (offset (-0.4 0.4 0) (scale (0.3 0.3 0.3) (sphere1)))
+      (offset (0.4 0.4 0) (scale (0.3 0.3 0.3) (sphere1)))
+      (offset (-0.5 -0.5 0) (rotate (0 0 45) (cylinder)))
+      (offset (0.5 -0.5 0) (rotate (0 0 -45) (cylinder)))
+		(offset (0 0.3 0.5) (scale (0.4 0.4 0.4) (fastigium)))
+		)
+	  )
+	 )
+
 (defvar rocket-model
   ';; Rocket model
 (progn
@@ -400,13 +528,26 @@
   '(union
   ;; Head (sphere)
   (rgb (0.9 0.8 0.7)
-    (scale (1 1 1)
+   (scale (1 1 1)
+	 (translate (0 1 0)
      (sphere1)
-	  ))
+	  )))
 
+    ;; Left eye (sphere)
+    (rgb (0 0 0)
+      (translate (-0.3 0.9 1.0)
+        (scale (0.1 0.1 0.1)
+          (sphere1))))
+
+    ;; Right eye (sphere)
+    (rgb (0 0 0)
+      (translate (0.3 0.9 1.0)
+        (scale (0.1 0.1 0.1)
+          (sphere1))))
+	 
   ;; Body (cylinder)
   (rgb (0.5 0.3 0.8)
-    (translate (0 -1.5 0)
+    (translate (0 -3 0)
       (scale (1 3 1)
        (cylinder)
 		 )))
@@ -414,19 +555,19 @@
   ;; Hat (cone)
   (rgb (0.5 0.3 0.8)
     (translate (0 2 0)
-      (scale (2 3 2)
-       (pyramid)
+      (scale (1 3 1)
+       (cone)
 		 )))
 
   ;; Hat brim (fastigium)
   (rgb (0.5 0.3 0.8)
-    (translate (0 1 0)
-      (scale (3 0.1 3)
-        (fastigium))))
+    (translate (0 2 0)
+      (scale (3 0.2 3)
+        (pyramid))))
 
   ;; Left arm (cylinder)
   (rgb (0.9 0.8 0.7)
-    (translate (-1.5 -1.5 0)
+    (translate (-1.5 -2.5 0)
       (rotate 0 0 0.785)
         (scale (0.5 2 0.5)
          (cylinder)
@@ -434,7 +575,7 @@
 
   ;; Right arm (cylinder)
   (rgb (0.9 0.8 0.7)
-    (translate (1.5 -1.5 0)
+    (translate (1.5 -2.5 0)
       (rotate 0 0 -0.785)
         (scale (0.5 2 0.5)
          (cylinder)
@@ -442,21 +583,21 @@
 
   ;; Left leg (cylinder)
   (rgb (0.5 0.3 0.8)
-    (translate (-0.5 -3.5 0)
+    (translate (-0.5 -4.5 0)
       (scale (0.5 2 0.5)
        (cylinder)
 		 )))
 
   ;; Right leg (cylinder)
   (rgb (0.5 0.3 0.8)
-    (translate (0.5 -3.5 0)
+    (translate (0.5 -4.5 0)
       (scale (0.5 2 0.5)
        (cylinder)
 		 )))
 
   ;; Staff (cylinder)
   (rgb (0.4 0.2 0.1)
-    (translate (2.5 -4 0)
+    (translate (2.5 -3 0)
       (rotate 0 0 -0.785)
         (scale (0.2 5 0.2)
          (cylinder)
@@ -464,7 +605,77 @@
 
   ;; Staff top (sphere)
   (rgb (0.7 0 0)
-    (translate (4.5 0 0)
+    (translate (2.5 2 0)
       (scale (0.5 0.5 0.5)
-        (sphere1))))
+       (sphere1))))
+
+	 ;; Left foot (cube)
+(rgb (0.5 0.3 0.8)
+  (translate (-0.5 -4.5 0.5)
+    (scale (0.5 0.5 1)
+      (cube))))
+
+;; Right foot (cube)
+(rgb (0.5 0.3 0.8)
+  (translate (0.5 -4.5 0.5)
+    (scale (0.5 0.5 1)
+      (cube))))
 ))
+
+
+(defvar cat-model
+  '(union
+    ;; Body (ellipsoid)
+    (rgb (0.3 0.3 0.3)
+      (translate (0 0.6 0)
+        (scale (1 1.3 1)
+         (sphere1)
+			)))
+
+    ;; Head (sphere)
+    (rgb (0.3 0.3 0.3)
+      (translate (0 2 0)
+        (scale (0.6 0.6 0.6)
+			(sphere1)
+			)))
+
+    ;; Left ear (pyramid)
+    (rgb (0.3 0.5 0.3)
+      (translate (-0.3 2.3 0)
+        (rotate 0 (-0.785) 0)
+          (scale (0.2 0.4 0.2)
+            (pyramid))))
+
+    ;; Right ear (pyramid)
+    (rgb (0.5 0.3 0.3)
+      (translate (0.3 2.3 0)
+        (rotate 0 0.785 0)
+          (scale (0.2 0.4 0.2)
+            (pyramid))))
+
+    ;; Left eye (sphere)
+    (rgb (1 1 1)
+      (translate (-0.2 2.1 0.4)
+        (scale (0.1 0.1 0.1)
+          (sphere1))))
+
+    ;; Right eye (sphere)
+    (rgb (1 1 1)
+      (translate (0.2 2.1 0.4)
+        (scale (0.1 0.1 0.1)
+          (sphere1))))
+
+    ;; Nose (pyramid)
+    (rgb (0 0 0)
+      (translate (0 1.9 0.5)
+        (rotate 1.57 0 0)
+          (scale (0.1 0.1 0.1)
+            (pyramid))))
+
+    ;; Tail (cylinder)
+    (rgb (0.3 0.3 0.3)
+      (translate (0 -2.0 0)
+        (rotate 0 0 1.57)
+          (scale (0.1 1.5 0.1)
+            (cylinder)))))
+)

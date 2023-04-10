@@ -52,6 +52,12 @@
 																					 ;(upcube)
 																					 )
 																		  (wizard-model)
+																		  (offset (5 0 0)
+																					 ;(rgb (1 0 0)														;				 (cube))
+																					 ;(rgb (0 1 0) (sphere1))
+			  (cat-model)
+																					 )
+																		  
 																		  ))))))
 
 							 )
@@ -59,19 +65,9 @@
 ))))
 
 (defvar model2
-	  '((ortho (100 100 100)
+	  '(perspective (1.0 1.0 0.1 1000.0)
 		 (depth t
 		  (rgb (1 0 0)
-			(offset (0 -20 -20)
-			(scale (40.0 40.0 40.0)
-			 (for i (-2 -1 0 1 2)
-			  (for j (-2 -1 0 1 2)
-					 (offset ((bind i) (bind j) 0)
-								(scale (0.3 0.3 0.3)
-										 (rotate (0 (bind real-time) 0)
-													;(horse)
-													(scale (0.25 0.25 0.25)
-															 
-													(cherry-tree 5 (bind (+ i (* j 1000)))))))))
-				  )))))
-)))
+			(offset (0 0 -5)
+			 (rotate (0 (bind real-time) 0)
+			  (wizard-model)))))))

@@ -131,9 +131,8 @@
     ))
 
 (defvar sphere1
-  '(offset (0 1.0 0)
-	 (sdf2 (:size 1 :resolution 0.2)
+  '(sdf2 (:size 1 :resolution 0.2)
 	 (rgb (1 1 1)
-	  (sphere 1.0)))))
+	  (sphere 0.95))))
 
 (defvar cone upcube)
