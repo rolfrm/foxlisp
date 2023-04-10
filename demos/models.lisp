@@ -1,4 +1,4 @@
-
+(load "ai-models.lisp")
 (defvar square-model '(polygon :3d-triangle-strip (0 0 0 1 0 0 0 1 0 1 1 0)))
 (defvar square
 	 '(scale (bind args)
@@ -131,8 +131,8 @@
     ))
 
 (defvar sphere1
-  '(sdf2 (:size 1 :resolution 0.2)
+  '(sdf2 (:size 1 :resolution 0.25)
 	 (rgb (1 1 1)
-	  (sphere 0.95))))
+	  (sphere 0.9))))
 
 (defvar cone upcube)
