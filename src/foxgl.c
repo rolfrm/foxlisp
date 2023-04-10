@@ -1189,6 +1189,7 @@ void foxgl_register() {
   lrn("math:sqrt", 1, math_sqrt);
   lrn("math:sqrtf", 1, math_sqrtf);
   lrn("math:random", -1, math_random);
+  lrn("random", -1, math_random);
   lrn("math:mod", 2, math_mod);
   lrn("math:tan", 1, math_tan);
   lrn("math:tan2", 2, math_tan2);

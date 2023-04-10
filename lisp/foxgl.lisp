@@ -1090,6 +1090,21 @@
 	 (release-matrix current-transform)
 	 ))
 
+(defun scope:skew (scope body)
+  (let ((t0 (symbol-value 'current-transform scope))
+		  (skew (unbind (car body) scope))
+		  (rest (cdr body))
+		  (current-transform (get-matrix)))
+	 (math:*! current-transform current-transform t0)
+	 (math:skew! current-transform skew)
+	 (lisp:with-scope-binding scope
+		(lisp:get-current-scope!!)
+		'(current-transform rest) nil
+		'((eval-scoped (lisp:get-current-scope!!) rest))) 
+	 (release-matrix current-transform)
+	 ))
+
+
 
 (defvar current-transform (mat4-identity))
 
@@ -1097,6 +1112,7 @@
   (eval
    '(let ((translate scope:translate)
 			 (rotate scope:rotate)
+			 (skew scope:skew)
 			 (scale scope:scale)
 			 (transform scope:transform)
 			 (offset scope:translate)
@@ -1422,11 +1438,25 @@
 		  ))))
 
 (defvar scope:bake-cache (make-hashtable))
+(defvar scope:bake-key-caches (make-hashtable))
 (defun scope:bake2 (scope model)
-  (let ((r (hashtable-ref scope:bake-cache model))
+  (let ((key (and (eq (car model) :key) (unbind (cadr model) scope)))
+		  (cache scope:bake-cache)
+		  )
+	 (when key
+		(set! cache (hashtable-ref scope:bake-key-caches model))
+		(unless cache
+		  (set! cache (make-hashtable))
+		  (hashtable-set! scope:bake-key-caches model cache)) 
+		(set! model (cddr model)))
+	 (unless key
+		(set! key model))
+			 
+  (let ((r (hashtable-ref cache key))
 		  (model-transform0 (symbol-value 'current-transform scope))
 		  )
     (unless r
+		
 		(let* ((baking-stack nil)
 				 (polygon (lambda (scope model2)
 								(let ((model-transform (symbol-value 'current-transform scope))
@@ -1458,7 +1488,7 @@
                                     (foxgl:load-polygon (cdr baked) 3 nil nil)
                                     )))
 		
-			 (hashtable-set scope:bake-cache model r)
+			 (hashtable-set cache key r)
 			 )
 		  )
 		)
@@ -1469,7 +1499,7 @@
     (foxgl:blit-polygon (cdr r))
     (foxgl:blit-mode nil)
     
-	 ))
+	 )))
 
 (defun scope:blit-text (scope model)
   (let ((model-transform (symbol-value 'current-transform scope))

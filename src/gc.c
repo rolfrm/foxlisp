@@ -818,6 +818,7 @@ static inline pool_info get_array_pool(size_t v) {
   return (pool_info){.alloc_size = v, .pool_id = poolid};
 }
 
+// always allocates cleared pointers.
 static inline void *pool_alloc_array(gc_context *ctx, pool_info p) {
   array_header *new_ptr = ctx->array_pool[p.pool_id].free_arrays;
   if (new_ptr) {

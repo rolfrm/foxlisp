@@ -1761,7 +1761,7 @@ f32 generic_sdf2(void *ud, vec3 p, vec3 *c) {
   // vec3_print(p);printf("\n");
   return generic_sdf(ud, p, c);
 }
-bool improve_meshes = false;
+bool improve_meshes = true;
 void ht_empty(hash_table *ht);
 lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res,
                               lisp_value model0, lisp_value offset) {

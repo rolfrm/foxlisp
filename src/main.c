@@ -481,16 +481,20 @@ lisp_value lisp_macro_expand(lisp_scope *scope, lisp_value value) {
   if (lisp_value_eq(car(value), quote_sym))
     return value;
   var value_new = lisp_sub_macro_expand(scope, value);
-  if (!lisp_value_eq(value_new, value))
-    return value_new;
+  if (!lisp_value_eq(value_new, value)){
+     return value_new;
+  }
   lisp_value head = car(value);
   if (!is_symbol(head))
     return value;
-  if (lisp_value_eq(head, quote_sym))
+     if (lisp_value_eq(head, quote_sym))
     return value;
   lisp_value head_value = lisp_scope_get_value(scope, head);
+  //printf("ok!\n");
+  //println(value_new);
   if (!is_function_macro(head_value))
     return value;
+  
   lisp_function *f = lisp_value_function(head_value);
   let argcnt = list_length(f->args);
   cons args3[argcnt];
@@ -1717,8 +1721,20 @@ static lisp_value lisp_eval_inner(lisp_scope *scope, lisp_value value) {
     case LISP_FUNCTION_NATIVE:
       return lisp_eval_native_functions(
           scope, lisp_value_native_function(first), argcnt, cdr(value));
+    case LISP_FUNCTION_MACRO:
+    {
+      bool p = gc_unsafe_stack;
+      gc_unsafe_stack = true;
+      let code = lisp_macro_expand(scope, value);
+      gc_unsafe_stack = p;
+      println(code);
+      return lisp_eval(scope, code);
+    }
     default:
-      lisp_error(new_cons(value, string_lisp_value("is not a function")));
+      printf("first_type: %i\n", first_type);
+      var codestr = lisp_value_to_string(value);
+      var message = string_lisp_value("Cannot be interpreted as a function call: ");
+      lisp_error(lisp_string_concat(message, codestr));
       return nil;
     }
   } break;
@@ -1884,6 +1900,7 @@ lisp_value lisp_eval_stream(io_reader *rd) {
       gc_unsafe_stack = true;
       next_toplevel = code;
       var next_code = lisp_macro_expand(current_context->globals, code);
+      
       gc_unsafe_stack = p;
 
       if (lisp_value_eq(next_code, code))
@@ -2085,7 +2102,7 @@ lisp_value print(lisp_value v) {
   return integer(l);
 }
 
-lisp_value value_to_string(lisp_value v) {
+static lisp_value value_to_string(lisp_value v) {
   int l = print2(NULL, 0, v);
   l += 100;
   char *str = lisp_malloc(l + 1);
@@ -2094,6 +2111,23 @@ lisp_value value_to_string(lisp_value v) {
   var r = string_lisp_value(str);
   lisp_string_double_quotes = true;
   return r;
+}
+
+lisp_value lisp_value_to_string(lisp_value v){
+  return value_to_string(v);
+}
+
+lisp_value lisp_string_concat(lisp_value a, lisp_value b){
+  TYPE_ASSERT(a, LISP_STRING);
+  TYPE_ASSERT(b, LISP_STRING);
+  var str1 = a.string;
+  var str2 = b.string;
+  var l1 = strlen(str1);
+  var l2 = strlen(str2);
+  char * newstr = lisp_malloc(l1 + l2 + 1);
+  memcpy(newstr, str1, l1);
+  memcpy(newstr + l1, str2, l2);
+  return string_lisp_value(newstr);
 }
 
 void lisp_register_value(const char *name, lisp_value value) {

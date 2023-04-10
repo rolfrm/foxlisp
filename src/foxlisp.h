@@ -338,6 +338,8 @@ lisp_value print(lisp_value v);
 lisp_value get_symbol(const char *s);
 lisp_value println(lisp_value v);
 lisp_value println_shallow(lisp_value v);
+lisp_value lisp_value_to_string(lisp_value v);
+lisp_value lisp_string_concat(lisp_value a, lisp_value b);
 lisp_value lisp_length(lisp_value cons_list);
 size_t list_length(lisp_value cons_list);
 const char *lisp_type_to_string(lisp_type t);

@@ -250,13 +250,16 @@ static lisp_value lisp_max(lisp_value *values, int count) {
 
 static lisp_value lisp_min(lisp_value *values, int count) {
   if(count == 0) return nil;
-  lisp_value v1 = values[0];
-  for(int i = 1; i < count; i++){
-    lisp_value it = values[i];
-    if(lisp_cmp(&v1, &it) > 0)
-      v1 = it;
+  
+  lisp_value *min_value = values;
+  lisp_value *end = values + count;
+
+  for (lisp_value *it = values + 1; it < end; ++it) {
+    if (lisp_cmp(min_value, it) > 0)
+      min_value = it;
   }
-  return v1;
+  
+  return *min_value;
 }
 
 static bool lessf(f64 a, f64 b) { return a < b; }

@@ -49,10 +49,15 @@
 
 (define cube1 cube-model)
 
+(defvar pyramid
+  '(polygon :3d-triangle-strip (-0.5 0 0.5   0 1 0   0.5 0 0.5   0 1 0   0.5 0 -0.5   0 1 0   -0.5 0 -0.5   0 1 0   -0.5 0 0.5)
+))
+
 (define tile-model '(polygon :3d-triangle-strip (0 0 0
                                                  1 0 0
                                                  0 0 1
                                                  1 0 1)))
+
 (define tile-model-2
   '(translate (-0.5 -0.5 -0.5)
     (ref tile-model)))
@@ -62,6 +67,27 @@
                                                  1 0 0
                                                  0 1 0
                                                     1 1 0)))
+
+;; y = sin(x), x = [0, 45, 90, 135, 180]
+(defun odd? (x)
+  (eq (mod x 2) 1))
+(defun gen-circle(n)
+  (let ((out (make-vector n)))
+	 (dotimes! i n
+				  (let ((phase (* pi (/ (rational i) (- n 1)))))
+					 (let (
+							(offset (if (odd? i) -1.0 1.0))
+							(x (sin phase))
+							(y (* offset (cos phase))))
+					 (vector-set! out i
+									  (cons x y)))))
+	 out))
+
+(println (gen-circle 5))
+
+(defvar circle-model
+  '(polygon :3d-triangle-strip (bind (gen-circle (car args)))))
+
 
 (define z-square
   '(translate (-0.5 -0.5 0.0)
@@ -103,3 +129,11 @@
           (set! out (list* z y x 0.0 y x out)))))
     (reverse! out)
     ))
+
+(defvar sphere1
+  '(offset (0 1.0 0)
+	 (sdf2 (:size 1 :resolution 0.2)
+	 (rgb (1 1 1)
+	  (sphere 1.0)))))
+
+(defvar cone upcube)
