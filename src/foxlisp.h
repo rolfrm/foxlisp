@@ -105,11 +105,7 @@ typedef enum {
 
 typedef struct {
   union {
-    struct {
-      lisp_type type : 32;
-
-      int macro_expanded : 1;
-    };
+	 lisp_type type;
     u64 reserved;
   };
   union {

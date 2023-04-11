@@ -1,4 +1,4 @@
-OPT = -O0 -g3
+OPT = -O4 -g0
 LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c process.c parser.c test.c surface.c mc.c foxmath.c lisp_base.c hashtable.c vector.c table.c #awsm.c foxvm.c #model.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc

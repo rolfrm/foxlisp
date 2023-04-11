@@ -1769,17 +1769,10 @@ lisp_value lisp_eval_value(lisp_value code, lisp_value scope) {
 
     lisp_value next_code = code; // code.expanded ? code :
     if (is_cons(next_code)) {
-      if (!next_code.cons->car.macro_expanded) {
         bool p = gc_unsafe_stack;
         gc_unsafe_stack = true;
         next_code = lisp_macro_expand(scopeptr, code);
         gc_unsafe_stack = p;
-
-        next_code.cons->car.macro_expanded = true;
-      } else {
-        break;
-        // printf("skip macro expand\n");
-      }
     }
 
     if (lisp_value_eq(next_code, code))
@@ -1787,7 +1780,18 @@ lisp_value lisp_eval_value(lisp_value code, lisp_value scope) {
     code = next_code;
   }
 
-  return lisp_eval(scopeptr, code);
+  lisp_value result = nil;
+  lisp_value next_toplevel = {0};
+  cons toplevel = {.car = current_toplevel,
+	 .cdr = lisp_pointer_to_lisp_value(&next_toplevel)};
+  current_toplevel = cons_lisp_value(&toplevel);
+  next_toplevel = code;
+  
+  current_toplevel = toplevel.car;
+
+  result = lisp_eval(scopeptr, code);
+
+  return result;
 }
 
 void on_read_cons(io_reader *rd, lisp_value c) {
