@@ -570,4 +570,13 @@
 ;(println (math:random 1 4))
 													 ;(dotimes! n 1000000 (test-varacic-perf 10 10 10))
 
+
+(defun test-5 (n)
+		  (decf n 1)
+		  n)
+(eval '(defun test-5 (n)
+		  (decf n 1)
+		  n))
+(assert (eq 3 (test-5 4)))
+
 (println "Tests Passed")

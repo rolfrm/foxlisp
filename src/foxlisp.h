@@ -323,6 +323,7 @@ void *gc_clone(const void *mem, size_t s);
 void *nogc_clone(const void *mem, size_t s);
 // functions
 lisp_value lisp_eval(lisp_scope *scope, lisp_value value);
+lisp_value lisp_eval_lisp_string(lisp_value string);
 // eval: (a1)
 lisp_value lisp_eval1(lisp_scope *scope, lisp_value a1);
 // eval: (a1 (quote a2))
@@ -445,7 +446,7 @@ void lisp_register_native_noeval(const char *name, int nargs, void *fptr);
 void lisp_register_native_macrolike(const char *name, lisp_value (*fptr)(lisp_scope*,lisp_value));
 
 lisp_value lisp_read_string(const char *str);
-
+//lisp_value lisp_eval_stream2(lisp_scope * scope, lisp_value (* next)(void * data), void * data);
 // macros
 
 #define cdddr(x) cdr(cddr(x))

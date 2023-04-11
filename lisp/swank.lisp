@@ -26,21 +26,19 @@
 
 (defun swank-repl:listener-eval (str )
   (let ((e (lambda ()
-             (let ((forms (read-string str)))
-               (if (not (null? forms))
+               (if (not (null? str))
                    (with-exception-handler
-                       (eval `(progn ,forms))
+                       (eval-string str)
                      (lambda (ex) ex))
 
-                   )))))
+                   ))))
     (let ((result (e)))
       `(:ok (:values ,(value->string result))))))
 
 (defun swank:compile-string-for-emacs (str buffer position filename _)
   (let ((e (lambda ()
-             (let ((forms (read-string str)))
-               (if (not (null? forms))
-                   (eval `(progn ,forms)))))))
+             (if (not (null? str))
+                   (eval-string str)))))
     (let ((result (e)))
       (println result)
       `(:ok (:compilation-result nil t 0.0 nil nil)))))

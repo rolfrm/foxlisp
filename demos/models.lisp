@@ -73,6 +73,10 @@
   (eq (mod x 2) 1))
 (defun gen-circle(n)
   (let ((out (make-vector n)))
+
+	 out))
+(defun gen-circle(n)
+  (let ((out (make-vector n)))
 	 (dotimes! i n
 				  (let ((phase (* pi (/ (rational i) (- n 1)))))
 					 (let (

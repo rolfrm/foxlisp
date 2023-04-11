@@ -490,10 +490,9 @@ lisp_value lisp_macro_expand(lisp_scope *scope, lisp_value value) {
      if (lisp_value_eq(head, quote_sym))
     return value;
   lisp_value head_value = lisp_scope_get_value(scope, head);
-  //printf("ok!\n");
-  //println(value_new);
-  if (!is_function_macro(head_value))
-    return value;
+  if (!is_function_macro(head_value)){
+	 return value;
+  }
   
   lisp_function *f = lisp_value_function(head_value);
   let argcnt = list_length(f->args);
@@ -1725,8 +1724,15 @@ static lisp_value lisp_eval_inner(lisp_scope *scope, lisp_value value) {
     {
       bool p = gc_unsafe_stack;
       gc_unsafe_stack = true;
-      let code = lisp_macro_expand(scope, value);
+		var code = value;
+		while(true){
+		  let code2 = lisp_macro_expand(scope, code);
+		  if(eq(code,code2))
+			 break;
+		  code = code2;
+		}
       gc_unsafe_stack = p;
+		printf("Done expanding: ");
       println(code);
       return lisp_eval(scope, code);
     }
@@ -1751,6 +1757,7 @@ static lisp_value lisp_eval_inner(lisp_scope *scope, lisp_value value) {
 }
 
 lisp_value lisp_eval_value(lisp_value code, lisp_value scope) {
+  
   lisp_scope *scopeptr;
   if (!is_nil(scope)) {
     TYPE_ASSERT(scope, LISP_SCOPE);
@@ -1869,6 +1876,7 @@ lisp_value lisp_print_code_location(lisp_value cons) {
   return nil;
 }
 
+
 lisp_value lisp_eval_stream(io_reader *rd) {
   lisp_value result = nil;
   lisp_value next_toplevel = {0};
@@ -1886,7 +1894,7 @@ lisp_value lisp_eval_stream(io_reader *rd) {
     gc_unsafe_stack = true;
 
     var code = lisp_read_stream(rd);
-    
+	 
     gc_unsafe_stack = p;
 
     if (off == rd->offset || is_nil(code))
@@ -1925,6 +1933,15 @@ static lisp_value lisp_eval_string(const char *str) {
   w.offset = 0;
   return lisp_eval_stream(&w);
 }
+
+lisp_value lisp_eval_lisp_string(lisp_value lisp_str) {
+  TYPE_ASSERT(lisp_str, LISP_STRING);
+  var str = lisp_str.string;
+  io_reader w = io_reader_from_bytes((void *)str, strlen(str) + 1);
+  w.offset = 0;
+  return lisp_eval_stream(&w);
+}
+
 
 lisp_value lisp_eval_file(const char *filepath) {
   char *buffer = read_file_to_string(filepath);
@@ -2603,6 +2620,7 @@ lisp_context *lisp_context_new() {
   lisp_register_native("lisp:code-location", 1, lisp_code_location);
   lisp_register_native("deref-pointer", 1, lisp_value_deref);
   lisp_register_native("eval", 2, lisp_eval_value);
+  lisp_register_native("eval-string", 1, lisp_eval_lisp_string);
   lisp_register_macro("if", LISP_IF);
   lisp_register_macro("quote", LISP_QUOTE);
   lisp_register_macro("+let-impl+", LISP_LET);

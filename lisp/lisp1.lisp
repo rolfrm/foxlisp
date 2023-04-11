@@ -1,5 +1,6 @@
 
-(def defun (macro (name args &rest body) `(def ,name (lambda ,args ,@body))))
+(def defun (macro (name args &rest body)
+						`(def ,name (lambda ,args ,@body))))
 
 (def defmacro (macro (name args &rest body)
                         `(def ,name  (macro ,args ,@body))))
@@ -206,6 +207,7 @@
   `(set! ,var (- ,var ,value)))
 
 (defmacro dotimes! (a n &rest body)
+  (println 'expanding-dotimes)
   `(let ((,a 0))
     (loop (< ,a ,n)
           ,@body
