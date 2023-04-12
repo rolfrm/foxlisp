@@ -574,9 +574,33 @@
 (defun test-5 (n)
 		  (decf n 1)
 		  n)
+
+
+
 (eval '(defun test-5 (n)
 		  (decf n 1)
 		  n))
+
 (assert (eq 3 (test-5 4)))
+
+
+(let ((weak-table (make-hashtable :weak))
+		(test-type2 (typespec-new 'test2))
+      (destruct-called nil)
+		)
+  (typespec-set-destruct! test-type2 (lambda (x)
+													;(println 'destry (cdr x))
+													(set! destruct-called t)))
+
+  (dotimes! i 10000
+				(hashtable-set! weak-table (cons test-type2 i) i)
+				;(println (hashtable-count weak-table))
+				)
+  (assert destruct-called)
+  (assert (< (hashtable-count weak-table) 30000))
+  (lisp:collect-garbage)
+  (assert (eq 0 (hashtable-count weak-table)))
+  )
+
 
 (println "Tests Passed")

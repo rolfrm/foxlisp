@@ -88,26 +88,26 @@ lisp_value math_tan2(lisp_value a, lisp_value b) {
       atan2(lisp_value_as_rational(a), lisp_value_as_rational(b)));
 }
 
-lisp_value math_random(lisp_value * values, size_t count) {
-  if(count == 0){
+lisp_value math_random(lisp_value *values, size_t count) {
+  if (count == 0) {
     return integer(randu32(0xFFFFFFFF));
   }
-  if(count == 1){
+  if (count == 1) {
     var range = values[0];
     if (range.type == LISP_INTEGER)
-     return integer(randu32((u32)range.integer));
-  
+      return integer(randu32((u32)range.integer));
+
     if (range.type == LISP_RATIONAL || range.type == LISP_FLOAT32)
       return rational(randf64() * range.rational);
   }
-  if(count == 2){
+  if (count == 2) {
     var min = values[0];
     var max = values[1];
     EXPR_ASSERT(min.type == max.type);
     if (min.type == LISP_INTEGER)
-       return integer(randu32((u32)max.integer - min.integer + 1) + min.integer);
+      return integer(randu32((u32)max.integer - min.integer + 1) + min.integer);
     if (min.type == LISP_RATIONAL || min.type == LISP_FLOAT32)
-       return rational(randf64()*(max.rational - min.rational) + min.rational);
+      return rational(randf64() * (max.rational - min.rational) + min.rational);
   }
   EXPR_ASSERT(false);
 }
@@ -1149,22 +1149,22 @@ lisp_value foxgl_eval_scoped0(lisp_value scope, lisp_value form) {
       var prevargs =
           lisp_scope_get_value(scope2, get_symbol_cached(&args, "args"));
       var it = cdr(form);
-      
+
       var argcount = list_length(it);
       cons lst[argcount];
-      if(argcount > 0){
-      
-      for(size_t i = 0; i < argcount; i++){
-        
-        lst[i].car = foxgl_unbind(car(it), scope);
-        if(i < argcount - 1)
-          lst[i].cdr = cons_lisp_value(&lst[i+1]);
-        else
-          lst[i].cdr = nil;
-        it = cdr(it);
+      if (argcount > 0) {
+
+        for (size_t i = 0; i < argcount; i++) {
+
+          lst[i].car = foxgl_unbind(car(it), scope);
+          if (i < argcount - 1)
+            lst[i].cdr = cons_lisp_value(&lst[i + 1]);
+          else
+            lst[i].cdr = nil;
+          it = cdr(it);
+        }
       }
-      }
-      
+
       lisp_scope_set_value(scope2, args, cons_lisp_value(lst));
       foxgl_eval_scoped0(scope, sub);
       lisp_scope_set_value(scope2, args, prevargs);

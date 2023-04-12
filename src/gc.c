@@ -703,9 +703,12 @@ void gc_collect_garbage(lisp_context *lisp) {
 
 bool gc_unsafe_stack = false;
 void maybe_gc(lisp_context * ctx){
-  if(gc_unsafe_stack == false && ctx->gc->request_gc){
+  static bool is_gcing = false;
+  if(gc_unsafe_stack == false && ctx->gc->request_gc && !is_gcing){
+	 is_gcing = true;
     gc_collect_garbage(ctx);
     ctx->gc->request_gc = false;
+	 is_gcing = false;
   }
 }
 
@@ -899,8 +902,23 @@ lisp_value lisp_count_allocated() {
   return integer(allocated);
 }
 
+lisp_value lisp_count_allocated_cons(){
+  var gc = current_context->gc;
+  size_t allocated = 0;
+  var buf = gc->cons_pool;
+
+  while (buf != NULL) {
+    allocated += buf->used;
+    buf = buf->next;
+  }
+  return integer(allocated);
+
+}
+static void lrn(const char *l, int args, void *f) { lisp_register_native(l, args, f); };
+
 void gc_register() {
   lisp_pinned_set = lisp_set_new();
   lisp_register_value("gc:++pinned-set++",
                       lisp_pointer_to_lisp_value(&lisp_pinned_set));
+  lrn("gc:allocated-cons", 0, lisp_count_allocated_cons);
 }

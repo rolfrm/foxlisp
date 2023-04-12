@@ -207,7 +207,6 @@
   `(set! ,var (- ,var ,value)))
 
 (defmacro dotimes! (a n &rest body)
-  (println 'expanding-dotimes)
   `(let ((,a 0))
     (loop (< ,a ,n)
           ,@body

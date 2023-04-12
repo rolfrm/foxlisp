@@ -84,11 +84,10 @@ bool type_assert(lisp_value val, lisp_type type) {
   return true;
 }
 
-bool type_assert_extra(lisp_value val, lisp_type type, const char * variable) {
+bool type_assert_extra(lisp_value val, lisp_type type, const char *variable) {
   if (lisp_value_type(val) != type) {
     char buffer[1000];
-    sprintf(buffer, "%s: Invalid type, expected %s, but got %s\n",
-            variable,
+    sprintf(buffer, "%s: Invalid type, expected %s, but got %s\n", variable,
             lisp_type_to_string(type),
             lisp_type_to_string(lisp_value_type(val)));
     raise_string(nogc_clone(buffer, strlen(buffer) + 1));
@@ -481,19 +480,19 @@ lisp_value lisp_macro_expand(lisp_scope *scope, lisp_value value) {
   if (lisp_value_eq(car(value), quote_sym))
     return value;
   var value_new = lisp_sub_macro_expand(scope, value);
-  if (!lisp_value_eq(value_new, value)){
-     return value_new;
+  if (!lisp_value_eq(value_new, value)) {
+    return value_new;
   }
   lisp_value head = car(value);
   if (!is_symbol(head))
     return value;
-     if (lisp_value_eq(head, quote_sym))
+  if (lisp_value_eq(head, quote_sym))
     return value;
   lisp_value head_value = lisp_scope_get_value(scope, head);
-  if (!is_function_macro(head_value)){
-	 return value;
+  if (!is_function_macro(head_value)) {
+    return value;
   }
-  
+
   lisp_function *f = lisp_value_function(head_value);
   let argcnt = list_length(f->args);
   cons args3[argcnt];
@@ -581,7 +580,6 @@ lisp_value lisp_eval_quasiquoted(lisp_scope *scope, lisp_value value) {
     if (lisp_value_eq(fst, unquote_splice_sym))
       return lisp_eval(scope, cadr(value));
 
-  
     return lisp_eval_quasiquoted_sub(scope, value);
   }
   default:
@@ -1091,9 +1089,9 @@ lisp_value lisp_eval_native_functions(lisp_scope *scope, native_function *n,
     raise_string("function is null");
     return nil;
   }
-  if(n->macro_like){
-      lisp_value (* f)(lisp_scope *, lisp_value) = n->fptr;
-      return f(scope, arg_form);
+  if (n->macro_like) {
+    lisp_value (*f)(lisp_scope *, lisp_value) = n->fptr;
+    return f(scope, arg_form);
   }
 
   size_t argcnt2 = argcnt;
@@ -1720,26 +1718,26 @@ static lisp_value lisp_eval_inner(lisp_scope *scope, lisp_value value) {
     case LISP_FUNCTION_NATIVE:
       return lisp_eval_native_functions(
           scope, lisp_value_native_function(first), argcnt, cdr(value));
-    case LISP_FUNCTION_MACRO:
-    {
+    case LISP_FUNCTION_MACRO: {
       bool p = gc_unsafe_stack;
       gc_unsafe_stack = true;
-		var code = value;
-		while(true){
-		  let code2 = lisp_macro_expand(scope, code);
-		  if(eq(code,code2))
-			 break;
-		  code = code2;
-		}
+      var code = value;
+      while (true) {
+        let code2 = lisp_macro_expand(scope, code);
+        if (eq(code, code2))
+          break;
+        code = code2;
+      }
       gc_unsafe_stack = p;
-		printf("Done expanding: ");
+      printf("Done expanding: ");
       println(code);
       return lisp_eval(scope, code);
     }
     default:
       printf("first_type: %i\n", first_type);
       var codestr = lisp_value_to_string(value);
-      var message = string_lisp_value("Cannot be interpreted as a function call: ");
+      var message =
+          string_lisp_value("Cannot be interpreted as a function call: ");
       lisp_error(lisp_string_concat(message, codestr));
       return nil;
     }
@@ -1757,7 +1755,7 @@ static lisp_value lisp_eval_inner(lisp_scope *scope, lisp_value value) {
 }
 
 lisp_value lisp_eval_value(lisp_value code, lisp_value scope) {
-  
+
   lisp_scope *scopeptr;
   if (!is_nil(scope)) {
     TYPE_ASSERT(scope, LISP_SCOPE);
@@ -1767,12 +1765,12 @@ lisp_value lisp_eval_value(lisp_value code, lisp_value scope) {
   }
   while (true) {
 
-    lisp_value next_code = code; // code.expanded ? code :
+    lisp_value next_code = code;
     if (is_cons(next_code)) {
-        bool p = gc_unsafe_stack;
-        gc_unsafe_stack = true;
-        next_code = lisp_macro_expand(scopeptr, code);
-        gc_unsafe_stack = p;
+      bool p = gc_unsafe_stack;
+      gc_unsafe_stack = true;
+      next_code = lisp_macro_expand(scopeptr, code);
+      gc_unsafe_stack = p;
     }
 
     if (lisp_value_eq(next_code, code))
@@ -1783,10 +1781,10 @@ lisp_value lisp_eval_value(lisp_value code, lisp_value scope) {
   lisp_value result = nil;
   lisp_value next_toplevel = {0};
   cons toplevel = {.car = current_toplevel,
-	 .cdr = lisp_pointer_to_lisp_value(&next_toplevel)};
+                   .cdr = lisp_pointer_to_lisp_value(&next_toplevel)};
   current_toplevel = cons_lisp_value(&toplevel);
   next_toplevel = code;
-  
+
   current_toplevel = toplevel.car;
 
   result = lisp_eval(scopeptr, code);
@@ -1880,7 +1878,6 @@ lisp_value lisp_print_code_location(lisp_value cons) {
   return nil;
 }
 
-
 lisp_value lisp_eval_stream(io_reader *rd) {
   lisp_value result = nil;
   lisp_value next_toplevel = {0};
@@ -1898,7 +1895,7 @@ lisp_value lisp_eval_stream(io_reader *rd) {
     gc_unsafe_stack = true;
 
     var code = lisp_read_stream(rd);
-	 
+
     gc_unsafe_stack = p;
 
     if (off == rd->offset || is_nil(code))
@@ -1912,7 +1909,7 @@ lisp_value lisp_eval_stream(io_reader *rd) {
       gc_unsafe_stack = true;
       next_toplevel = code;
       var next_code = lisp_macro_expand(current_context->globals, code);
-      
+
       gc_unsafe_stack = p;
 
       if (lisp_value_eq(next_code, code))
@@ -1945,7 +1942,6 @@ lisp_value lisp_eval_lisp_string(lisp_value lisp_str) {
   w.offset = 0;
   return lisp_eval_stream(&w);
 }
-
 
 lisp_value lisp_eval_file(const char *filepath) {
   char *buffer = read_file_to_string(filepath);
@@ -2134,18 +2130,16 @@ static lisp_value value_to_string(lisp_value v) {
   return r;
 }
 
-lisp_value lisp_value_to_string(lisp_value v){
-  return value_to_string(v);
-}
+lisp_value lisp_value_to_string(lisp_value v) { return value_to_string(v); }
 
-lisp_value lisp_string_concat(lisp_value a, lisp_value b){
+lisp_value lisp_string_concat(lisp_value a, lisp_value b) {
   TYPE_ASSERT(a, LISP_STRING);
   TYPE_ASSERT(b, LISP_STRING);
   var str1 = a.string;
   var str2 = b.string;
   var l1 = strlen(str1);
   var l2 = strlen(str2);
-  char * newstr = lisp_malloc(l1 + l2 + 1);
+  char *newstr = lisp_malloc(l1 + l2 + 1);
   memcpy(newstr, str1, l1);
   memcpy(newstr + l1, str2, l2);
   return string_lisp_value(newstr);
@@ -2164,7 +2158,9 @@ void lisp_register_native(const char *name, int nargs, void *fptr) {
   lisp_register_value(name, v);
 }
 
-void lisp_register_native_macrolike(const char *name, lisp_value (*fptr)(lisp_scope*,lisp_value)){
+void lisp_register_native_macrolike(const char *name,
+                                    lisp_value (*fptr)(lisp_scope *,
+                                                       lisp_value)) {
   native_function *nf = lisp_malloc(sizeof(*nf));
   nf->fptr = fptr;
   nf->macro_like = true;
