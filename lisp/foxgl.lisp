@@ -1316,6 +1316,9 @@
 		  (foxgl:blit-polygon (cdr r))
         ))))
 
+
+(define foxgl:sdf-build-lookup2 (make-hashtable :weak))
+
 (defun scope:sdf (scope model)
   (let ((conf (car model))
 		  (body (cdr model)))
@@ -1333,17 +1336,18 @@
           ))
       (unless clip
         (set! foxgl:sdf-stack nil)
-		  (let ((r (hashtable-ref foxgl:polygon-cache model)))
+		  (let ((r (hashtable-ref foxgl:polygon-cache3 model)))
 			 (unless r
 				(let* ((model2 (foxgl:build-sdf (cdr model) foxgl:current-scope) )
 						 
 						 (poly
                     (foxgl:sdf-marching-cubes size resolution model2  position)
 							))
-				  (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil)
-													 (foxgl:load-polygon (cdr poly) 3 nil nil)
-													 )))
-				  (hashtable-set foxgl:polygon-cache model r)
+				  (set! r (list foxgl:polygon-type
+									 (foxgl:load-polygon (car poly) 3 nil nil)
+									 (foxgl:load-polygon (cdr poly) 3 nil nil)
+													 ))
+				  (hashtable-set foxgl:polygon-cache3 model r)
 				  
 				  ))
 			 
@@ -1449,8 +1453,8 @@
 
 		  ))))
 
-(defvar scope:bake-cache (make-hashtable))
-(defvar scope:bake-key-caches (make-hashtable))
+(defvar scope:bake-cache (make-hashtable :weak))
+(defvar scope:bake-key-caches (make-hashtable :weak))
 (defun scope:bake2 (scope model)
   (let ((key (and (eq (car model) :key) (unbind (cadr model) scope)))
 		  (cache scope:bake-cache)
@@ -1496,9 +1500,9 @@
 											'((eval-scoped0 (lisp:get-current-scope!!) submodel)) 
 											)
 		  (let ((baked (foxgl:bake baking-stack model-transform0)))
-          (set! r (cons 'bake (list (foxgl:load-polygon (car baked) 3 nil nil)
+          (set! r (list foxgl:polygon-type (foxgl:load-polygon (car baked) 3 nil nil)
                                     (foxgl:load-polygon (cdr baked) 3 nil nil)
-                                    )))
+                                    ))
 		
 			 (hashtable-set cache key r)
 			 )
