@@ -72,9 +72,9 @@
 (defun odd? (x)
   (eq (mod x 2) 1))
 (defun gen-circle(n)
-  (let ((out (make-vector n)))
-
-	 out))
+  (let ((i 0)) (loop (< i n) (set! i (+ i 1))) nil))
+(defun gen-circle (n)
+  (decf n 1))
 (defun gen-circle(n)
   (let ((out (make-vector n)))
 	 (dotimes! i n

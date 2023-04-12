@@ -1280,6 +1280,17 @@
 	  (lisp:get-current-scope))
    transform-scope))
 
+(defvar foxgl:polygon-cache3 (make-hashtable :weak))
+(defvar foxgl:polygon-type (typespec-new 'polygon))
+(defun foxgl:polygon-type.destruct (poly)
+  (println 'destructing-polygon (cdr poly))
+  (let ((polygons (cdr poly)))
+	 (loop polygons
+			 (foxgl:delete-polygon (car polygons))
+			 (set! polygons (cdr polygons))))
+  )
+(typespec-set-destruct! foxgl:polygon-type foxgl:polygon-type.destruct)
+
 (defun scope:polygon (scope model)
   (let ((dims 2)
         (poly (plookup model :2d-triangle-strip))
@@ -1293,11 +1304,12 @@
       )
     (when poly
 		
-		(let ((r (hashtable-ref foxgl:polygon-cache model)))
+		(let ((r (hashtable-ref foxgl:polygon-cache3 model)))
         (unless r
-          (set! r (list 'poly (foxgl:load-polygon (list-to-array poly) dims)))
+          (set! r (list foxgl:polygon-type (foxgl:load-polygon (list-to-array poly) dims)))
+	
 			 (println (cons '>>>>> (cons r model)))
-		    (hashtable-set foxgl:polygon-cache model r)
+		    (hashtable-set foxgl:polygon-cache3 model r)
           )
 		  (foxgl:color scope:color)
         (foxgl:transform model-transform)

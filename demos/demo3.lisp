@@ -19,8 +19,8 @@
 						(tile-model))))
 			
 		   (offset (0 -2 -20)
-			 (scale (0.9 0.9 0.9)
-		       (rotate (0.0 100.0 0.0);(bind (* -5 real-time)) 0.0)
+			 (scale (0.2 0.2 0.2)
+		       (rotate (0.0 (bind (* -5 real-time)) 0.0)
 				  (for i (-40 0 40)
 				 		 (for j (-40 0 40)
 								(offset ((bind i) 0 (bind j))

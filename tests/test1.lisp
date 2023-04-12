@@ -602,5 +602,16 @@
   (assert (eq 0 (hashtable-count weak-table)))
   )
 
+(let ((weak-table (make-hashtable :weak)))
+  (eval-string "(defvar weak-test-1 '(1 2))")
+  (hashtable-set! weak-table weak-test-1 1)
+  (eval-string "(defvar weak-test-1 '(3 4))")
+  (hashtable-set! weak-table weak-test-1 1)
+  (println (hashtable-count weak-table))
+  (assert (= 1 (hashtable-count weak-table)))
+
+  )
+
+
 
 (println "Tests Passed")
