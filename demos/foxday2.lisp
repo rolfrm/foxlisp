@@ -67,7 +67,8 @@
 	  (incf freq1 5.0)
 	  (set! new-buffer (audio:source-update source))
 	  )
-	))
+  ))
+  
 ;(audio:source-play source sample4-loaded)
 (defun update ()
   ;(update-audio)

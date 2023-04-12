@@ -1149,26 +1149,24 @@ lisp_value foxgl_eval_scoped0(lisp_value scope, lisp_value form) {
       var prevargs =
           lisp_scope_get_value(scope2, get_symbol_cached(&args, "args"));
       var it = cdr(form);
-
+		
       var argcount = list_length(it);
-      cons lst[argcount];
-      if (argcount > 0) {
+		cons lst[argcount];
 
-        for (size_t i = 0; i < argcount; i++) {
+		for (size_t i = 0; i < argcount; i++) {
 
-          lst[i].car = foxgl_unbind(car(it), scope);
-          if (i < argcount - 1)
-            lst[i].cdr = cons_lisp_value(&lst[i + 1]);
-          else
-            lst[i].cdr = nil;
-          it = cdr(it);
-        }
-      }
-
-      lisp_scope_set_value(scope2, args, cons_lisp_value(lst));
+		  lst[i].car = foxgl_unbind(car(it), scope);
+		  if (i < argcount - 1)
+			 lst[i].cdr = cons_lisp_value(&lst[i + 1]);
+		  else
+			 lst[i].cdr = nil;
+		  it = cdr(it);
+		}
+		
+      lisp_scope_set_value(scope2, args, argcount == 0 ? nil : cons_lisp_value(lst));
       foxgl_eval_scoped0(scope, sub);
       lisp_scope_set_value(scope2, args, prevargs);
-      return nil;
+		return nil;
     }
   }
 

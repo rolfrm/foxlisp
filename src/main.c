@@ -114,6 +114,7 @@ lisp_scope *lisp_scope_new(lisp_scope *super) {
 
 void lisp_scope_stack(lisp_scope *s, lisp_scope *super, cons *lookup,
                       size_t cnt) {
+  s->non_heap_mark = 0;
   s->sub_scope = NULL;
   s->super = super;
   s->values = NULL;

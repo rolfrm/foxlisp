@@ -68,27 +68,6 @@
                                                  0 1 0
                                                     1 1 0)))
 
-;; y = sin(x), x = [0, 45, 90, 135, 180]
-(defun odd? (x)
-  (eq (mod x 2) 1))
-(defun gen-circle(n)
-  (let ((i 0)) (loop (< i n) (set! i (+ i 1))) nil))
-(defun gen-circle (n)
-  (decf n 1))
-(defun gen-circle(n)
-  (let ((out (make-vector n)))
-	 (dotimes! i n
-				  (let ((phase (* pi (/ (rational i) (- n 1)))))
-					 (let (
-							(offset (if (odd? i) -1.0 1.0))
-							(x (sin phase))
-							(y (* offset (cos phase))))
-					 (vector-set! out i
-									  (cons x y)))))
-	 out))
-
-(println (gen-circle 5))
-
 (defvar circle-model
   '(polygon :3d-triangle-strip (bind (gen-circle (car args)))))
 
