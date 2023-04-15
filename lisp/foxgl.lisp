@@ -1453,8 +1453,8 @@
 
 		  ))))
 
-(defvar scope:bake-cache (make-hashtable :weak))
-(defvar scope:bake-key-caches (make-hashtable :weak))
+(defvar scope:bake-cache (make-hashtable))
+(defvar scope:bake-key-caches (make-hashtable))
 (defun scope:bake2 (scope model)
   (let ((key (and (eq (car model) :key) (unbind (cadr model) scope)))
 		  (cache scope:bake-cache)

@@ -333,6 +333,22 @@ lisp_value lisp_scope_create_value(lisp_scope *scope, lisp_value sym,
   scope->values_count += 1;
   return nil;
 }
+void panic_on_scope_error(){
+
+}
+lisp_value lisp_print_scope(lisp_value scope){
+  lisp_scope * s = lisp_value_scope(scope);
+  for(size_t i = 0; i < s->argcnt; i++){
+	 var l = s->lookup[i];
+	 if(is_nil(l.car))
+		panic_on_scope_error();
+	 printf("%i:  ", i);print(l.car); printf(" "); print(l.cdr);printf("\n");
+  }
+
+  lisp_value_scope(scope);
+  
+  return scope;
+}
 
 lisp_scope *lisp_get_root_scope() { return current_context->globals; }
 
@@ -1017,6 +1033,13 @@ lisp_value lisp_eval_lambda(lisp_scope *scope, lisp_value args,
   lisp_function *f = lisp_malloc(sizeof(*f));
   f->code = body;
   f->args = args;
+  var it = args;
+  while(!is_nil(it)){
+	 if(!is_symbol(car(it))) {
+		RETURN_ERROR(string_lisp_value("Unexpected argument declaration type."));
+	 }
+	 it = cdr(it);
+  }
   f->eval_args = true;
   scope = lisp_scope_unstack(scope);
   f->closure = scope;
@@ -1289,7 +1312,7 @@ static inline lisp_value lisp_eval_function(lisp_scope *scope, lisp_function *f,
   }
 
   lisp_unpin_args(args0, argcnt);
-
+  
   var it = f->code;
   lisp_value ret = nil;
   while (!is_nil(it)) {
@@ -1341,9 +1364,35 @@ lisp_value lisp_eval_plookup(lisp_scope *scope, lisp_value lst,
   return nil;
 }
 
-lisp_value lisp_eval_add(lisp_scope *scope, lisp_value number_forms) {
+static lisp_value lisp_eval_add1(lisp_value val1) {
+  lisp_type val1_type = lisp_value_type(val1);
+  EXPR_ASSERT(is_number_type(val1_type));
+  bool integer_mode = !is_float_type(val1_type);
+  if(integer_mode){
+	 val1.integer += 1;
+  }else{
+	 val1.rational += 1.0;
+  }
+  return val1;
+}
+
+static lisp_value lisp_eval_sub1(lisp_value val1) {
+  lisp_type val1_type = lisp_value_type(val1);
+  EXPR_ASSERT(is_number_type(val1_type));
+  bool integer_mode = !is_float_type(val1_type);
+  if(integer_mode){
+	 val1.integer -= 1;
+  }else{
+	 val1.rational -= 1.0;
+  }
+  return val1;
+}
+
+
+lisp_value lisp_eval_add(lisp_scope * scope, lisp_value number_forms) {
   lisp_value val1 = lisp_eval(scope, car(number_forms));
   lisp_type val1_type = lisp_value_type(val1);
+  EXPR_ASSERT(is_number_type(val1_type));
   bool integer_mode = !is_float_type(val1_type);
 
   while (!is_nil(number_forms = cdr(number_forms))) {
@@ -1382,9 +1431,19 @@ lisp_value lisp_eval_add(lisp_scope *scope, lisp_value number_forms) {
 lisp_value lisp_eval_sub(lisp_scope *scope, lisp_value number_forms) {
   lisp_value val1 = lisp_eval(scope, car(number_forms));
   lisp_type val1_type = lisp_value_type(val1);
+  EXPR_ASSERT(is_number_type(val1_type));
   bool integer_mode = !is_float_type(val1_type);
-
-  while (!is_nil(number_forms = cdr(number_forms))) {
+  number_forms = cdr(number_forms);
+  if(is_nil(number_forms)){
+	 if(integer_mode)
+		val1.integer = -val1.integer;
+	 else
+		val1.rational = -val1.rational;
+	 
+	 return val1;
+  }
+  
+  while (!is_nil(number_forms)) {
     lisp_value val2 = lisp_eval(scope, car(number_forms));
     lisp_type val2_type = lisp_value_type(val2);
     if (integer_mode) {
@@ -1412,6 +1471,7 @@ lisp_value lisp_eval_sub(lisp_scope *scope, lisp_value number_forms) {
         val1_type = LISP_RATIONAL;
       }
     }
+	 number_forms = cdr(number_forms);
   }
   val1.type = val1_type;
   return val1;
@@ -1420,6 +1480,7 @@ lisp_value lisp_eval_sub(lisp_scope *scope, lisp_value number_forms) {
 lisp_value lisp_eval_mul(lisp_scope *scope, lisp_value number_forms) {
   lisp_value val1 = lisp_eval(scope, car(number_forms));
   lisp_type val1_type = lisp_value_type(val1);
+  EXPR_ASSERT(is_number_type(val1_type));
   bool integer_mode = !is_float_type(val1_type);
 
   while (!is_nil(number_forms = cdr(number_forms))) {
@@ -1458,6 +1519,7 @@ lisp_value lisp_eval_mul(lisp_scope *scope, lisp_value number_forms) {
 lisp_value lisp_eval_div(lisp_scope *scope, lisp_value number_forms) {
   lisp_value val1 = lisp_eval(scope, car(number_forms));
   lisp_type val1_type = lisp_value_type(val1);
+  EXPR_ASSERT(is_number_type(val1_type));
   bool integer_mode = !is_float_type(val1_type);
 
   while (!is_nil(number_forms = cdr(number_forms))) {
@@ -1528,7 +1590,7 @@ lisp_value lisp_eval(lisp_scope *scope, lisp_value value) {
   cons stk = {.car = value, .cdr = lisp_stack};
   lisp_stack = cons_lisp_value(&stk);
   lisp_stack_size += 1;
-
+  
   var r = lisp_eval_inner(scope, value);
   lisp_stack = stk.cdr;
   lisp_stack_size -= 1;
@@ -1730,8 +1792,6 @@ static lisp_value lisp_eval_inner(lisp_scope *scope, lisp_value value) {
         code = code2;
       }
       gc_unsafe_stack = p;
-      printf("Done expanding: ");
-      println(code);
       return lisp_eval(scope, code);
     }
     default:
@@ -2658,11 +2718,16 @@ lisp_context *lisp_context_new() {
   lisp_register_macro("-", LISP_SUB);
   lisp_register_macro("*", LISP_MUL);
   lisp_register_macro("/", LISP_DIV);
+  lisp_register_native("1+", 1, lisp_eval_add1);
+  lisp_register_native("1-", 1, lisp_eval_sub1);
+  lisp_register_native_macrolike("expand-macro", lisp_macro_expand);
+  
+
   lisp_register_macro("vector-length", LISP_VECTOR_LENGTH);
   lisp_register_macro("vector-ref", LISP_VECTOR_REF);
   lisp_register_macro("vector-set!", LISP_VECTOR_SET);
   lisp_register_macro("float32", LISP_CONV_FLOAT32);
-
+  
   lisp_register_value("native-null-pointer",
                       (lisp_value){.type = LISP_NATIVE_POINTER, .integer = 0});
 #ifndef WASM

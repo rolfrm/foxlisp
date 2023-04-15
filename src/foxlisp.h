@@ -239,9 +239,10 @@ bool is_function_macro(lisp_value a);
 bool is_function_native(lisp_value a);
 bool is_macro_builtin(lisp_value a);
 bool is_float_type(lisp_type t);
+bool is_number_type(lisp_type t);
 f64 lisp_value_rational(lisp_value v);
 lisp_value rational_lisp_value(double o);
-;
+
 int64_t lisp_value_as_integer(lisp_value v);
 f64 lisp_value_as_rational(lisp_value v);
 lisp_value string_lisp_value(const char *str);

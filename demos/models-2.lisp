@@ -488,20 +488,33 @@
         (scale (0.5 2 0.5)
          (cylinder)
 			)))
-
+	 (rotate ((bind (* 15 (sin (* 1 run-cycle)))) 0 0)
   ;; Left leg (cylinder)
   (rgb (0.5 0.3 0.8)
     (translate (-0.5 -4.5 0)
       (scale (0.5 2 0.5)
        (cylinder)
 		 )))
+	 ;; Left foot (cube)
+	 
+(rgb (0.5 0.3 0.8)
+  (translate (-0.5 -4.5 0.5)
+    (scale (0.5 0.5 1)
+      (cube)))))
 
-  ;; Right leg (cylinder)
+	 ;; Right leg (cylinder)
+	 (rotate ((bind (* -15 (sin (* 1 run-cycle)))) 0 0)
   (rgb (0.5 0.3 0.8)
     (translate (0.5 -4.5 0)
       (scale (0.5 2 0.5)
        (cylinder)
 		 )))
+	 ;; Right foot (cube)
+	 (rgb (0.5 0.3 0.8)
+	  (translate (0.5 -4.5 0.5)
+		(scale (0.5 0.5 1)
+       (cube)))))
+
 
   ;; Staff (cylinder)
   (rgb (0.4 0.2 0.1)
@@ -517,17 +530,7 @@
       (scale (0.5 0.5 0.5)
        (sphere1))))
 
-	 ;; Left foot (cube)
-(rgb (0.5 0.3 0.8)
-  (translate (-0.5 -4.5 0.5)
-    (scale (0.5 0.5 1)
-      (cube))))
 
-;; Right foot (cube)
-(rgb (0.5 0.3 0.8)
-  (translate (0.5 -4.5 0.5)
-    (scale (0.5 0.5 1)
-      (cube))))
 ))
 
 

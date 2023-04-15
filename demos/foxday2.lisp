@@ -101,6 +101,9 @@
 
 (define ld50:initialized nil)
 (define win nil)
+(defun key-down?(key)
+  (when win
+	 (foxgl:key-down? win key)))
 (define swnk nil)
 (defun ld50:initialize()
   (set! win (foxgl:create-window (integer 800) (integer 800)))

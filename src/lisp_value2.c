@@ -22,6 +22,21 @@ inline bool is_float_type(lisp_type t) {
   return false;
 }
 
+inline bool is_number_type(lisp_type t){
+
+  switch (t) {
+  case LISP_INTEGER:
+  case LISP_RATIONAL:
+  case LISP_FLOAT32:
+  case LISP_BYTE:
+  case LISP_INTEGER32:
+    return true;
+  default:
+    break;
+  }
+  return false;
+}
+
 inline bool is_nil(lisp_value v) { return v.type == LISP_NIL; }
 
 inline bool is_t(lisp_value v) { return v.type == LISP_T; }

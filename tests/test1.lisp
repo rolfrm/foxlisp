@@ -8,9 +8,10 @@
   (println x2))
 (do-times 4 (lambda () (println (quote hej))))
 (map! print (list 1 2 3 4 (quote x)))
-(define x (macro (&rest b) b))
-
-(println (x))
+;; dont define a macro named X! When x is later used as the first
+;; argument name for a function, that will get expanded.
+;(define x (macro (&rest b) b))
+;(println (x))
 
 (println (read-string "(+ 1 2)"))
 (println (eval (read-string "(+ 1 2)")))
@@ -26,9 +27,10 @@
 (println (lambda (x) x))
 (define y (+ 0.33333 5.0))
 (println (+ y y))
-((lambda (x y) (print (+ x y))) 5.0 50.9)
+((lambda (x2 y) (print (+ x2 y))) 5.0 50.9)
 (define add (lambda (x y) (+ (println x) (println y))))
 (println (add 123 321))
+
 
 (when t (println "unless nil"))
 (unless nil (println "__unless nil_-"))
@@ -40,6 +42,11 @@
 (assert (= 15 (+ 1 2 3 4 5)))
 (assert (= 8 (* 2 2 2)))
 (assert (= 8.0 (* 2 2 2.0)))
+(assert (= -1 (- 1)))
+(assert (= 2 (1- 3)))
+(assert (= 2.0 (1- 3.0)))
+(assert (= 4 (1+ 3)))
+(assert (= 4.0 (1+ 3.0)))
 
 (assert (= 10 (funcall + 1 9)))
 (assert (eq 1 '1)) ; '1 is the number 1.
@@ -386,7 +393,6 @@
 (assert (and t t t))
 (assert-not (and t nil t))
 (assert-not (or nil nil nil))
-(println pi)
 
 (assert (eq 4 (case :b
                 (:a 2)
@@ -612,6 +618,12 @@
 
   )
 
-
+(let ((handled-error nil))
+  (with-exception-handler
+		(cadr (- (cons 1 2)))
+	 (lambda (ex)
+		(set! handled-error t)))
+  ;(assert handled-error)
+  )
 
 (println "Tests Passed")
