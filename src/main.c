@@ -2681,6 +2681,7 @@ lisp_context *lisp_context_new() {
   lisp_register_native("lisp:scope-vars", 1, lisp_scope_vars);
   lisp_register_native("lisp:scope-super", 1, lisp_scope_super);
   lisp_register_native("lisp:scope-set!", 3, lisp_scope_set);
+  lisp_register_native("lisp:print-scope", 1, lisp_print_scope);
   lisp_register_native("lisp:code-location", 1, lisp_code_location);
   lisp_register_native("deref-pointer", 1, lisp_value_deref);
   lisp_register_native("eval", 2, lisp_eval_value);

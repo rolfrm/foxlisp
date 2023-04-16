@@ -28,7 +28,9 @@
 (defun is-table (table) (eq (car table) table-type))
 
 (typespec-set-print! table-type 
-    (lambda (x) (cdr x)))
+							(lambda (x)
+							  ;(raise x)
+							  (cdr x)))
 
 (defun table-push-row (table &rest args)
     (let ((rowcnt (table-rows table)))

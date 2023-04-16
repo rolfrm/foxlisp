@@ -1036,6 +1036,10 @@
   (let ((bind-clause (car form)))
 	 (eval-scoped scope (eval bind-clause scope))))
 
+(defun scope:bind2 (scope form)
+  (let ((bind-clause (car form)))
+	 (eval-scoped0 scope (eval (eval bind-clause scope) scope))))
+
 (defvar base-scope
   (let ((vars scope:let)
 		  (print (lambda (scope body) (println (unbind (car body) scope))))
@@ -1044,6 +1048,7 @@
 		  (ref scope:ref)
 		  (scope:if scope:if0)
 		  (bind scope:bind)
+		  (bind2 scope:bind2)
 		  (args ())
 		  (ignore (lambda (s b) ))
 		  )

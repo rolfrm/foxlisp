@@ -22,7 +22,7 @@
 (table-insert entities a-id 10.0 0.0 15.0 45.0) 
 (table-insert entities b-id 15.0 0.0 5.0 20.0) 
 (table-insert entity-model wizard-id 'duck-toy) 
-(table-insert entity-model a-id 'wizard-model)
+(table-insert entity-model a-id 'evil-wizard-model)
 (table-insert entity-model b-id 'duck-toy)
 (table-insert active-entities wizard-id)
 (table-insert active-entities a-id)
@@ -65,9 +65,9 @@
 		  (set! z (caddr wizard-offset))
 		  (set! angle (rational wizard-angle)))
 		))
-  (println entities)
   (when events
-	 (println events))
+	 ;(println events)
+	 )
   )
 
 (set! model
@@ -98,7 +98,7 @@
 			  (scale (1000 1 1000)
 						(tile-model))))
 
-				(vars ((run-cycle (* 2 wizard-walk)))
+				  (vars ((run-cycle (* 2 wizard-walk)))
 						(offset (bind wizard-offset)
 								  (rotate (0 (bind wizard-angle) 0)
 								  (scale 0.4
@@ -109,13 +109,14 @@
 											 )
 								  
 													  )))))
+						 (vars ((test 123))
 						(for-table (entities active-entities entity-model)
 									  (offset ((bind x) (bind y) (bind z))
 								  (rotate (0 (bind angle) 0)
 								  (scale 0.4
 											(offset (0 1 0)
-													  (bind (eval model))
-													  )))))
+													  (bind2 model)
+													  ))))))
 									  
 		    
 			 (scale 1.0
