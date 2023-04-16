@@ -199,7 +199,7 @@
 	  '((perspective (1.0 1.0 1.0 1000.0)
 		 (depth t
 		  (transform (bind view)
-		  	(rgb (0 0 1)
+		  				 (rgb (0 0 1)
 				 (translate (0 -10 0)
 					(scale (100 1 100)
 						   (cube-2)))

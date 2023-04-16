@@ -23,21 +23,39 @@
 (defvar active-entities (table-new 'active-entities '((entity 0 :entity))))
 (defvar entity-model (table-new 'entity-model '((entity 0 :entity) (model ()))))
 
+(defvar collisions (table-new 'collisions '((entity-a 0 :entity) (entity-b 0 :entity) (collision-data ()))))
+
+(defvar physical-body (table-new 'physical-body
+											'((entity 0 :entity)
+											  (offset-x 0.0)
+											  (offset-y 0.0)
+											  (offset-z 0.0)
+											  (body ()))))
+(defvar dec-to-rad (* pi (/ 2.0 360.0))) 
 (defvar wizard-id (gen-id))
 (defvar a-id (gen-id))
 (defvar b-id (gen-id))
 (defvar c-id (gen-id))
 (table-insert entities wizard-id 3.0 0.0 5.0 0.0) 
-(table-insert entities a-id 10.0 0.0 15.0 45.0) 
+(table-insert entities a-id 10.0 0.0 15.0 0.0) 
 (table-insert entities b-id 15.0 0.0 5.0 20.0)
+(table-insert entities c-id 13.0 0.0 15.0 0.0)
 
 (table-insert entity-model wizard-id 'player-wizard) 
 (table-insert entity-model a-id 'evil-wizard-model)
+(table-insert entity-model c-id 'evil-wizard-model)
 (table-insert entity-model b-id 'duck-toy)
 
 (table-insert active-entities wizard-id)
 (table-insert active-entities a-id)
 (table-insert active-entities b-id)
+(table-insert active-entities c-id)
+
+(table-insert physical-body wizard-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
+(table-insert physical-body a-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
+(table-insert physical-body b-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
+(table-insert physical-body c-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
+
 
 (defvar run-cycle 0.0)
 
@@ -81,7 +99,51 @@
 						(set! z (caddr wizard-offset))
 						(set! angle (rational wizard-angle)))
 					 )
-	 )
+	 
+	 ;; physical body collisions
+	 (table:clear collisions)
+	 (table:iter (entities physical-body)
+					 (let ((e0 entity)
+							 (offset-x0 (+ x offset-x))
+							 (offset-y0 (+ y offset-y))
+							 (offset-z0 (+ z offset-z))
+							 (mat-0 (get-matrix))
+							 (col-out (cons nil nil))
+							 (body-0 body)
+												  
+							 (angle-0 angle))
+						(math:translate! mat-0 offset-x0 offset-y0 offset-z0)
+						(math:rotate! mat-0 0 angle-0 0)
+						
+						(table:iter (entities physical-body)
+										(unless (>= entity e0)
+										  (let ((mat-1 (get-matrix)))
+							
+											 
+											 (math:translate! mat-1
+																	(- offset-x0 (+ x offset-x))
+																	(- (+ y offset-y) offset-y0)
+																	(- offset-z0 (+ z offset-z)))
+											 (math:rotate! mat-1 0 (* dec-to-rad (- angle-0  angle)) 0)
+											 
+											 (let ((col (sdf:detect-collision body-0 body mat-1 col-out)))
+												
+												(when col
+												  ;(println (list e0 entity col-out))
+												  (table-insert collisions e0 entity col-out)
+												  )
+											 
+
+											 (release-matrix mat-1)
+											 ))))
+						
+						(release-matrix mat-0)
+									
+						)))
+  (when (> (table-rows collisions) 0)
+	 (println collisions)
+  )
+	 
   (when events
 	 )
   )

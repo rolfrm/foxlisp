@@ -94,7 +94,9 @@ lisp_value table_insert_index(lisp_value table, lisp_value key){
     RAISE("Unable to locate key column");
   lisp_type t = vector_element_type(key_column);
   void * data_ptr = vector_data_pointer(key_column);
-  ASSERT(data_ptr != NULL);
+  // data_ptr == NULL for empty arrays
+  if(data_ptr == NULL)
+	 return integer(0);
   if(t == LISP_INTEGER){
     size_t index = 0;
     i64_insert_index(data_ptr, &key.integer, &index, 1, key_column.vector->count);

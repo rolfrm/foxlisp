@@ -374,31 +374,99 @@ typedef struct {
 
 const float sqrt_3 = 1.73205f;
 
+typedef int (*CompareFunction)(const void *a, const void *b, void *userdata);
+
+void swap_elements(void *a, void *b, size_t size) {
+    char *temp = malloc(size);
+    memcpy(temp, a, size);
+    memcpy(a, b, size);
+    memcpy(b, temp, size);
+    free(temp);
+}
+
+size_t partition(void *base, size_t num, size_t size, CompareFunction compare, void *userdata) {
+    char *pivot = (char *)base + (num / 2) * size;
+    size_t i = 0;
+    size_t j = num - 1;
+
+    while (true) {
+        while (compare((char *)base + i * size, pivot, userdata) < 0) {
+            i++;
+        }
+
+        while (compare((char *)base + j * size, pivot, userdata) > 0) {
+            j--;
+        }
+
+        if (i >= j) {
+            return j;
+        }
+
+        swap_elements((char *)base + i * size, (char *)base + j * size, size);
+        i++;
+        j--;
+    }
+}
+
+void quick_sort(void *base, size_t num, size_t size, CompareFunction compare, void *userdata) {
+    if (num <= 1) {
+        return;
+    }
+
+    size_t p = partition(base, num, size, compare, userdata);
+    quick_sort(base, p + 1, size, compare, userdata);
+    quick_sort((char *)base + (p + 1) * size, num - p - 1, size, compare, userdata);
+}
+
+int comp_depth(const int * a, const int * b, const f32 * d){
+  if(d[*a] < d[*b])
+	 return -1;
+  if(d[*a] > d[*b])
+	 return 1;
+  return 0;
+}
+
 void sdf_detect_collision(cdf_ctx *ctx, vec3 position, f32 size) {
   if (ctx->collision_detected)
     return;
   var d = ctx->sdf1(ctx->userdata1, position, NULL);
   var d2 = ctx->sdf2(ctx->userdata2, position, NULL);
-  // vec3_print(position);
-  // printf("%f %f %f\n", d, d2, size);
+  //vec3_print(position);
+  //printf("%f %f %f\n", (f64)d, (f64)d2, (f64)size);
   if (d < size * sqrt_3 && d2 < size * sqrt_3) {
     f32 s2 = size * 0.5f;
-
+	 
     if (size < ctx->threshold * sqrt_3) {
       // collison detected
       ctx->pt = position;
       ctx->collision_detected = MAX(d, d2) < -ctx->threshold;
       return;
     } else {
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, -s2, -s2)),
-                           s2);
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, -s2, -s2)), s2);
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, s2, -s2)), s2);
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, s2, -s2)), s2);
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, -s2, s2)), s2);
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, -s2, s2)), s2);
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(-s2, s2, s2)), s2);
-      sdf_detect_collision(ctx, vec3_sub(position, vec3_new(s2, s2, s2)), s2);
+		f32 d1[8];
+		int idx[8];
+		vec3 offset[8];
+		for(size_t i = 0; i < 8; i++){
+		  
+		  offset[i] = vec3_sub(position,
+									  vec3_new(
+												  -s2 * ((i&1) == 0 ? 1 : -1),
+												  -s2 * (((i>>1)&1) == 0 ? 1 : -1),
+												  -s2 * (((i>>2)&1) == 0 ? 1 : -1)));
+		  
+		  let d_a = ctx->sdf1(ctx->userdata1, offset[i], NULL);
+		  let d_b = ctx->sdf2(ctx->userdata2, offset[i], NULL);
+		  d1[i] = MAX(d_a, d_b);
+		  idx[i] = i;
+		}
+		
+		qsort_r(idx, 8, sizeof(int), (void *)comp_depth, d1);
+		
+		for(size_t i = 0; i < 8; i++){
+		  size_t i2 = idx[i];
+		  sdf_detect_collision(ctx, offset[i2],s2);
+		  if(ctx->collision_detected)
+		  	 return;
+		}
     }
   }
 }
@@ -1137,8 +1205,6 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,
   sdf_detect_collision(&ctx, p2, 10.0);
   if (ctx.collision_detected && is_cons(out_cons)) {
     ctx2.threshold = 0.01;
-    // describe_sdf(&a_t);
-    // describe_sdf(&b_t);
 
     describe_sdf(ctx.userdata1);
     describe_sdf(ctx.userdata2);
@@ -1154,11 +1220,10 @@ lisp_value foxgl_detect_collision2(lisp_value obj1, lisp_value obj2,
 
   void *model1 = get_physics_model_cached2(obj1);
   void *model2 = get_physics_model_cached2(obj2);
-
   mat4 tform = lisp_value_mat4(tform2);
   vec3 p2 = vec3_new(0.5, 0.5, 0.5);
   p2 = mat4_mul_vec3(tform, p2);
-  // tform = mat4_invert(tform);
+
   sdf_transform a_t = {.type = SDF_TYPE_TRANSFORM,
                        .inv_tform = tform,
                        .models = &model2,
@@ -1168,20 +1233,14 @@ lisp_value foxgl_detect_collision2(lisp_value obj1, lisp_value obj2,
                  .sdf2 = generic_sdf,
                  .userdata1 = model1,
                  .userdata2 = &a_t,
-                 .threshold = 0.001,
+                 .threshold = 0.1,
                  .greatest_common_overlap = 100.0};
   cdf_ctx ctx2 = ctx;
-  // vec3 c;
-  // f32 a = generic_sdf(&a_t, p2, &c);
-  // f32 b = generic_sdf(model2, p2, &c);
-  // printf(">>>> %f %f\n", (double)a, (double)b);
 
   sdf_detect_collision(&ctx, p2, 100.0);
   if (ctx.collision_detected && is_cons(out_cons)) {
     ctx2.threshold = 0.001;
 
-    // describe_sdf(ctx.userdata1);
-    // describe_sdf(ctx.userdata2);
     sdf_detect_max_overlap(&ctx2, p2, 100.0);
     set_car(out_cons, rational_lisp_value((f64)ctx2.pt.x));
     set_cdr(out_cons, rational_lisp_value((f64)ctx2.pt.z));
