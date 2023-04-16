@@ -279,53 +279,53 @@
 
 
 (defvar duck-toy
-  '(scene
-  ;; Body
-  (offset (0 2 0)
-    (rgb (1 1 0)
+  '(scale (-1 1 -1)
+	 ;; Body
+	 (offset (0 0 0)
+     (rgb (1 1 0)
       (scale (4 2 6)
-        (cube))))
-        
-  ;; Head
-  (offset (0 4 -4)
-    (rgb (1 1 0)
+				 (cube))))
+    
+	 ;; Head
+	 (offset (0 2 -4)
+     (rgb (1 1 0)
       (scale (2 2 2)
-        (cube))))
-  
-  ;; Wings
-  ;; Left Wing
-  (offset (-2.5 2 0)
-    (rgb (1 0.9 0)
+				 (cube))))
+	 
+	 ;; Wings
+	 ;; Left Wing
+	 (offset (-2.5 0 0)
+     (rgb (1 0.9 0)
       (rotate (0 0 -45)
-        (scale (1 0.5 3)
-          (cube)))))
-          
-  ;; Right Wing
-  (offset (2.5 2 0)
-    (rgb (1 0.9 0)
+				  (scale (1 0.5 3)
+							(cube)))))
+    
+	 ;; Right Wing
+	 (offset (2.5 0 0)
+     (rgb (1 0.9 0)
       (rotate (0 0 45)
-        (scale (1 0.5 3)
-          (cube)))))
-          
-  ;; Beak
-  (offset (0 4 -6)
-    (rgb (1 0.5 0)
+				  (scale (1 0.5 3)
+							(cube)))))
+    
+	 ;; Beak
+	 (offset (0 2 -6)
+     (rgb (1 0.5 0)
       (scale (0.5 0.5 0.5)
-       (cube))))
+				 (cube))))
 
 	 ;; Eyes
-;; Left Eye
-(offset (-0.5 5 -5.5)
-  (rgb (0 0 0)
-    (scale (0.25 0.25 0.25)
-      (cube))))
+	 ;; Left Eye
+	 (offset (-0.5 3 -5.5)
+	  (rgb (0 0 0)
+		(scale (0.25 0.25 0.25)
+				 (cube))))
 
-;; Right Eye
-(offset (0.5 5 -5.5)
-  (rgb (0 0 0)
-    (scale (0.25 0.25 0.25)
-      (cube))))
-))
+	 ;; Right Eye
+	 (offset (0.5 3 -5.5)
+	  (rgb (0 0 0)
+		(scale (0.25 0.25 0.25)
+				 (cube))))
+	 ))
 
 (defvar duck-toy2
   '(offset (0 -0.5 0)
@@ -439,6 +439,7 @@
 
 (defvar wizard-model
   '(rgb (bind wizard-model-color)
+	 (offset (0 4.5 0)
 	 ;; Head (sphere)
 	 (rgb (0.9 0.8 0.7)
  	  (translate (0 1 0)
@@ -541,7 +542,7 @@
 				 (sphere1))))
 
 
-	 ))
+	 )))
 
 
 (defvar cat-model

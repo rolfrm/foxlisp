@@ -338,6 +338,12 @@ void panic_on_scope_error(){
 }
 lisp_value lisp_print_scope(lisp_value scope){
   lisp_scope * s = lisp_value_scope(scope);
+  lisp_print_scope2(s);
+  return nil;  
+}
+
+
+void lisp_print_scope2(lisp_scope *s){
   for(size_t i = 0; i < s->argcnt; i++){
 	 var l = s->lookup[i];
 	 if(is_nil(l.car))
@@ -345,9 +351,6 @@ lisp_value lisp_print_scope(lisp_value scope){
 	 printf("%i:  ", i);print(l.car); printf(" "); print(l.cdr);printf("\n");
   }
 
-  lisp_value_scope(scope);
-  
-  return scope;
 }
 
 lisp_scope *lisp_get_root_scope() { return current_context->globals; }

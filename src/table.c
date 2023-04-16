@@ -192,11 +192,19 @@ bool is_typeobj(lisp_value v){
   return car(v).type == LISP_TYPESPEC;
 }
 lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
+  static lisp_value edit_keyword;
   var table_form = car(argforms);
   if(is_symbol(table_form)){
 	 table_form = lisp_eval(scope, table_form);
   }
-
+  
+  var rest = cdr(argforms);
+  bool edit = false;
+  if(eq(car(rest), get_symbol_cached(&edit_keyword, ":edit"))){
+	 edit = true;
+	 rest = cdr(rest);
+  }
+  
   size_t table_count = 1;
   if(is_cons(table_form) && !is_typeobj(table_form)){
 	 table_count = list_length(table_form);
@@ -254,29 +262,40 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
   memset(iterators, 0, sizeof(iterators[0]) * table_count);
   
   lisp_scope iter_scope[1] = {0};
-
+  lisp_scope * scope_ptr = iter_scope;
   lisp_scope_stack(iter_scope, scope, args3, column_count_total);
-
+  
   while(iterators[0] < table_rows2[0]){
 	 i64 key = lisp_value_integer(vector_ref(key_columns[0], integer(iterators[0])));
+	 
 	 for(size_t i = 1; i < table_count; i++){
 		
 		  // search for a matching key.
 		  for(; iterators[i] < table_rows2[i]; iterators[i]++){
 			 i64 key2 = lisp_value_integer(vector_ref(key_columns[i], integer(iterators[i])));
-			 
 			 if(key2 == key) break;
 			 if(key2 > key) goto next;
 		  }
 	 }
-	 
-	 for(size_t i = 0; i < column_count_total; i++){
+	 for(size_t i = 0; i < table_count; i++){
 		if(iterators[i] >= table_rows2[i]) return nil;
-		args3[i].cdr = vector_ref(columns[i], integer(iterators[column_source_index[i]]));
+		
 	 }
 	 
-    lisp_eval_progn(iter_scope, cdr(argforms));
-	 next:
+	 for(size_t i = 0; i < column_count_total; i++){
+		scope_ptr->lookup[i].cdr = vector_ref(columns[i], integer(iterators[column_source_index[i]]));
+	 }
+	 
+    lisp_eval_progn(iter_scope, rest);
+	 if(iter_scope->sub_scope != NULL)
+		scope_ptr = scope_ptr->sub_scope;
+
+	 if(edit){
+		for(size_t i = 1; i < column_count_total; i++){
+		  vector_set(columns[i], integer(iterators[column_source_index[i]]),args3[i].cdr);
+		}
+	 }
+  next:
 	 iterators[0] += 1;
   }
   

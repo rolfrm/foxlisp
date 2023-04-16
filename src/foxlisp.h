@@ -362,6 +362,7 @@ gc_context *gc_context_new();
 lisp_value lisp_code_location(lisp_value cons);
 lisp_value lisp_print_code_location(lisp_value cons);
 lisp_value lisp_print_scope(lisp_value scope);
+void lisp_print_scope2(lisp_scope *s);
 
 lisp_value lisp_string(const char *str);
 
