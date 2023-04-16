@@ -979,10 +979,28 @@
 		  (body (cdr body)))
 	 (lisp:with-scope-binding scope (lisp:get-current-scope) '(body) vars
                              '((eval-scoped (lisp:get-current-scope) body)))))
-(defun scope:for(scope body)
+(defun scope:for (scope body)
   (let ((var (car body))
 		  (evalues (unbind (cadr body) scope))
 		  (rest (cddr body)))
+	 (if (eq (car evalues) 'range)
+		  (let ((a (unbind (cadr evalues)))
+				  (b (unbind (caddr evalues)))
+				  (c (unbind (cadddr evalues))))
+			 (let ((start (if b a 0))
+					 (end (or c b a 1))
+					 (step (if c b 1)))
+				(lisp:with-scope-variable
+				  scope (lisp:get-current-scope!!)
+				  '(start step end rest var) var
+				  '((loop start
+							 (lisp:scope-set! (lisp:get-current-scope!!) var start)
+							 (eval-scoped (lisp:get-current-scope!!) rest)
+							 (set! start (+ start step))
+							 (if (> start end)
+								  (set! start nil))
+							 )))))
+		  
 	 (lisp:with-scope-variable
 		  scope (lisp:get-current-scope!!)
 		  '(evalues rest var) var
@@ -990,7 +1008,20 @@
 					(lisp:scope-set! (lisp:get-current-scope!!) var (unbind (car evalues) (lisp:get-current-scope!!)))
 					(eval-scoped (lisp:get-current-scope!!) rest)
 					(set! evalues (cdr evalues))))				 
-		  )))
+		  ))))
+
+(defun scope:for-table (scope body)
+  (let ((scope:for-table:table (car body))
+		  (rest (cdr body)))
+
+	 (lisp:with-scope-variable
+		  scope (lisp:get-current-scope!!)
+		  '(scope:for-table:table rest) nil
+		'((table:iter scope:for-table:table
+			(eval-scoped (lisp:get-current-scope!!) rest)
+			  )))))
+
+
 (defun scope:if0 (scope body)
   (let ((r (eval (car body) scope)))
 	 (when r
@@ -1009,6 +1040,7 @@
   (let ((vars scope:let)
 		  (print (lambda (scope body) (println (unbind (car body) scope))))
 		  (for scope:for)
+		  (for-table scope:for-table)
 		  (ref scope:ref)
 		  (scope:if scope:if0)
 		  (bind scope:bind)

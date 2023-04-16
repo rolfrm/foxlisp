@@ -188,35 +188,99 @@ lisp_value table_print(lisp_value table){
    
    return nil;
 }
-
+bool is_typeobj(lisp_value v){
+  return car(v).type == LISP_TYPESPEC;
+}
 lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
-  var table = lisp_eval(scope, car(argforms));
-  var columns = table_columns(table);
-  var column_names = table_column_names(table);
-  var column_count = (size_t) vector_length(columns).integer;
+  var table_form = car(argforms);
+  if(is_symbol(table_form)){
+	 table_form = lisp_eval(scope, table_form);
+  }
+
+  size_t table_count = 1;
+  if(is_cons(table_form) && !is_typeobj(table_form)){
+	 table_count = list_length(table_form);
+  }
+  lisp_value tables[table_count];
   
-  var rows = table_rows(table);
+  lisp_value key_columns[table_count];
+  i64 table_rows2[table_count];
+  
+  size_t column_count_total = 0;
+
+  for(size_t i = 0; i < table_count; i++){
+	 
+	 lisp_value table;
+	 if(is_cons(table_form) && !is_typeobj(table_form)){
+		table = lisp_eval(scope, car(table_form));
+		table_form = cdr(table_form);
+ 	 }else{
+		if(!is_typeobj(table_form))
+		  table = lisp_eval(scope, table_form);
+		else
+		  table = table_form;
+	 }
+	 tables[i] = table;
+	 var columns = table_columns(table);
+	 var column_count = (size_t) vector_length(columns).integer;
+	 if(i == 0){
+		column_count_total = column_count;
+	 }else{
+		column_count_total += column_count - 1;
+	 }
+	 key_columns[i] = vector_ref(columns, integer(0));
+	 table_rows2[i] = table_rows(table);
+  }
+  
+  cons args3[column_count_total];
+  lisp_value columns[column_count_total];
+  size_t column_source_index[column_count_total];
+  size_t j = 0;
+  for(size_t i = 0; i < table_count; i++){
+	 var table = tables[i];
+	 var columns2 = table_columns(table);
+	 var column_names = table_column_names(table);
+	 var column_count = (size_t) vector_length(columns2).integer;
+	 for(size_t i2 = i == 0 ? 0 : 1; i2 < column_count; i2++){
+		args3[j].car = vector_ref(column_names, integer(i2));
+		args3[j].cdr = nil;
+		columns[j] = vector_ref(columns2, integer(i2));
+		column_source_index[j] = i;
+		j++;
+	 }
+  }
+
+  i64 iterators[table_count];
+  memset(iterators, 0, sizeof(iterators[0]) * table_count);
   
   lisp_scope iter_scope[1] = {0};
-  cons args3[column_count];
-  
-  for(size_t i = 0; i < column_count; i++){
-    args3[i].car = vector_ref(column_names, integer(i));
+
+  lisp_scope_stack(iter_scope, scope, args3, column_count_total);
+
+  while(iterators[0] < table_rows2[0]){
+	 i64 key = lisp_value_integer(vector_ref(key_columns[0], integer(iterators[0])));
+	 for(size_t i = 1; i < table_count; i++){
+		
+		  // search for a matching key.
+		  for(; iterators[i] < table_rows2[i]; iterators[i]++){
+			 i64 key2 = lisp_value_integer(vector_ref(key_columns[i], integer(iterators[i])));
+			 
+			 if(key2 == key) break;
+			 if(key2 > key) goto next;
+		  }
+	 }
+	 
+	 for(size_t i = 0; i < column_count_total; i++){
+		if(iterators[i] >= table_rows2[i]) return nil;
+		args3[i].cdr = vector_ref(columns[i], integer(iterators[column_source_index[i]]));
+	 }
+	 
+    lisp_eval_progn(iter_scope, cdr(argforms));
+	 next:
+	 iterators[0] += 1;
   }
-  lisp_scope_stack(iter_scope, scope, args3, column_count);
-  lisp_value result = nil;
-  for(size_t i = 0; i < rows; i++){
-    for(size_t j = 0; j < column_count; j++){
-      args3[j].cdr = vector_ref(vector_ref(columns, integer(j)), integer(i));
-    }
-    result = lisp_eval_progn(iter_scope, cdr(argforms));
-    // update every column except from the key one .dont update the key column.
-    for(size_t j = 1; j < column_count; j++){
-      args3[j].cdr = vector_set(vector_ref(columns, integer(j)), integer(i), args3[j].cdr);
-    }
-  }
   
-  return result;
+  return nil;
 }
 
 void table_register() { 

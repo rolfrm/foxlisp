@@ -756,7 +756,8 @@ lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2,
   lisp_scope *super_scope = lisp_value_scope(scope);
   lisp_scope *scope22 = lisp_value_scope(scope2);
   size_t len2 = lisp_value_integer(lisp_length(syms));
-  cons con[len2 + 1];
+  size_t len3 = is_nil(variable) ? len2 : len2 + 1;
+  cons con[len3];
   lisp_value it = syms;
 
   for (size_t i = 0; i < len2; i++) {
@@ -764,10 +765,12 @@ lisp_value lisp_with_scope_vars(lisp_value scope, lisp_value scope2,
     con[i].cdr = lisp_scope_get_value(scope22, con[i].car);
     it = cdr(it);
   }
-  con[len2].car = variable;
-  con[len2].cdr = nil;
+  if(!is_nil(variable)){
+	 con[len2].car = variable;
+	 con[len2].cdr = nil;
+  }
 
-  lisp_scope_stack(&s, super_scope, con, len2 + 1);
+  lisp_scope_stack(&s, super_scope, con, len3);
 
   return lisp_eval_progn(&s, body);
 }

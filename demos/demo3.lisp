@@ -1,10 +1,32 @@
 (load "models-2.lisp")
+(load "table.lisp")
+(defun gen-id ()
+    (incf table-id-iterator 1)
+  )
+
 (defvar camera-offset '(0 16 20))
-(defvar wizard-offset '(3 0 5))
+(defvar wizard-offset '(3.0 0.0 5.0))
 (defvar wizard-walk 0.0)
 (defvar wizard-angle 0.0)
 
+(defvar entities (table-new 'entities '((entity 0 :entity) (x 0.0) (y 0.0) (z 0.0) (angle 0.0))))
+(defvar entity-model (table-new 'models '((entity 0 :entity) (model 'nothing))))
+(defvar active-entities (table-new 'active-entities '((entity 0 :entity))))
+(defvar entity-model (table-new 'entity-model '((entity 0 :entity) (model ()))))
 
+(defvar wizard-id (gen-id))
+(defvar a-id (gen-id))
+(defvar b-id (gen-id))
+(defvar c-id (gen-id))
+(table-insert entities wizard-id 3.0 0.0 5.0 0.0) 
+(table-insert entities a-id 10.0 0.0 15.0 45.0) 
+(table-insert entities b-id 15.0 0.0 5.0 20.0) 
+(table-insert entity-model wizard-id 'duck-toy) 
+(table-insert entity-model a-id 'wizard-model)
+(table-insert entity-model b-id 'duck-toy)
+(table-insert active-entities wizard-id)
+(table-insert active-entities a-id)
+(defvar run-cycle 0.0)
 (defun game-update (events)
   (when (key-down? foxgl:key-w)
 	 (incf wizard-walk 0.1)
@@ -35,7 +57,15 @@
 			 (list (car wizard-offset)
 					 (cadr wizard-offset)
 					 (+ (caddr wizard-offset) 0.1))))
-
+  (when nil
+  (table:iter entities
+		(when (eq entity wizard-id)
+		  (set! x (car wizard-offset))
+		  (set! y (cadr wizard-offset))
+		  (set! z (caddr wizard-offset))
+		  (set! angle (rational wizard-angle)))
+		))
+  (println entities)
   (when events
 	 (println events))
   )
@@ -73,17 +103,25 @@
 								  (rotate (0 (bind wizard-angle) 0)
 								  (scale 0.4
 											(offset (0 1 0)
-								  (wizard-model)
-								  (offset (5 0 0)
+													  (wizard-model)
+													  (offset (-2 0 0)
 											 (cat-model)
 											 )
 								  
-								  )))))
+													  )))))
+						(for-table (entities active-entities entity-model)
+									  (offset ((bind x) (bind y) (bind z))
+								  (rotate (0 (bind angle) 0)
+								  (scale 0.4
+											(offset (0 1 0)
+													  (bind (eval model))
+													  )))))
+									  
 		    
 			 (scale 1.0
 		       (rotate (0.0 0 0.0)
-				  (for i (-30 0 30);(-140 -120 -100 -80 -60 -40 -20 0 20 40 60 80 100 120 140)
-				 		 (for j (-30 0 30);(-140 -120 -100 -80 -60 -40 -20 0 20 40 60 80 100 120 140)
+				  (for i (range -30 30 30);(-140 -120 -100 -80 -60 -40 -20 0 20 40 60 80 100 120 140)
+				 		 (for j (range -30 30 30);(-140 -120 -100 -80 -60 -40 -20 0 20 40 60 80 100 120 140)
 								(offset ((bind i) 0 (bind j))
 										  (rotate (0 (bind (* 0 (+ i j))) 0) 
 													 (cherry-tree 6 (bind (+ i (* j 100))))))))

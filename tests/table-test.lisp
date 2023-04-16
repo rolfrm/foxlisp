@@ -3,9 +3,9 @@
 
 (defun gen-id ()
     (incf table-id-iterator 1)
-    )
+  )
 (let ((tab1 (table-new 'entities '((entity 0 :entity)(x 0.0) (y 0.0))))
-     (active-entities (table-new 'active-entities '((entity 0 :entity))'))
+     (active-entities (table-new 'active-entities '((entity 0 :entity))))
      (hp-tab (table-new 'hp '((entity 0 :entity) (hp 0))))
      (hp-lookup (table-new 'hp-lookup '((entity 0 :entity) (hp 0))))
      (models (table-new 'models '((entity 0 :entity) (model ()))))
@@ -26,12 +26,16 @@
     (table-insert active-entities b)
     (table-insert active-entities c)
     (table-insert models a 'mesh_123)
+    (table-insert models b 'mesh_5)
+    ;(table-insert models c 'mesh_123)
     (println models)
-    (table-push-row hp-tab a 10)
-    (table-push-row hp-tab b -5)
-    (table-push-row hp-tab d -10)
+    (table-insert hp-tab (gen-id) 66)
+    (table-insert hp-tab (gen-id) 66)
+    (table-insert hp-tab a 10)
+    (table-insert hp-tab b -5)
+    (table-insert hp-tab d -10)
     (println "generating rows")
-    (dotimes! i 1000
+    (dotimes! i 10
         (table-push-row tab1 (gen-id) (+ 1.0 i) (- 2.13 i))
         
         )
@@ -39,7 +43,8 @@
     (table:iter tab1
         (set! x (+ x 0.1))   
     )
-        
+
+	  
         
     (println "done updating rows")
     
@@ -48,6 +53,10 @@
         (println (cons hp entity))
         (set! hp (- hp 1))
         )
+		(println 'fancy-iter)
+		(table:iter (active-entities hp-tab models)
+						(println (list 'found hp entity model))
+						)
     
     ;(println tab1 " " hp-tab " " active-entities " " hp-lookup)
     (table:clear hp-lookup)
