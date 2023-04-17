@@ -19,6 +19,7 @@
 (defvar wizard-angle 0.0)
 
 (defvar entities (table-new 'entities '((entity 0 :entity) (x 0.0) (y 0.0) (z 0.0) (angle 0.0))))
+(defvar velocities (table-new 'entity-velocity '((entity 0 :entity) (vx 0.0) (vy 0.0) (vz 0.0) (vangle 0.0))))
 (defvar entity-model (table-new 'models '((entity 0 :entity) (model 'nothing))))
 (defvar active-entities (table-new 'active-entities '((entity 0 :entity))))
 (defvar entity-model (table-new 'entity-model '((entity 0 :entity) (model ()))))
@@ -58,47 +59,56 @@
 
 
 (defvar run-cycle 0.0)
+(defun interpolate-angle(now target turn-speed)
+  (let ((now (mod now 360.0))
+		  (target (mod target 360.0)))
+	 (let ((diff (- target now)))
+		(when (> (abs diff) 180)
+		  (set! target (+ target (if (> target now) -360.0 360.0)))
+
+		  (set! diff (- target now))
+		  )
+		(mod (+ now (* (sign diff) (min turn-speed (abs diff)))) 360))))
 
 (defun game-update (events)
-  ;(println 'update3)
-  (when (key-down? foxgl:key-w)
-	 (incf wizard-walk 0.1)
-	 (set! wizard-angle 180)
-	 (set! wizard-offset
-			 
-			 (list (car wizard-offset)
-					 (cadr wizard-offset)
-					 (- (caddr wizard-offset) 0.1))))
-  (when (key-down? foxgl:key-a)
-	 (incf wizard-walk 0.1)
-	 (set! wizard-angle 90)
-	 (set! wizard-offset
-			 (list (- (car wizard-offset) 0.1)
-					 (cadr wizard-offset)
-					 (caddr wizard-offset))))
-  (when (key-down? foxgl:key-d)
-	 (incf wizard-walk 0.1)
-	 (set! wizard-angle -90)
-	 (set! wizard-offset
-			 (list (+ (car wizard-offset) 0.1)
-					 (cadr wizard-offset)
-					 (caddr wizard-offset))))
-  (when (key-down? foxgl:key-s)
-	 (incf wizard-walk 0.1)
-	 (set! wizard-angle 0)
-	 (set! wizard-offset
-			 (list (car wizard-offset)
-					 (cadr wizard-offset)
-					 (+ (caddr wizard-offset) 0.1))))
-  (when t
-	 (table:iter entities :edit
+  (let ((v-x 0.0)
+		  (v-y 0.0)
+		  (v-z 0.0)
+		  (v-angle 0.0))
+	 (when (key-down? foxgl:key-w)
+		(set! v-angle 180)
+		(set! v-z -0.1))
+	 (when (key-down? foxgl:key-a)
+		(set! v-angle 90)
+		(set! v-x -0.1))
+	 (when (key-down? foxgl:key-d)
+		(set! v-angle -90)
+		(set! v-x 0.1))
+	 (when (key-down? foxgl:key-s)
+		(set! v-angle 0)
+		(set! v-z 0.1))
+	 ;(println v-x v-z)
+	 (let ((absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
+		(when (> absv 0)
+		  (let ((target-angle (/ (math:atan (- v-x) v-z) dec-to-rad)))
+		  (set! wizard-walk (+ wizard-walk 0.1))
+		  (set! wizard-angle (interpolate-angle wizard-angle target-angle 10))
+		  (set! v-x (* 0.1 (/ v-x absv)))
+		  (set! v-z (* 0.1 (/ v-z absv)))
+		  )
+		(table:iter entities :edit
 				 	 (when (eq entity wizard-id)
 						
-						(set! x (car wizard-offset))
-						(set! y (cadr wizard-offset))
-						(set! z (caddr wizard-offset))
+						(set! x (+ x v-x))
+						(set! y (+ y v-y))
+						(set! z (+ z v-z))
 						(set! angle (rational wizard-angle)))
 					 )
+	 
+
+		)
+	 ))
+  (when t
 	 
 	 ;; physical body collisions
 	 (table:clear collisions)

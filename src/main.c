@@ -408,6 +408,32 @@ size_t list_length(lisp_value lst) {
   return l;
 }
 
+lisp_value lisp_sign(lisp_value x){
+  if(is_float(x)){
+	 x.rational = x.rational >= 0.0 ? 1.0 :-1.0;
+	 return x;
+  }
+  else if(is_integer(x)){
+	 x.integer = x.integer >= 0 ? 1 :-1;
+	 return x;
+  }
+  raise_string("invalid type for sign");
+  return nil;
+}
+
+lisp_value lisp_abs(lisp_value x){
+  if(is_float(x)){
+	 x.rational = x.rational >= 0.0 ? x.rational : -1.0 * x.rational;
+	 return x;
+  }
+  else if(is_integer(x)){
+	 x.integer = x.integer >= 0 ? x.integer :-1 * x.integer;
+	 return x;
+  }
+  raise_string("invalid type for sign");
+  return nil;
+}
+
 int64_t get_symbol_id(const char *s) {
   int64_t id = 0;
   if (ht_get(current_context->symbols, &s, &id))
@@ -2673,6 +2699,8 @@ lisp_context *lisp_context_new() {
   lisp_register_native("typespec-instance", -1, typespec_create_instance);
   lisp_register_native("read-string", 1, lisp_read);
   lisp_register_native("load", 1, lisp_load);
+  lisp_register_native("sign", 1, lisp_sign);
+  lisp_register_native("abs", 1, lisp_abs);
 
   lisp_register_native("function-signature", 1, lisp_signature);
 
