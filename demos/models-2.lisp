@@ -601,3 +601,5 @@
           (scale (0.1 1.5 0.1)
             (cylinder)))))
 )
+
+(load "models-3.lisp")

@@ -52,9 +52,9 @@
 (table-insert active-entities b-id)
 (table-insert active-entities c-id)
 
-(table-insert physical-body wizard-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
+(table-insert physical-body wizard-id 0.0 0.0 0.0 '(sphere 1.0))
 (table-insert physical-body a-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
-(table-insert physical-body b-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
+(table-insert physical-body b-id 0.0 0.0 0.0 '(aabb 1 1 1.2))
 (table-insert physical-body c-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
 
 
@@ -71,6 +71,7 @@
 		(mod (+ now (* (sign diff) (min turn-speed (abs diff)))) 360))))
 
 (defun game-update (events)
+  (table:clear velocities)
   (let ((v-x 0.0)
 		  (v-y 0.0)
 		  (v-z 0.0)
@@ -95,52 +96,45 @@
 		  (set! wizard-angle (interpolate-angle wizard-angle target-angle 10))
 		  (set! v-x (* 0.1 (/ v-x absv)))
 		  (set! v-z (* 0.1 (/ v-z absv)))
-		  )
-		(table:iter entities :edit
-				 	 (when (eq entity wizard-id)
-						
-						(set! x (+ x v-x))
-						(set! y (+ y v-y))
-						(set! z (+ z v-z))
-						(set! angle (rational wizard-angle)))
-					 )
-	 
-
+			 )
+		  (table-insert velocities wizard-id v-x 0.0 v-z 0.0)
 		)
 	 ))
   (when t
 	 
 	 ;; physical body collisions
 	 (table:clear collisions)
-	 (table:iter (entities physical-body)
+	 (table:iter (entities physical-body velocities)
 					 (let ((e0 entity)
-							 (offset-x0 (+ x offset-x))
-							 (offset-y0 (+ y offset-y))
-							 (offset-z0 (+ z offset-z))
+							 (offset-x0 (+ x offset-x vx))
+							 (offset-y0 (+ y offset-y vy))
+							 (offset-z0 (+ z offset-z vz))
 							 (mat-0 (get-matrix))
-							 (col-out (cons nil nil))
 							 (body-0 body)
 												  
 							 (angle-0 angle))
+						(math:rotate! mat-0 0 (* dec-to-rad angle-0) 0)
 						(math:translate! mat-0 offset-x0 offset-y0 offset-z0)
-						(math:rotate! mat-0 0 angle-0 0)
 						
 						(table:iter (entities physical-body)
-										(unless (>= entity e0)
-										  (let ((mat-1 (get-matrix)))
-							
+										(unless (= entity e0)
+										  (let ((mat-1 (get-matrix))
+												  (col-out (make-vector 5 0.0))
+												  )
+											 (math:rotate! mat-1 0 (* dec-to-rad angle) 0)
+	
 											 
 											 (math:translate! mat-1
-																	(- offset-x0 (+ x offset-x))
-																	(- (+ y offset-y) offset-y0)
-																	(- offset-z0 (+ z offset-z)))
-											 (math:rotate! mat-1 0 (* dec-to-rad (- angle-0  angle)) 0)
-											 
-											 (let ((col (sdf:detect-collision body-0 body mat-1 col-out)))
+																	(+ x offset-x)
+																	(+ y offset-y)
+																	(+ z offset-z))
+																	 
+											 (let ((col (sdf:detect-collision2 body-0 body mat-0 mat-1 col-out)))
 												
 												(when col
-												  ;(println (list e0 entity col-out))
+													 ;(println (list e0 entity col-out))
 												  (table-insert collisions e0 entity col-out)
+	
 												  )
 											 
 
@@ -151,8 +145,47 @@
 									
 						)))
   (when (> (table-rows collisions) 0)
+	 (println (list velocities collisions))
+	 (table:iter (velocities collisions entities) :edit
+					 ;(set! vx (* vx -0.01));0.0)
+					 ;(set! vz (* vz -0.01));0.0)
+					 (let* ((dx (- (vector-ref collision-data 0) x))
+							  (dz (- (vector-ref collision-data 2) z))
+							  (dl (math:sqrt (+ (* dx dx) (* dz dz)))))
+						(set! dx (/ dx dl))
+						(set! dz (/ dz dl))
+						(let ((cor-x (* (vector-ref collision-data 3) dx))
+								(cor-z (* (vector-ref collision-data 3) dz)))
+						  (set! vx (+ vx (* 0.9 cor-x)))
+						  (set! vz (+ vy (* 0.9 cor-z)))
+						
+						
+						))
+								  
+					 ;(if (< (car collision-data) (cdr collision-data))
+					;	  (set! vx (- vx (* 1.0 (car collision-data))))
+					;	  (set! vz (- vz (* 1.0 (cdr collision-data))))
+													 ;	  )
+					 ;(let ((cx (car collision-data))
+					;		 (cz (cdr collision-data)))
+													 ;	(println (list vx vz collision-data (cons (- x cx) (- z cz)))))
+					 (println collision-data)
+						  
+					 )
 	 (println collisions)
-  )
+	 )
+  (table:iter (velocities entities) :edit
+				  (set! x (+ x vx))
+				  (set! y (+ y vy))
+				  (set! z (+ z vz))
+					 
+				  (when (eq entity wizard-id)
+					 
+					 (set! wizard-offset (list x y z))
+					 (set! angle (rational wizard-angle)))
+					 
+				  )
+	 
 	 
   (when events
 	 )

@@ -1240,13 +1240,72 @@ lisp_value foxgl_detect_collision2(lisp_value obj1, lisp_value obj2,
   sdf_detect_collision(&ctx, p2, 100.0);
   if (ctx.collision_detected && is_cons(out_cons)) {
     ctx2.threshold = 0.001;
-
+	 
     sdf_detect_max_overlap(&ctx2, p2, 100.0);
-    set_car(out_cons, rational_lisp_value((f64)ctx2.pt.x));
-    set_cdr(out_cons, rational_lisp_value((f64)ctx2.pt.z));
+	 vec3 p3 = ctx2.pt;
+	 var itform = mat4_invert(tform);
+	 p3 = mat4_mul_vec3(itform, p3);
+	 //var p0 = mat4_mul_vec3(itform, vec3_new(0,0,0));
+	 //p3 = vec3_sub(p3, p0);
+	 set_car(out_cons, rational_lisp_value((f64)p3.x));
+    set_cdr(out_cons, rational_lisp_value((f64)p3.z));
   }
   return ctx.collision_detected ? t : nil;
 }
+
+lisp_value foxgl_detect_collision3(lisp_value obj1, lisp_value obj2,
+											  lisp_value l_tform1, lisp_value l_tform2, lisp_value out_cons) {
+
+  void *model1 = get_physics_model_cached2(obj1);
+  void *model2 = get_physics_model_cached2(obj2);
+  mat4 tform1 = lisp_value_mat4(l_tform1);
+  mat4 tform2 = lisp_value_mat4(l_tform2);
+  vec3 p2 = vec3_new(0.0, 0.0, 0.0);
+  p2 = mat4_mul_vec3(tform1, p2);
+  vec3 p2_2 = vec3_new(0.0, 0.0, 0.0);
+  p2_2 = mat4_mul_vec3(tform2, vec3_new(0.0, 0.0, 0.0));
+  p2 = vec3_scale(vec3_add(p2, p2_2), 0.5);
+  
+  sdf_transform a_t = {.type = SDF_TYPE_TRANSFORM,
+                       .inv_tform = tform1,
+                       .models = &model1,
+                       .model_count = 1};
+
+  sdf_transform b_t = {.type = SDF_TYPE_TRANSFORM,
+                       .inv_tform = tform2,
+                       .models = &model2,
+                       .model_count = 1};
+  
+  cdf_ctx ctx = {.sdf1 = generic_sdf,
+                 .sdf2 = generic_sdf,
+                 .userdata1 = &b_t,
+                 .userdata2 = &a_t,
+                 .threshold = 0.1,
+                 .greatest_common_overlap = 100.0};
+  cdf_ctx ctx2 = ctx;
+
+  sdf_detect_collision(&ctx, p2, 100.0);
+  if (ctx.collision_detected && is_vector(out_cons)) {
+    ctx2.threshold = 0.001;
+	 
+    sdf_detect_max_overlap(&ctx2, p2, 100.0);
+	 vec3 p3 = ctx2.pt;
+	 vector_set(out_cons, integer(0), rational_lisp_value((f64)-p3.x));
+	 vector_set(out_cons, integer(1), rational_lisp_value((f64)-p3.y));
+	 vector_set(out_cons, integer(2), rational_lisp_value((f64)-p3.z));
+
+	 var d1 = ctx.sdf1(ctx.userdata1, p3, NULL);
+	 var d2 = ctx.sdf2(ctx.userdata2, p3, NULL);
+	 
+
+	 vector_set(out_cons, integer(3), rational_lisp_value((f64)d1));
+	 vector_set(out_cons, integer(4), rational_lisp_value((f64)d2));
+	 
+	 
+  }
+  return ctx.collision_detected ? t : nil;
+}
+
 
 lisp_value foxgl_detect_collision_floor(lisp_value floor_tile, lisp_value obj2,
                                         lisp_value model) {
@@ -2245,4 +2304,6 @@ void sdf_register() {
   lrn("sdf:render", 3, lisp_render_sdf_lods);
   lrn("sdf:to-image", 6, lisp_render_sdf_to_image);
   lrn("sdf:detect-collision", 4, foxgl_detect_collision2);
+  lrn("sdf:detect-collision2", 5, foxgl_detect_collision3);
+  
 }
