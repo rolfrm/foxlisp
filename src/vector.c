@@ -106,18 +106,21 @@ lisp_value vector_resize(lisp_value vector, lisp_value k) {
   size_t elem_size = lisp_type_size(lisp_value_type(vec0->default_value));
   
   if(is_native){
-    vec0->data = realloc(vec0->data, elem_size * l);
+	 vec0->data = realloc(vec0->data, elem_size * l);
     ssize_t l2 = l - vec0->count;
-    if(l2 > 0)
-      memset(vec0->data + vec0->count * elem_size, 0, l2);
-    vec0->count = l;
+    if(l2 > 0){
+		
+		memset(vec0->data + vec0->count * elem_size, 0, l2 * elem_size);
+	 }
+	 vec0->count = l;
     return vector;
   }
   lisp_vector *vec = lisp_malloc(sizeof(*vec));
 
   void *new_data = lisp_malloc(l * elem_size);
   size_t prevCount = MIN(l, vec->count);
-  memcpy(new_data, vec->data, prevCount * elem_size);
+  if(prevCount < l)
+	 memcpy(new_data, vec->data, prevCount * elem_size);
   vec->data = new_data;
   vec->count = l;
 

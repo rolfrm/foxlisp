@@ -387,12 +387,12 @@ lisp_context *lisp_context_new_bare();
 lisp_value make_vector(lisp_value len, lisp_value _default);
 lisp_value make_native_vector(lisp_value len, lisp_value _default);
 lisp_value vector_length(lisp_value v);
-lisp_value vector_ref(lisp_value _vector, lisp_value k);
-lisp_value vector_ref_2(lisp_vector *vector, int i);
-lisp_value vector_set(lisp_value vector, lisp_value k, lisp_value v);
+lisp_value vector_ref(lisp_value _vector, lisp_value index);
+lisp_value vector_ref_2(lisp_vector *vector, int index);
+lisp_value vector_set(lisp_value vector, lisp_value index, lisp_value v);
 lisp_value vector_elem_type(lisp_value vector);
 lisp_value vector_copy(lisp_value vector);
-lisp_value vector_resize(lisp_value vector, lisp_value k);
+lisp_value vector_resize(lisp_value vector, lisp_value elem_count);
 
 void *vector_data_pointer(lisp_value vector);
 lisp_type vector_element_type(lisp_value vector);

@@ -25,6 +25,8 @@
 (defvar active-entities (table-new 'active-entities '((entity 0 :entity))))
 (defvar entity-model (table-new 'entity-model '((entity 0 :entity) (model ()))))
 
+(defvar bullets (table-new 'bullets '((entity 0 :entity) (vx 0.0) (vz 0.0) (life 0.0))))
+
 (defvar collisions (table-new 'collisions '((entity-a 0 :entity) (entity-b 0 :entity) (collision-data ()))))
 
 (defvar physical-body (table-new 'physical-body
@@ -113,6 +115,14 @@
 (table-insert entity-model cat-1-id 'cat-2-model)
 (table-insert active-entities cat-1-id)
 (table-insert physical-body cat-1-id 0.0 0.0 0.0 '(aabb 0.5 0.5 0.5))
+
+(defvar bullet-2-model '(rgb (1 1 1) (upcube)))
+(defvar bullet-1-id (gen-id))
+(table-insert entities bullet-1-id 0.0 1.0 10.0 0.0) 
+(table-insert entity-model bullet-1-id 'bullet-2-model)
+(table-insert active-entities bullet-1-id)
+;(table-insert physical-body bullet-1-id 0.0 0.0 0.0 '(aabb 0.5 0.5 0.5))
+(table-insert bullets bullet-1-id 0.1 0.0 50.0)
 
 
 
@@ -232,6 +242,30 @@
 					 )
 	 (println collisions)
 	 )
+  (let ((clear-bullets nil))
+  (table:iter (entities bullets) :edit
+				  (set! x (+ x vx))
+				  (set! z (+ z vz))
+				  (set! life (- life 1.0))
+				  (when (> 0 life)
+					 (println life)
+					 (set! clear-bullets (cons entity clear-bullets))
+					 
+					 (println 'remove)
+					 )
+				  
+				  )
+	 (when clear-bullets
+		(loop clear-bullets
+				(table:iter (bullets entities) :edit 
+								(when (eq (car clear-bullets) entity)
+								  :remove))
+				(set! clear-bullets (cdr clear-bullets))
+
+				)
+		
+	 )
+	
   (table:iter (velocities entities) :edit
 				  (set! x (+ x vx))
 				  (set! y (+ y vy))

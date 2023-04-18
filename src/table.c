@@ -80,23 +80,22 @@ lisp_value table_clear(lisp_value table){
   return nil;
 }
 
-
-
 size_t table_rows(lisp_value table){
   return table_key_column(table).vector->count;
 }
 
 lisp_value table_insert_index(lisp_value table, lisp_value key){
-  //lisp_value table_data = cdr(table);
+
   lisp_value columns = table_columns(table);
   lisp_value key_column = vector_ref(columns, integer(0));
   if(is_nil(key_column))
     RAISE("Unable to locate key column");
   lisp_type t = vector_element_type(key_column);
   void * data_ptr = vector_data_pointer(key_column);
-  // data_ptr == NULL for empty arrays
+
   if(data_ptr == NULL)
 	 return integer(0);
+
   if(t == LISP_INTEGER){
     size_t index = 0;
     i64_insert_index(data_ptr, &key.integer, &index, 1, key_column.vector->count);
@@ -199,7 +198,8 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
   if(is_symbol(table_form)){
 	 table_form = lisp_eval(scope, table_form);
   }
-  
+  static lisp_value remove_keyword;
+  get_symbol_cached(&remove_keyword, ":remove");
   var rest = cdr(argforms);
   bool edit = false;
   if(eq(car(rest), get_symbol_cached(&edit_keyword, ":edit"))){
@@ -262,7 +262,9 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
 
   i64 iterators[table_count];
   memset(iterators, 0, sizeof(iterators[0]) * table_count);
-  
+
+  i64 * remove_indexes = NULL;
+  size_t remove_count = 0;
   lisp_scope iter_scope[1] = {0};
   lisp_scope * scope_ptr = iter_scope;
   lisp_scope_stack(iter_scope, scope, args3, column_count_total);
@@ -288,17 +290,47 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
 		scope_ptr->lookup[i].cdr = vector_ref(columns[i], integer(iterators[column_source_index[i]]));
 	 }
 	 
-    lisp_eval_progn(iter_scope, rest);
+    lisp_value r = lisp_eval_progn(iter_scope, rest);
+	 
 	 if(iter_scope->sub_scope != NULL)
 		scope_ptr = scope_ptr->sub_scope;
 
 	 if(edit){
+		if(eq(r, remove_keyword)){
+			 remove_count += 1;
+			 remove_indexes = realloc(remove_indexes, sizeof(remove_indexes[0]) * table_count * remove_count);
+			 memcpy(remove_indexes + (remove_count - 1) * sizeof(iterators), iterators, sizeof(iterators)); 
+		  }
 		for(size_t i = 1; i < column_count_total; i++){
 		  vector_set(columns[i], integer(iterators[column_source_index[i]]),args3[i].cdr);
 		}
 	 }
   next:
 	 iterators[0] += 1;
+  }
+
+  if(remove_indexes != NULL){
+	 for(size_t i = 0; i < table_count; i++){
+		var table = tables[i];
+		var columns2 = table_columns(table);
+		var column_count = (size_t) vector_length(columns2).integer;
+		var rows = table_rows(table);
+		for(size_t k = 0; k < column_count; k++){
+		  var column = vector_ref(columns2, integer(k));
+		  var it = remove_indexes + i;
+		  size_t offset = 0;
+		  if(offset >= remove_count) break;
+		  for(size_t j = *it; j < rows - offset; j++){
+			 if((i64)j == *it){
+				offset += 1;
+				it += table_count;
+			 }
+			 var val = vector_ref(column, integer(j + offset));
+			 vector_set(column, integer(j), val);
+		  }
+		  vector_resize(column, integer(rows - offset));
+		}
+	 }
   }
   
   return nil;

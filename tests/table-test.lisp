@@ -49,9 +49,18 @@
     (println "done updating rows")
     
     (table:select active-entities hp-tab hp-lookup (> hp -10))
-    (table:iter hp-lookup 
-        (println (cons hp entity))
+    (table:iter hp-lookup :edit 
+        (println (list entity hp))
         (set! hp (- hp 1))
+		  (when (> hp 0)
+			 (println 'remove)
+			 :remove
+			 )
+        )
+
+		(table:iter hp-lookup  
+        (println (list '--->> entity hp ))
+
         )
 		(println 'fancy-iter)
 		(table:iter (active-entities hp-tab models)
