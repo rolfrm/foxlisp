@@ -8,8 +8,9 @@
 	 (offset (0 0 0)
 	  (vars ((run-cycle (* 2 wizard-walk)))
 		(wizard-model))
-	  (offset (-2 0 0)
-		(cat-model)
+	  (offset (-0.6 2 0)
+		(scale 0.4
+				 (cat-model))
 		) 
 	  )))
 
@@ -57,6 +58,63 @@
 (table-insert physical-body b-id 0.0 0.0 0.0 '(aabb 1 1 1.2))
 (table-insert physical-body c-id 0.0 0.0 0.0 '(aabb 1 1 0.7))
 
+(defvar house-1-id (gen-id))
+(table-insert entities house-1-id -10.0 0.0 0.0 0.0) 
+(table-insert entity-model house-1-id 'house-1-model)
+(table-insert active-entities house-1-id)
+(table-insert physical-body house-1-id 0.0 0.0 0.0 '(aabb 2 1.5 2))
+
+
+(defvar house-1-id (gen-id))
+(table-insert entities house-1-id -20.0 0.0 7.0 -45.0) 
+(table-insert entity-model house-1-id 'house-1-model)
+(table-insert active-entities house-1-id)
+(table-insert physical-body house-1-id 0.0 0.0 0.0 '(aabb 2 1.5 2))
+
+
+(defvar cherry-tree-1-6-model '(cherry-tree 6 1))
+(defvar cherry-tree-2-6-model '(cherry-tree 6 2))
+
+(defvar tree-1-id (gen-id))
+(table-insert entities tree-1-id -6.5 0.0 0.0 5.2) 
+(table-insert entity-model tree-1-id 'cherry-tree-1-6-model)
+(table-insert active-entities tree-1-id)
+(table-insert physical-body tree-1-id 0.0 0.0 0.0 '(aabb 0.5 5.0 0.5))
+
+(defvar tree-1-id (gen-id))
+(table-insert entities tree-1-id 10.0 0.0 0.0 -3.0) 
+(table-insert entity-model tree-1-id 'cherry-tree-2-6-model)
+(table-insert active-entities tree-1-id)
+(table-insert physical-body tree-1-id 0.0 0.0 0.0 '(aabb 0.5 5.0 0.5))
+
+(defvar tree-1-id (gen-id))
+(table-insert entities tree-1-id 5.0 0.0 -15.0 90.0) 
+(table-insert entity-model tree-1-id 'cherry-tree-2-6-model)
+(table-insert active-entities tree-1-id)
+(table-insert physical-body tree-1-id 0.0 0.0 0.0 '(aabb 0.5 5.0 0.5))
+
+
+(defvar rock-1-id (gen-id))
+(table-insert entities rock-1-id 20.0 0.0 -15.0 90.0) 
+(table-insert entity-model rock-1-id 'rock-model-1)
+(table-insert active-entities rock-1-id)
+(table-insert physical-body rock-1-id 0.0 0.0 0.0 '(aabb 2.5 5.0 2.5))
+
+(defvar rock-1-id (gen-id))
+(table-insert entities rock-1-id 5.0 0.0 -20.0 0.0) 
+(table-insert entity-model rock-1-id 'rock-model-1)
+(table-insert active-entities rock-1-id)
+(table-insert physical-body rock-1-id 0.0 0.0 0.0 '(aabb 2.5 5.0 2.5))
+
+
+(defvar cat-2-model '(scale 1.0 (cat-model)))
+(defvar cat-1-id (gen-id))
+(table-insert entities cat-1-id 0.0 0.0 5.0 .0) 
+(table-insert entity-model cat-1-id 'cat-2-model)
+(table-insert active-entities cat-1-id)
+(table-insert physical-body cat-1-id 0.0 0.0 0.0 '(aabb 0.5 0.5 0.5))
+
+
 
 (defvar run-cycle 0.0)
 (defun interpolate-angle(now target turn-speed)
@@ -92,10 +150,10 @@
 	 (let ((absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
 		(when (> absv 0)
 		  (let ((target-angle (/ (math:atan (- v-x) v-z) dec-to-rad)))
-		  (set! wizard-walk (+ wizard-walk 0.1))
+		  (set! wizard-walk (+ wizard-walk 0.2))
 		  (set! wizard-angle (interpolate-angle wizard-angle target-angle 10))
-		  (set! v-x (* 0.1 (/ v-x absv)))
-		  (set! v-z (* 0.1 (/ v-z absv)))
+		  (set! v-x (* 0.2 (/ v-x absv)))
+		  (set! v-z (* 0.2 (/ v-z absv)))
 			 )
 		  (table-insert velocities wizard-id v-x 0.0 v-z 0.0)
 		)
@@ -220,23 +278,16 @@
 					  (rgb (0.5 0.5 1)
 							 (scale (1000 1 1000)
 									  (tile-model))))
-			
+			(flower-floor-model)
 			(for-table (entities active-entities entity-model)
 						  (offset ((bind x) (bind y) (bind z))
 									 (rotate (0 (bind angle) 0)
-												(scale 0.4
-														 (offset (0 0 0)
-																	(bind2 model))
-																	))))
+												(bind2 model))
+												))
 			
 			
 			(scale 1.0
 					 (rotate (0.0 0 0.0)
-								(for i (range -30 30 30)
-				 					  (for j (range -30 30 30)
-											 (offset ((bind i) 0 (bind j))
-														(rotate (0 (bind (* 0 (+ i j))) 0) 
-																  (cherry-tree 6 (bind (+ i (* j 100))))))))
 								(offset (0 0 0)
 										  (vars ((run-cycle (* 2 real-time)))
 												  (rotate (0 (bind (* 10.0 run-cycle)) 0)

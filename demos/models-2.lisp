@@ -279,7 +279,7 @@
 
 
 (defvar duck-toy
-  '(scale (-1 1 -1)
+  '(scale (-0.5 0.5 -0.5)
 	 ;; Body
 	 (offset (0 0 0)
      (rgb (1 1 0)
@@ -388,7 +388,7 @@
 
 
 (defvar house-1
-  '(union
+  '(bake2
   ;; House main body
   (offset (0 0.5 0)
     (rgb (0.8 0.4 0.4)
@@ -439,8 +439,10 @@
 
 (defvar wizard-model
   '(rgb (bind wizard-model-color)
+	 (scale 0.4
 	 (offset (0 4.5 0)
-	 ;; Head (sphere)
+	  
+	  ;; Head (sphere)
 	 (rgb (0.9 0.8 0.7)
  	  (translate (0 1 0)
 		(sphere1)
@@ -542,7 +544,7 @@
 				 (sphere1))))
 
 
-	 )))
+	 ))))
 
 
 (defvar cat-model
@@ -562,14 +564,14 @@
 			)))
 
     ;; Left ear (pyramid)
-    (rgb (0.3 0.5 0.3)
+    (rgb (0.3 0.3 0.3)
       (translate (-0.3 2.3 0)
         (rotate 0 (-0.785) 0)
           (scale (0.2 0.4 0.2)
             (pyramid))))
 
     ;; Right ear (pyramid)
-    (rgb (0.5 0.3 0.3)
+    (rgb (0.3 0.3 0.3)
       (translate (0.3 2.3 0)
         (rotate 0 0.785 0)
           (scale (0.2 0.4 0.2)
