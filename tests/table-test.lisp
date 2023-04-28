@@ -66,6 +66,11 @@
 		(table:iter (active-entities hp-tab models)
 						(println (list 'found hp entity model))
 						)
+		(println ',,,)
+		;(println active-entities)
+		(table:iter (active-entities (:optional hp-tab) (:optional models))
+						(println (list 'found hp entity " " model))
+						)
     
     ;(println tab1 " " hp-tab " " active-entities " " hp-lookup)
     (table:clear hp-lookup)

@@ -194,15 +194,22 @@ bool is_typeobj(lisp_value v){
 }
 lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
   static lisp_value edit_keyword;
+  static lisp_value optional_sym;
+  static lisp_value remove_keyword;
+  if(edit_keyword.symbol == 0){
+	 get_symbol_cached(&remove_keyword, ":remove");
+	 get_symbol_cached(&optional_sym, ":optional");
+	 get_symbol_cached(&edit_keyword, ":edit");
+  }
+  
   var table_form = car(argforms);
   if(is_symbol(table_form)){
 	 table_form = lisp_eval(scope, table_form);
   }
-  static lisp_value remove_keyword;
-  get_symbol_cached(&remove_keyword, ":remove");
+  
   var rest = cdr(argforms);
   bool edit = false;
-  if(eq(car(rest), get_symbol_cached(&edit_keyword, ":edit"))){
+  if(eq(car(rest), edit_keyword)){
 	 edit = true;
 	 rest = cdr(rest);
   }
@@ -212,24 +219,35 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
 	 table_count = list_length(table_form);
   }
   lisp_value tables[table_count];
-  
+  bool optional_table[table_count];
   lisp_value key_columns[table_count];
   i64 table_rows2[table_count];
   
   size_t column_count_total = 0;
 
   for(size_t i = 0; i < table_count; i++){
-	 
-	 lisp_value table;
+	 optional_table[i] = false;
+	 lisp_value this_form;// = car(table_form);
 	 if(is_cons(table_form) && !is_typeobj(table_form)){
-		table = lisp_eval(scope, car(table_form));
+		this_form = car(table_form);
 		table_form = cdr(table_form);
- 	 }else{
-		if(!is_typeobj(table_form))
-		  table = lisp_eval(scope, table_form);
-		else
-		  table = table_form;
 	 }
+	 else
+		this_form = table_form;
+	 lisp_value table = {0};
+	 if(is_cons(this_form) && eq(car(this_form), optional_sym)){
+		optional_table[i] = true;
+		this_form = cdr(this_form);
+	 }
+
+	 if(is_typeobj(this_form)){
+		table = this_form;
+	 }else if (is_cons(this_form)){
+		table = lisp_eval(scope, car(this_form));
+	 }else{
+		table = lisp_eval(scope, this_form);
+	 }
+	 
 	 tables[i] = table;
 	 var columns = table_columns(table);
 	 var column_count = (size_t) vector_length(columns).integer;
@@ -244,6 +262,7 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
   
   cons args3[column_count_total];
   lisp_value columns[column_count_total];
+  
   size_t column_source_index[column_count_total];
   size_t j = 0;
   for(size_t i = 0; i < table_count; i++){
@@ -261,7 +280,9 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
   }
 
   i64 iterators[table_count];
+  bool skip_iterator[table_count];
   memset(iterators, 0, sizeof(iterators[0]) * table_count);
+  memset(skip_iterator, 0, sizeof(skip_iterator[0]) * table_count);
 
   i64 * remove_indexes = NULL;
   size_t remove_count = 0;
@@ -273,21 +294,40 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
 	 i64 key = lisp_value_integer(vector_ref(key_columns[0], integer(iterators[0])));
 	 
 	 for(size_t i = 1; i < table_count; i++){
-		
-		  // search for a matching key.
-		  for(; iterators[i] < table_rows2[i]; iterators[i]++){
-			 i64 key2 = lisp_value_integer(vector_ref(key_columns[i], integer(iterators[i])));
-			 if(key2 == key) break;
-			 if(key2 > key) goto next;
+		skip_iterator[i] = false;
+		// search for a matching key.
+		for(; iterators[i] < table_rows2[i]; iterators[i]++){
+		  i64 key2 = lisp_value_integer(vector_ref(key_columns[i], integer(iterators[i])));
+		  if(key2 == key) break;
+		  if(key2 > key) {
+			 if(optional_table[i]) {
+				skip_iterator[i] = true;
+				break;
+			 } else{
+				goto next;
+			 }
+			 
 		  }
+		}
 	 }
 	 for(size_t i = 0; i < table_count; i++){
-		if(iterators[i] >= table_rows2[i]) return nil;
+		if(iterators[i] >= table_rows2[i]){
+		  if(optional_table[i]){
+			 skip_iterator[i] = true;
+		  }else{
+			 return nil;
+		  }
+		}
 		
 	 }
 	 
 	 for(size_t i = 0; i < column_count_total; i++){
-		scope_ptr->lookup[i].cdr = vector_ref(columns[i], integer(iterators[column_source_index[i]]));
+		let i2 = iterators[column_source_index[i]];
+		if(skip_iterator[column_source_index[i]]){
+		  scope_ptr->lookup[i].cdr = nil;
+		}else{
+		  scope_ptr->lookup[i].cdr = vector_ref(columns[i], integer(i2));
+		}
 	 }
 	 
     lisp_value r = lisp_eval_progn(iter_scope, rest);
@@ -300,9 +340,13 @@ lisp_value table_iter(lisp_scope * scope, lisp_value argforms){
 			 remove_count += 1;
 			 remove_indexes = realloc(remove_indexes, sizeof(remove_indexes[0]) * table_count * remove_count);
 			 memcpy(remove_indexes + (remove_count - 1) * sizeof(iterators), iterators, sizeof(iterators)); 
-		  }
+		}else{
+		
 		for(size_t i = 1; i < column_count_total; i++){
-		  vector_set(columns[i], integer(iterators[column_source_index[i]]),args3[i].cdr);
+		  let i2 = iterators[column_source_index[i]];
+		  if(!skip_iterator[column_source_index[i]])
+			 vector_set(columns[i], integer(i2),args3[i].cdr);
+		}
 		}
 	 }
   next:
