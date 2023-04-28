@@ -1378,7 +1378,7 @@
 				(let* ((model2 (foxgl:build-sdf (cdr model) foxgl:current-scope) )
 						 
 						 (poly
-                    (foxgl:sdf-marching-cubes size resolution model2  position)
+                    (foxgl:sdf-marching-cubes size resolution model2 position)
 							))
 				  (set! r (list foxgl:polygon-type
 									 (foxgl:load-polygon (car poly) 3 nil nil)
@@ -1395,9 +1395,40 @@
 			 (foxgl:blit-mode :triangle-strip)
 			 
 			 ))
-      (set! model nil)
       ))
   )
+
+(defun scope:height-sdf (scope model)
+  (let ((points (car model))
+		  (resolution (cadr model))
+		  (body (caddr model)))
+	 (set! foxgl:sdf-stack nil)
+	 (let ((r (hashtable-ref foxgl:polygon-cache3 model)))
+		(unless r
+		  (println (list 'getting-heightmap body) (foxgl:build-sdf body foxgl:current-scope))
+		  (let* ((model2 (foxgl:build-sdf body foxgl:current-scope))
+					
+					(poly
+                (sdf:height-map points resolution (cdr model2))
+					  ))
+			 (println poly)
+			 (set! r (list foxgl:polygon-type
+								;(foxgl:load-polygon (car poly) 3 nil nil)
+								;(foxgl:load-polygon (cdr poly) 3 nil nil)
+								))
+			 ;(hashtable-set foxgl:polygon-cache3 model r)
+
+			 
+			 ))
+		
+		;(foxgl:color foxgl:current-color)
+		;(foxgl:transform foxgl:current-transform)
+		;(foxgl:blit-mode :triangles-color)
+		;(foxgl:blit-polygon (cdr r))
+		;(foxgl:blit-mode :triangle-strip)
+			 
+		)))
+
 
 (defun scope:sdf0 (scope model)
   (let ((conf (car model))
@@ -1537,9 +1568,10 @@
 											'((eval-scoped0 (lisp:get-current-scope!!) submodel)) 
 											)
 		  (let ((baked (foxgl:bake baking-stack model-transform0)))
-          (set! r (list foxgl:polygon-type (foxgl:load-polygon (car baked) 3 nil nil)
-                                    (foxgl:load-polygon (cdr baked) 3 nil nil)
-                                    ))
+          (set! r (list foxgl:polygon-type
+								(foxgl:load-polygon (car baked) 3 nil nil)
+                        (foxgl:load-polygon (cdr baked) 3 nil nil)
+                        ))
 		
 			 (hashtable-set cache key r)
 			 )
@@ -1611,6 +1643,7 @@
   (eval
    '(let ((polygon scope:polygon)
 			 (sdf2 scope:sdf0)
+			 (height-sdf scope:height-sdf)
 			 (cache scope:cache-image)
 			 (bake2 (lambda (a b) (scope:bake2 a b)))
 			 (text-base scope:blit-text)

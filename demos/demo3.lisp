@@ -116,7 +116,7 @@
 (table-insert active-entities cat-1-id)
 (table-insert physical-body cat-1-id 0.0 0.0 0.0 '(aabb 0.5 0.5 0.5))
 
-(defvar bullet-2-model '(rgb (1 1 1) (upcube)))
+(defvar bullet-2-model '(rgb (1 1 1) (scale 0.5 (upsphere))))
 (defvar bullet-1-id (gen-id))
 (table-insert entities bullet-1-id 0.0 1.0 10.0 0.0) 
 (table-insert entity-model bullet-1-id 'bullet-2-model)
@@ -255,7 +255,7 @@
 					 )
 				  
 				  )
-	 (when clear-bullets
+  (when clear-bullets
 		(loop clear-bullets
 				(table:iter (bullets entities) :edit 
 								(when (eq (car clear-bullets) entity)
@@ -264,7 +264,7 @@
 
 				)
 		
-	 )
+	 ))
 	
   (table:iter (velocities entities) :edit
 				  (set! x (+ x vx))
@@ -279,7 +279,22 @@
 				  )
 	 
 	 
-  (when events
+	 (when events
+		(for-each event events
+					 (when (equals? event '(key-down key 32))
+						(println 'space!)
+						(let ((bullet-id (gen-id)))
+						  (println wizard-offset)
+						  (table-insert entities bullet-id (car wizard-offset) 1.0 (caddr wizard-offset) 0.0) 
+						  (table-insert entity-model bullet-id 'bullet-2-model)
+						  (table-insert active-entities bullet-id)
+						  (table-insert bullets bullet-id (cos (* dec-to-rad (+ 90 wizard-angle))) (sin (* dec-to-rad (+ 90 wizard-angle))) 500.0)
+						  (println bullets)
+
+						  )
+						)
+					 )
+	 (println events)
 	 )
   )
 

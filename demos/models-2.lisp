@@ -1,5 +1,4 @@
 
-
 (defvar leg-rotation-1 0)
 (defvar leg-rotation-2 0)
 (defvar horse-leg
@@ -429,7 +428,7 @@
   )
 (defvar wizard-beard-color '(1 1 1))
 (defvar wizard-model-color '(0.5 0.3 0.8))
-
+(defvar wizard-staff-motion 0.0)
 (defvar evil-wizard-model
   '(vars ((wizard-model-color '(0.75 0.25 0.2)))
 	 (wizard-model)))

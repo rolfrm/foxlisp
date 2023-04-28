@@ -1,16 +1,16 @@
-OPT = -O3 -g0
+OPT = -Og -g3
 LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c process.c parser.c test.c surface.c mc.c foxmath.c lisp_base.c hashtable.c vector.c table.c #awsm.c foxvm.c #model.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
 TARGET = run
 LIB_OBJECTS =$(LIB_SOURCES:.c=.o)
 BCOBJECTS =$(LIB_SOURCES:.c=.bc)
-LDFLAGS= -L. $(OPT) -ffast-math	# -flto
-LIBS= libmicroio.a -lm -lGL -lglfw -lX11 -lopenal -lpng
+LDFLAGS = -L. $(OPT) -ffast-math	# -flto
+LIBS = libmicroio.a -lm -lGL -lglfw -lX11 -lopenal -lpng
 BCLIBS = -s USE_GLFW=3 -s WASM=1 -s USE_WEBGL2=1 -lm -lglfw3 -lGL -lopenal
 BCFLAGS = -DWASM -emit-llvm
-BCLDFLAGS= -s ALLOW_MEMORY_GROWTH=1
-ALL= $(TARGET)
+BCLDFLAGS = -s ALLOW_MEMORY_GROWTH=1
+ALL = $(TARGET)
 CFLAGS = -Isrc/  -I. -Iinclude/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -DDEBUG -Wextra -Wall -ffast-math -Werror -Wdouble-promotion
 
 all: libmicroio.a

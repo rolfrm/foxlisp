@@ -118,4 +118,11 @@
 	 (rgb (1 1 1)
 	  (sphere 0.9))))
 
-(defvar cone upcube)
+(defvar upsphere
+  '(plane
+	 (height-sdf (4 4) (8 8)
+	  (rgb (1 1 1);(offset (0 -1 0)
+				  (sphere 0.9)))));)
+	  
+(defvar upsphere '(offset (0 1 0)
+						 (sphere1)))

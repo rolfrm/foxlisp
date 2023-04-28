@@ -1,4 +1,4 @@
-(println 'eval1)
+
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 (load "vec2.lisp")

@@ -2023,6 +2023,110 @@ lisp_value sdf_marching_cubes(lisp_value scale_v, lisp_value _res,
   return new_cons(vec, vec2);
 }
 
+lisp_value sdf_heightmap(lisp_value points, lisp_value resolution,
+								 lisp_value model0) {
+  void *model = get_physics_model_cached2(model0);
+  if (model == NULL)
+	 return nil;
+  
+  var px = lisp_value_as_integer(car(points));
+  var py = lisp_value_as_integer(cadr(points));
+  var rx = lisp_value_as_integer(car(resolution));
+  var ry = lisp_value_as_integer(cadr(resolution));
+
+  var points_vec = make_vector(integer(px * py * 3), float32(0.0));
+  var uv_vec = make_vector(integer(px * py * 2), float32(0.0));
+  var texture_vec = make_vector(integer(rx * ry * 4), byte(0));
+  var out_vec = make_vector(integer(4), nil);
+  vector_set(out_vec, integer(0), points_vec);
+  vector_set(out_vec, integer(1), uv_vec);
+  vector_set(out_vec, integer(2), texture_vec);
+  //vector_set(out_vec, integer(3), points_vec);
+  f32 * points_ptr = points_vec.vector->data;
+  f32 * uv_ptr = uv_vec.vector->data;
+  for(i64 y = 0; y < py; y++){
+	 for(i64 x = 0; x < px; x++){
+		f32 * uv = uv_ptr + 2 * (x + y * px);
+		uv[0] = (float)x / (float)(px - 1);
+		uv[1] = (float)y / (float)(py - 1);
+	 }
+  }
+  u8 * texture_ptr = texture_vec.vector->data;
+  vec3 rd = vec3_new(0,-1,0);
+  for(i64 y = 0; y < py; y++){
+	 for(i64 x = 0; x < px; x++){
+		vec3 r = vec3_div(vec3_new(x,100,y), vec3_new(px, 1, py));
+		vec3 c;
+		while(true){
+		  f32 d = generic_sdf2(model, r, &c);
+		  if(d < 0.01f){
+			 var p = points_ptr + (x + y *px)*3;
+			 p[0] = r.x;
+			 p[1] = r.y;
+			 p[2] = r.z;
+			 break;
+		  }
+		  if(d > 200){
+			 var p = points_ptr + (x + y *px)*3;
+			 
+			 p[0] = r.x;
+			 p[1] = r.y;
+			 p[2] = r.z;
+			 break;
+		  }
+		  r = vec3_add(r, vec3_scale(rd, d));
+		}
+	 }
+  }
+
+  for(i64 y = 0; y < ry; y++){
+	 for(i64 x = 0; x < rx; x++){
+		f32 uvx = x / ((f32) rx);
+		f32 uvy = y / ((f32) ry);
+		f32 ptx = uvx * px;
+		f32 pty = uvy * py;
+		i32 x1 = (i32)floor(ptx);
+		i32 x2 = (i32)ceil(ptx);
+		i32 y1 = (i32)floor(pty);
+		i32 y2 = (i32)ceil(pty);
+		
+		i32 i00 = (x1 + y1 * py) * 3;
+		vec3 v00 = vec3_new(points_ptr[i00],points_ptr[i00 + 1],points_ptr[i00 + 2]);
+		i32 i10 = (x2 + y1 * py) * 3;
+		vec3 v10 = vec3_new(points_ptr[i10],points_ptr[i10 + 1],points_ptr[i10 + 2]);
+		
+		i32 i01 = (x1 + y2 * py) * 3;
+		vec3 v01 = vec3_new(points_ptr[i01],points_ptr[i01 + 1],points_ptr[i01 + 2]);
+		i32 i11 = (x2 + y2 * py) * 3;
+		vec3 v11 = vec3_new(points_ptr[i11],points_ptr[i11 + 1],points_ptr[i11 + 2]);
+		var uvx0 = ptx - x1;
+		var uvy0 = pty - y1;
+
+		vec3 v1 = vec3_interpolate(v00, v10, uvx0);
+		vec3 v2 = vec3_interpolate(v01, v11, uvx0);
+		vec3 v = vec3_interpolate(v1, v2, uvy0);
+		vec4 color = vec4_new(0,0,0,0);
+		vec3 c;
+		f32 d = generic_sdf2(model, v, &c);
+		if(d >= 10){
+		  color.x = c.x;
+		  color.y = c.y;
+		  color.z = c.z;
+		  color.w = 1.0;
+		  size_t index = x + y * rx;
+		  u8 * p = texture_ptr + index * 4;
+		  for(int i = 0; i <4; i++){
+			 p[i] = (u8)(color.data[i] * 255);
+		  }
+		}
+		
+		
+	 }
+  }
+  return out_vec;
+
+}
+
 typedef struct {
   blit3d_polygon *vert;
   blit3d_polygon *color;
@@ -2297,6 +2401,37 @@ lisp_value lisp_render_sdf_to_image(lisp_value model,
 
   return new_cons(vector_lisp_value(image_vec), vector_lisp_value(depth_vec));
 }
+#define N_D 3
+typedef struct _octree_node octree_node;
+struct _octree_node{
+  float d[N_D * N_D * N_D];
+  u32 color;
+  octree_node * sub_nodes;
+};
+
+void sdf_octree_from_sdf(octree_node ** node, df_ctx * df){
+  
+  if(*node == NULL){
+	 *node = alloc0(sizeof(octree_node));
+  }
+  var f = node[0]->d;
+  
+  for(int z = 0; z < N_D; z++){
+	 for(int y = 0; y < N_D; y++){
+		for(int x = 0; x < N_D;x++){
+		  int i = x + (y + z * N_D) * N_D;
+		  vec3 r = vec3_new(x, y, z);
+		  vec3 c;
+		  f32 d = df->sdf(df->userdata, r, &c);
+		  if(d > -1 && d < 1){
+			 // build a sub sdf
+		  }
+		  f[i] = d;
+		}
+	 }
+  }
+
+}
 
 void sdf_register() {
   lrn("sdf:dist", 2, lisp_sdf_distance);
@@ -2305,5 +2440,5 @@ void sdf_register() {
   lrn("sdf:to-image", 6, lisp_render_sdf_to_image);
   lrn("sdf:detect-collision", 4, foxgl_detect_collision2);
   lrn("sdf:detect-collision2", 5, foxgl_detect_collision3);
-  
+  lrn("sdf:height-map", 3, sdf_heightmap);
 }
