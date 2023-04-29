@@ -14,10 +14,10 @@
 		(mod (+ now (* (sign diff) (min turn-speed (abs diff)))) 360))))
 
 (defmacro with-clist(clist &rest body)
-  (println `(lisp:with-variables (lisp:get-current-scope!!) ,clist
+  `(lisp:with-variables! (lisp:get-current-scope!!) ,clist
 	  (quote (quote ,@body))
 	  
-  )))
+  ))
 
 (defvar dec-to-rad (* pi (/ 2.0 360.0))) 
 (defvar ui:entity-id nil)
@@ -37,20 +37,21 @@
 		(set! model (cdr model))
 		)
 	 (set! ui:entity-id (or id ui:next-id))
- 	 (let ((data (hashtable-ref entity-data ui:entity-id))) 
-		;(println (list (or ui:next-id) model data))
-	 
+ 	 (let ((data (ui:entity-data ui:entity-id))) 
 		(unless data
+		  (println 'generate! ui:entity-id)
+		
 		  (for-each arg scope-args
 						(set! data (cons (cons (car arg) (eval (cadr arg) scope)) data))
 
 						)
+		  
 		  (hashtable-set entity-data ui:entity-id data)
 		  
 		  (loop scope-args
 				 
 				 (set! scope-args (cdr scope-args))
-				 ))
+				  ))
 		
 		(incf ui:next-id 1)
 		(let ((prev ui:next-id))
@@ -66,6 +67,58 @@
   (set! ui:next-id 0)
   (eval-scoped0 scope model)
   )
+
+(defvar phase-offset 0.0)
+(defun move-circle (scope model)
+  (with-clist (ui:entity-data ui:entity-id)
+	 (let ((radius (car model))
+			 (phase (+ phase-offset real-time)))
+
+		(set! x (+ x (* 0.025 (sin phase) radius)))
+		(set! z (+ z (* 0.025 (cos phase) radius)))
+		(set! angle (* -25.0 real-time))
+		)
+
+  ))
+
+
+(defvar bee-wing-1
+  '(rotate (15 0 0)
+	 (offset (1.5 0 0)
+	  (scale (1.5 0.1 0.9)
+	  
+		(sphere1)))))
+(defvar bee-1
+  '(scale 0.2
+	 (rgb (0.3 0.2 0.2)
+	 (for x (range -1 0.5 1)
+	  (offset (0 0 (bind x))
+		
+	  (scale (1.1 1 0.2)
+		(rgb (1 1 0)
+			  (sphere1)
+			  ))))
+	 ;;stinger
+	 (offset (0 0 0.5)
+	  (scale (0.1 0.1 2.0)
+		(sphere1)))
+	 ;; body
+	 (scale (1 1 2.0)
+	  (sphere1))
+
+	 ;;wings
+
+	 (offset (0. 0 0)
+	  (rotate (0 0 (bind (+ 20 (* 40 (sin (* 10.0 real-time))))))
+		(bee-wing-1)))
+	 
+	 (offset (-0.5 0 0)
+	  (rotate (0 0 (bind (+ -20 (* 40 (sin (* -10.0 real-time))))))
+	
+		(scale (-1 1 1)
+				 (bee-wing-1))))
+	 )))
+
 (defvar wing-flap 0.0)
 (defvar wing-in -80.0)
 (defvar tail-spread 5)
@@ -99,6 +152,7 @@
 (defvar blink 1.0)
 (defvar bird-model
   '(offset (0 0 1)
+	 
 	 (rgb (1 1 1)
 	 ;;head
 	 (tile-model-2)
@@ -195,7 +249,6 @@
 (defvar space-down-event '(key-down key 32))
 
 (defun game-update (events)
-  
   (let ((player-stats (ui:entity-data :player))
 		  (space-down (key-down? foxgl:key-space))
 		  )
@@ -312,7 +365,8 @@
 	  (sphere1))
 	  (offset (1.5 0 -0.1)
 		(scale 1.5
-		(sphere1))))))
+				 (sphere1))))))
+
 
 (defun get-data (id sym)
   (cdr (clist-get (ui:entity-data id) sym))
@@ -331,8 +385,8 @@
 												 (bind (- (or (get-data :player 'z) 0))))
 												
 												(offset (0 -2 0)
-														  (ui:entity :ground ()
-														  (ground)))
+														  (ui:entity :ground ((x 0))
+																		 (ground)))
 												
 												
 											 
@@ -383,7 +437,33 @@
 																																											(upcube))))
 
 
-																		 ))))
+																				  ))))
+
+												;; todo: there is a bug if the same entity has a different number of arguments and then calls e.g move-circle.
+												;; probably due to the optimizer.
+												(ui:entity :bee ((x 10) (y 1.0) (z 10) (angle 10) (phase-offset 0))
+															  (move-circle 10.0)
+															  (offset ((bind x) (bind y) (bind z))
+																		 (rotate (0 (bind angle) 0)
+																		 (bee-1)))
+															  )
+
+												(ui:entity :bee-2 ((x 7) (y 1.0) (z 7) (angle 10)
+																				 (phase-offset 5))
+															  (move-circle 10.0)
+															  (offset ((bind x) (bind y) (bind z))
+																		 (rotate (0 (bind angle) 0)
+																		 (bee-1)))
+															  )
+
+												(ui:entity :bee-3 ((x 7) (y 1.0) (z -7) (angle 10)
+																				 (phase-offset 14))
+															  (move-circle 10.0)
+															  (offset ((bind x) (bind y) (bind z))
+																		 (rotate (0 (bind angle) 0)
+																		 (bee-1)))
+															  )
+
 												
 												(scope:if (> player-y 5.0)
 															 (ui:entity 123213
@@ -405,7 +485,8 @@
 															  (offset ((bind x) 10 (bind z))
 																		 (rotate (0 -13 0)
 																					(scale 4.3
-																					(cloud-1)))))
+																							 (cloud-1)))))
+																								
 
 									(blend t
 									 (offset (0 2 0)

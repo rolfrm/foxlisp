@@ -738,8 +738,31 @@ lisp_value lisp_with_sub_scope(lisp_value scope, lisp_value sym,
   return lisp_eval_progn(&s, body);
 }
 
-lisp_value lisp_with_vars(lisp_value scope, lisp_value vars, lisp_value body) {
+lisp_value lisp_with_vars_no_writeback(lisp_value scope, lisp_value vars, lisp_value body) {
   lisp_scope s;
+  lisp_scope *super_scope = lisp_value_scope(scope);
+  size_t len = list_length(vars);
+  var vars0 = vars;
+  cons con[len];//= {.car = sym, .cdr = value};
+  size_t i = 0;
+  while(!is_nil(vars)){
+	 var head = car(vars);
+	 vars = cdr(vars);
+	 con[i].car = car(head);
+	 con[i].cdr = cdr(head);
+	 i++;
+  }
+  vars = vars0;
+  i = 0;
+				  
+  lisp_scope_stack(&s, super_scope, con, len);
+  let result = lisp_eval_progn(&s, body);
+  
+  return result;
+}
+
+lisp_value lisp_with_vars(lisp_value scope, lisp_value vars, lisp_value body) {
+  lisp_scope s = {0};
   lisp_scope *super_scope = lisp_value_scope(scope);
   size_t len = list_length(vars);
   var vars0 = vars;
@@ -764,8 +787,7 @@ lisp_value lisp_with_vars(lisp_value scope, lisp_value vars, lisp_value body) {
 	 set_cdr(head, con[i].cdr);
 	 i++;
   }
-  //println(vars0);
-	 
+  
   return result;
 }
 
@@ -2751,7 +2773,8 @@ lisp_context *lisp_context_new() {
   lisp_register_native("lisp:with-scope-binding", 5, lisp_with_scope_binding);
   lisp_register_native("lisp:with-scope-variable", 5, lisp_with_scope_vars);
   //lisp_with_vars
-  lisp_register_native("lisp:with-variables", 3, lisp_with_vars);
+  lisp_register_native("lisp:with-variables!", 3, lisp_with_vars);
+  lisp_register_native("lisp:with-variables", 3, lisp_with_vars_no_writeback);
   lisp_register_native("lisp:scope-vars", 1, lisp_scope_vars);
   lisp_register_native("lisp:scope-super", 1, lisp_scope_super);
   lisp_register_native("lisp:scope-set!", 3, lisp_scope_set);
