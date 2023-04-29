@@ -742,7 +742,7 @@ lisp_value lisp_with_vars(lisp_value scope, lisp_value vars, lisp_value body) {
   lisp_scope s;
   lisp_scope *super_scope = lisp_value_scope(scope);
   size_t len = list_length(vars);
-  
+  var vars0 = vars;
   cons con[len];//= {.car = sym, .cdr = value};
   size_t i = 0;
   while(!is_nil(vars)){
@@ -752,8 +752,21 @@ lisp_value lisp_with_vars(lisp_value scope, lisp_value vars, lisp_value body) {
 	 con[i].cdr = cdr(head);
 	 i++;
   }
+  vars = vars0;
+  i = 0;
+				  
   lisp_scope_stack(&s, super_scope, con, len);
-  return lisp_eval_progn(&s, body);
+  let result = lisp_eval_progn(&s, body);
+  
+  while(!is_nil(vars)){
+	 var head = car(vars);
+	 vars = cdr(vars);
+	 set_cdr(head, con[i].cdr);
+	 i++;
+  }
+  //println(vars0);
+	 
+  return result;
 }
 
 lisp_value lisp_with_scope_binding(lisp_value scope, lisp_value scope2,

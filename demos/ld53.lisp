@@ -2,7 +2,7 @@
 (load "lisp1.lisp")
 (load "foxgl.lisp")
 (load "vec2.lisp")
-(define window-title "funky")
+(define window-title "Highbird")
 (load "models.lisp")
 (defvar model '())
 (defun game-update(events)

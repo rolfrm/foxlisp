@@ -626,4 +626,13 @@
   ;(assert handled-error)
   )
 
+(let ((h (make-hashtable)))
+  (hashtable-set h 1 2)
+  (hashtable-set h 3 'aaa)
+  (hashtable-set h 'xx 'aaa)
+
+  ( hashtable-iter h
+						(println (list key value)))
+  )
+
 (println "Tests Passed")

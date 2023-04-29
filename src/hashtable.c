@@ -186,6 +186,45 @@ lisp_value lisp_hashtable_clear(lisp_value _ht) {
   ht_clear(ht);
   return nil;
 }
+typedef struct{
+  cons args[2];
+  lisp_value body;
+  lisp_scope iter_scope;
+}iter_data;
+
+static void iter_key_value(void *key, void *value, void *user_data) {
+  UNUSED(key);
+  iter_data * ud = user_data;
+  ud->args[0].cdr = ((lisp_value *)key)[0];
+  ud->args[1].cdr = ((lisp_value *)value)[0];
+  lisp_eval_progn(&ud->iter_scope, ud->body);
+  
+}
+
+
+lisp_value lisp_hashtable_iter(lisp_scope * scope, lisp_value args){
+  static lisp_value key_sym;
+  static lisp_value value_sym;
+
+  if(key_sym.symbol == 0){
+	 get_symbol_cached(&key_sym, "key");
+	 get_symbol_cached(&value_sym, "value");
+  }
+
+  var table = car(args);
+  args = cdr(args);
+  table = lisp_eval(scope, table);
+  hash_table *ht = lisp_value_hashtable(table);
+  
+  iter_data iter_data = {0};
+  iter_data.args[0].car = key_sym;
+  iter_data.args[1].car = value_sym;
+  iter_data.body = args;
+  lisp_scope_stack(&iter_data.iter_scope, scope, iter_data.args, 2);
+  
+  ht_iterate(ht, iter_key_value, &iter_data);
+  return nil;
+}
 
 void load_hashtable_module() {
 
@@ -200,4 +239,6 @@ void load_hashtable_module() {
   lisp_register_native("hashtable-values", 1, lisp_hashtable_values);
   lisp_register_native("hashtable-clear", 1, lisp_hashtable_clear);
   lisp_register_native("hashtable-count", 1, lisp_hashtable_count);
+
+  lisp_register_native_macrolike("hashtable-iter", lisp_hashtable_iter);
 }
