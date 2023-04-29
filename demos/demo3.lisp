@@ -360,11 +360,3 @@
 								)))))
 		))))
 
-(defvar model2
-  '(perspective (1.0 1.0 0.1 1000.0)
-	 (depth t
-	  (rgb (1 0 0)
-		(offset (0 0 -5)
-				  (rotate (0 (bind real-time) 0)
-							 (wizard-model)))))))
-
