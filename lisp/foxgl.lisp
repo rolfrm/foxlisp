@@ -1305,6 +1305,14 @@
   (eval-scoped scope (cdr body))  
   )
 
+(defun scope:blend (scope body)
+  (foxgl:blend 1)
+  (eval-scoped scope (cdr body))  
+  (foxgl:blend nil)
+  
+  )
+
+
 (defvar paint-scope
   (eval
    '(let ((box scope:box)
@@ -1313,6 +1321,7 @@
 			 (ortho scope:ortho)
 			 (perspective scope:perspective)
 			 (depth scope:depth)
+			 (blend scope:blend)
 			 )
 	  (lisp:get-current-scope))
    transform-scope))

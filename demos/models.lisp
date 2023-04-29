@@ -62,7 +62,7 @@
     (ref tile-model)))
 
 (define tile-model-2
-  '(translate (-0.5 -0.5 -0.5)
+  '(translate (-0.5 0.0 -0.5)
     (ref tile-model)))
 
 

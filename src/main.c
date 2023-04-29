@@ -1414,6 +1414,16 @@ lisp_value lisp_eval_plookup(lisp_scope *scope, lisp_value lst,
   return nil;
 }
 
+lisp_value lisp_clist_lookup(lisp_value clist, lisp_value key){
+  while(!is_nil(clist)){
+	 let item = car(clist);
+	 if(eq(key, car(item)))
+		return item;
+	 clist = cdr(clist);
+  }
+  return nil;
+}
+
 static lisp_value lisp_eval_add1(lisp_value val1) {
   lisp_type val1_type = lisp_value_type(val1);
   EXPR_ASSERT(is_number_type(val1_type));
@@ -2719,7 +2729,7 @@ lisp_context *lisp_context_new() {
   lisp_register_native("load", 1, lisp_load);
   lisp_register_native("sign", 1, lisp_sign);
   lisp_register_native("abs", 1, lisp_abs);
-
+  lisp_register_native("clist-get", 2, lisp_clist_lookup);
   lisp_register_native("function-signature", 1, lisp_signature);
 
   lisp_register_native("function->code", 1, lisp_function_code);
