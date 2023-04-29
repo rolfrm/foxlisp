@@ -206,7 +206,7 @@
 				(animation-time (cdr (clist-get player-stats 'animation-time)))
 				(animation (cdr (clist-get player-stats 'animation)))
 				)
-		  (println (cdr y))
+
 		  (when (< (cdr y) 0.001)
 			 (set! animation :walk)
 			 (incf animation-time 0.04)
@@ -219,18 +219,16 @@
 			 (when (> animation-time 2.0)
 				(set! animation-time 0.0))
 			 (when (and (< animation-time 0.02) (not space-down))
-				(set-cdr! y (+ (cdr y) 0.04))
+				(set-cdr! y (- (cdr y) 0.02))
 			 
 				)
 			 )
 		  (when space-down
-			 (println 'space!)
 			 	 (set! animation :fly)
 				 (set-cdr! (clist-get player-stats 'animation) animation)
 				 
 				(set-cdr! y (+ (cdr y) 0.01))
 			 (set! animation-time (+ 0.01 animation-time)))
-		  ;(set-cdr! z (+ 0.01 (cdr z)))
 		  (set-cdr! (clist-get player-stats 'animation-time) animation-time)
 		  (let ((v-x 0.0)
 				  (v-y 0.0)
@@ -248,19 +246,14 @@
 				(set! v-x (- (sin (* (cdr angle) dec-to-rad))))
 				(set! v-z (cos (* (cdr angle) dec-to-rad)))
 				)
-			 								 ;(println v-x v-z)
 			 (let ((absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
 				(when (> absv 0)
 				  (let ((target-angle (/ (math:atan (- v-x) v-z) dec-to-rad)))
-					 ;(set! wizard-walk (+ wizard-walk 0.2))
-					 (set-cdr! angle (interpolate-angle (cdr angle) target-angle 10))
-					 ;(set-cdr! angle angle)
-					 (set! v-x (* 0.2 (/ v-x absv)))
+					 (set-cdr! angle (interpolate-angle (cdr angle) target-angle 10))					 (set! v-x (* 0.2 (/ v-x absv)))
 					 (set! v-z (* 0.2 (/ v-z absv)))
 					 (set-cdr! x (+ v-x (cdr x)))
 					 (set-cdr! z (+ v-z (cdr z)))
 					 )
-				  ;(table-insert velocities wizard-id v-x 0.0 v-z 0.0)
 				  )
 				
 				)))
@@ -282,23 +275,13 @@
 										(with-clist object-body
 										  (mat4:identity! mat2)
 										  (math:translate! mat2 x y z)
-													 ;(println (cons mat1 mat2))
-										  
 										  (let ((col (sdf:detect-collision2 body value mat1 mat2 col-out)))
 											 (when col
-												;(println hidden)
 												(set! hidden t)
-												;(println key 'aa col-out hidden object-body))
-
+										
 											 )
 										  ))
-										;(println object-body)
-										;(println (list key value x y object-body))
-
-
 										)))
-
-
 				)
 			 
 			 )
@@ -353,13 +336,13 @@
 												  (vars ((wing-flap (if (eq animation :walk) 0.0 animation-time))
 															(wing-in (if (eq animation :walk) -80 0))
 															(tail-spread (if (eq animation :walk) 3 8))
-															(walk-cycle (println (if (eq animation :walk) animation-time 0.0)))
+															(walk-cycle (if (eq animation :walk) animation-time 0.0))
 															(show-feet (eq animation :walk))
 															
 
 															)
 												  
-										(offset ((bind (println x)) (bind y) (bind z))
+										(offset ((bind x) (bind y) (bind z))
 												  (rotate (0 (bind angle) 0)
 												  (bird-model))))
 
