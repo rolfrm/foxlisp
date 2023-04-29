@@ -58,8 +58,13 @@
                                                  0 0 1
                                                  1 0 1)))
 (define right-tile
-  '(translate (0.0 -0.5 -0.5)
+  '(translate (0.0 -0.0 -0.5)
     (ref tile-model)))
+
+(define z-tile
+  '(translate (-0.5 -0.0 -0.0)
+    (ref tile-model)))
+
 
 (define tile-model-2
   '(translate (-0.5 0.0 -0.5)

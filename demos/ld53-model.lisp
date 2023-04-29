@@ -73,12 +73,12 @@
 (defvar show-feet t)
 (defvar bird-wing
   '(rgb (1 1 1)
-	 (rotate (0 (bind wing-in) (bind (* 22 (sin (* 2.0 pi wing-flap)))))
+	 (rotate (0 (bind wing-in) (bind (* 15 (sin (* 1.5 pi wing-flap)))))
 	  (offset (-0.25 0 0)
 		(scale (1.5 1.0 1.0)
 				 (right-tile))
 	  (offset (1.4 0 0)
-		(rotate (0 0 (bind (* 22 (sin (* 2.0 pi wing-flap)))))
+		(rotate (0 0 (bind (* 15 (sin (* 1.5 pi wing-flap)))))
 				  (offset (-0.25 0 0)
 							 (scale (1.5 1.0 1.0)
 									  (right-tile))
@@ -96,7 +96,7 @@
 	  (scale (0.2 1.0 1.0)
 		(z-tile)))
 	 )))
-
+(defvar blink 1.0)
 (defvar bird-model
   '(offset (0 0 1)
 	 (rgb (1 1 1)
@@ -105,10 +105,11 @@
 	 ;; eyes
 	 (rgb (0 0 0)
 	  (offset (0.2 0.1 0.1)
-		(scale (0.1 1.0 0.2)
+				 
+		(scale (0.1 1.0 (bind (* 0.2 (- 1.0 blink))))
 				 (tile-model-2)))
 	  (offset (-0.2 0.1 0.1)
-		(scale (0.1 1.0 0.2)
+		(scale (0.1 1.0 (bind (* 0.2 (- 1.0 blink))))
 				 (tile-model-2)))
 
 	  )
@@ -120,7 +121,7 @@
 		(rotate (0 0 0)
 				  (scale (0.5 1.0 1.0)
 							(tile-model-2)))))
-	  (rotate (0 0 (bind (* 5 (sin (* 5 walk-cycle)))))
+	  (rotate (0 0 (bind (* 15 (sin (* 5 walk-cycle)))))
 	  ;;body
 	 (offset (0 0 -1)
 	  (scale (1.1 1.0 2.0)
@@ -199,6 +200,11 @@
 		  (space-down (key-down? foxgl:key-space))
 		  )
 	 (when player-stats
+		(with-clist player-stats
+		  (set! blink (if (< (abs (- 25 (mod real-time 50.0))) 0.25) 1.0 0.0 ))
+		  ))
+	 
+	 (when player-stats
 		(let ((z (clist-get player-stats 'z))
 				(y (clist-get player-stats 'y))
 				(x (clist-get player-stats 'x))
@@ -209,17 +215,18 @@
 
 		  (when (< (cdr y) 0.001)
 			 (set! animation :walk)
-			 (incf animation-time 0.04)
-			 (set-cdr! (clist-get player-stats 'animation) animation))
+			 (set-cdr! (clist-get player-stats 'animation) animation)
+					 
+			 )
 		  (when (eq animation :fly)
 			 (when (> animation-time 0.0)
 				(set-cdr! y (+ (cdr y) 0.04))
-			 
-				(incf animation-time 0.04))
+			 	(incf animation-time 0.04))
+
 			 (when (> animation-time 2.0)
 				(set! animation-time 0.0))
 			 (when (and (< animation-time 0.02) (not space-down))
-				(set-cdr! y (- (cdr y) 0.02))
+				(set-cdr! y (- (cdr y) 0.04))
 			 
 				)
 			 )
@@ -248,6 +255,11 @@
 				)
 			 (let ((absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
 				(when (> absv 0)
+				  (when (eq animation :walk)
+					 (incf animation-time 0.04)
+					 (set-cdr! (clist-get player-stats 'animation-time) animation-time)
+		  			 )
+				  
 				  (let ((target-angle (/ (math:atan (- v-x) v-z) dec-to-rad)))
 					 (set-cdr! angle (interpolate-angle (cdr angle) target-angle 10))					 (set! v-x (* 0.2 (/ v-x absv)))
 					 (set! v-z (* 0.2 (/ v-z absv)))
@@ -325,10 +337,13 @@
 												
 											 
 									
-									(ui:entity :player ((x 0) (y 0) (z 0)
-															  (angle 0)
-															  (animation :fly)
-																	  (animation-time 0.0))
+												(ui:entity :player ((x 0)
+																		  (y 0) (z 0)
+																		  (angle 0)
+																		  (animation :fly)
+																		  (animation-time 0.0)
+																		  (blink 0.0)
+																		  )
 												  (ui:body (sphere 3.0));(aabb 0.5 0.2 1.0))
 		
 
