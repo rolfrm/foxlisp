@@ -88,13 +88,13 @@
   '(rgb (0.7 0.5 0.1)
 	 (rotate (0 30 0)
 	 (scale (0.2 1.0 1.0)
-	  (tile-model-2))
+	  (z-tile))
 	 (rotate (0 15 0)
 	  (scale (0.2 1.0 1.0)
-		(tile-model-2)))
+		(z-tile)))
 	 (rotate (0 -15 0)
 	  (scale (0.2 1.0 1.0)
-		(tile-model-2)))
+		(z-tile)))
 	 )))
 
 (defvar bird-model
@@ -144,14 +144,15 @@
 
 		(scope:if show-feet
 	  ;; left foot
-	  (offset (-0.5 -0.8 (bind (+ -0.6 (* 0.4 (sin (* 5.0 walk-cycle))))))
+	  (offset (-0.5 -0.8 (bind (+ -1.5 (* 0.4 (sin (* 5.0 walk-cycle))))))
 		(rgb (0.7 0.5 0.1)
 			  (bird-feet)))
 
 	  ;; right foot
-	  (offset (0.5 -0.8 (bind (+ -0.6 (* 0.4 (sin (+ (* 5.0 walk-cycle) 3.14 ))))))
+	  (offset (0.5 -0.8 (bind (+ -1.5 (* 0.4 (sin (+ (* 5.0 walk-cycle) 3.14 ))))))
+				 (scale (-1 1 1)
 		(rgb (0.7 0.5 -0.01)
-			  (bird-feet)))
+			  (bird-feet))))
 
 	  ))
 	  )))
@@ -195,11 +196,8 @@
 (defun game-update (events)
   
   (let ((player-stats (ui:entity-data :player))
-		  (space-clicked nil)
+		  (space-down (key-down? foxgl:key-space))
 		  )
-	 (for-each event events
-				  (when (equals? event space-down-event)
-					 (set! space-clicked t)))
 	 (when player-stats
 		(let ((z (clist-get player-stats 'z))
 				(y (clist-get player-stats 'y))
@@ -220,8 +218,12 @@
 				(incf animation-time 0.04))
 			 (when (> animation-time 2.0)
 				(set! animation-time 0.0))
+			 (when (and (< animation-time 0.02) (not space-down))
+				(set-cdr! y (+ (cdr y) 0.04))
+			 
+				)
 			 )
-		  (when space-clicked
+		  (when space-down
 			 (println 'space!)
 			 	 (set! animation :fly)
 				 (set-cdr! (clist-get player-stats 'animation) animation)
@@ -242,7 +244,11 @@
 				(set! v-x -0.1))
 			 (when (key-down? foxgl:key-s)
 				(set! v-z -0.1))
-													 ;(println v-x v-z)
+			 (when (and (eq v-x 0.0) (eq v-z 0.0) (eq animation :fly))
+				(set! v-x (- (sin (* (cdr angle) dec-to-rad))))
+				(set! v-z (cos (* (cdr angle) dec-to-rad)))
+				)
+			 								 ;(println v-x v-z)
 			 (let ((absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
 				(when (> absv 0)
 				  (let ((target-angle (/ (math:atan (- v-x) v-z) dec-to-rad)))
