@@ -44,3 +44,14 @@ jobs:
       run: make -C iron wasm
     - name: make
       run: make index.js
+    - name: list files
+      run: ls 
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: dist-without-markdown
+        path: |
+          index.js
+          index.wasm
+          index.html
+   
