@@ -366,16 +366,26 @@
 
 (defvar cloud-1
   '(rgb (0.9 0.9 1)
-	 (sphere1)
+	 (sphere2)
 	 (offset (0.7 0 0.1)
 	  (scale 1.2
-	  (sphere1))
+	  (sphere2))
 	  (offset (1.5 0 -0.1)
 		(scale 1.5
-				 (sphere1))))))
+				 (sphere2))))))
 
 (defvar skylevel
-  '(for id (range 10)
+  '((bake2 :key (bind y0)
+	  (for id (range 3)
+		(offset ((bind (println (math:random -30.0 30.0) "building clouds"))
+					(bind (+ y0 (math:random -3.0 3.0)))
+					(bind (math:random -30.0 30.0)))
+		 (scale (bind (math:random 2.0 4.0))
+		  (cloud-1)
+		))))
+
+
+	 (for id (range 10)
 	  
 	  (ui:entity ((x (math:random -20.0 20.0))
 					  (y y0)
@@ -389,7 +399,12 @@
 								 (rgb (0.9 0.8 0.3)
 										(tile-model-2))))
 	  
-		))))
+					 )))))
+(defvar skylevel-gen
+  '(ui:entity  ((y0 (car args)))
+	 (scope:if (> player-y (- y0 5.0))
+				  (skylevel))
+	 ))
 
 
 
@@ -513,25 +528,7 @@
 																)
 												(scope:if (> player-y 5.0)
 															 
-															 (ui:entity ((x 0 ) (z 0))
-												  (offset ((bind x) 8 (bind z))
-															 (scale 2.0
-															 (cloud-1))))
-
-												(ui:entity
-															  ((x -53 ) (z 5))
-															  (offset ((bind x) 10 (bind z))
-																		 (rotate (0 13 0)
-																					(scale 3.0
-																					(cloud-1))
-
-																					)))
-																								(ui:entity
-															  ((x 15 ) (z -23))
-															  (offset ((bind x) 10 (bind z))
-																		 (rotate (0 -13 0)
-																					(scale 4.3
-																							 (cloud-1)))))
+															 
 																								
 
 									

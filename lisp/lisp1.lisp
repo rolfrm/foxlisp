@@ -337,10 +337,10 @@
     (set! ,place (cdr ,place))
     v))
 
-(defun concat-2 (head lst lists)
+(defun lisp:concat-2 (head lst lists)
   (cons head
         (if lst
-            (concat-2 (car lst) (cdr lst) lists)
+            (lisp:concat-2 (car lst) (cdr lst) lists)
             (concat-1 lists))))
 
 (defun concat-1 (lists)
@@ -348,13 +348,18 @@
         (tail (cdr lists)))
     (if tail
         (if head
-            (concat-2 (car head) (cdr head) tail)
+            (lisp:concat-2 (car head) (cdr head) tail)
             (concat-1 (cdr lists)))
             
         head)))
         
 (defun concat (&rest lists) (concat-1 lists) )
 
+(defun concat-2 (a b)
+  (if a
+		(cons (car a) (concat-2 (cdr a) b))
+		b))
+										 
 (defmacro for-each (arg list &rest body)
   `(let ((lst ,list)
          (,arg nil))

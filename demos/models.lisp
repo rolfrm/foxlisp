@@ -121,6 +121,46 @@
     (reverse! out)
     ))
 
+
+(defun generate-sphere-single-draw (radius steps)
+  (let ((vertex-list (list))
+         (step-phi (/ pi steps))
+         (step-theta (/ (* 2 pi) steps)))
+    ;; Generate vertices for triangle strip
+    (dotimes! i steps ;; vertical steps
+      (dotimes! j (+ steps 1) ;; horizontal steps
+        (let ((phi1 (* i step-phi))
+              (phi2 (* (+ i 1) step-phi))
+              (theta (* j step-theta)))
+			 (let(
+               (x1 (* radius (sin phi1) (cos theta)))
+               (y1 (* radius (cos phi1)))
+               (z1 (* radius (sin phi1) (sin theta)))
+               (x2 (* radius (sin phi2) (cos theta)))
+               (y2 (* radius (cos phi2)))
+               (z2 (* radius (sin phi2) (sin theta))))
+				(let ((seg (list x1 y1 z1 x2 y2 z2)))
+				  (println seg)
+				  
+				  (set! vertex-list (cons z2 (cons y2 (cons x2 (cons z1 (cons y1 (cons x1 vertex-list)))))))
+				  ;(println '>> vertex-list)
+
+				  )))
+		  )
+		(when (< i (1- steps))
+        (let ((phi2 (* (+ i 2) step-phi))
+              (theta 0))
+			 (let (
+               (x2 (* radius (sin phi2) (cos theta)))
+               (y2 (* radius (cos phi2)))
+               (z2 (* radius (sin phi2) (sin theta))))
+				(set! vertex-list (cons z2 (cons y2 (cons x2 (cons z2 (cons y2 (cons x2 vertex-list)))))))
+		  )
+		)))
+
+	 (reverse! vertex-list)))
+
+
 (defvar sphere1
   '(sdf2 (:size 1 :resolution 0.25)
 	 (rgb (1 1 1)
@@ -134,3 +174,7 @@
 	  
 (defvar upsphere '(offset (0 1 0)
 						 (sphere1)))
+
+(defvar sphere2 (list 'polygon :3d-triangle-strip (generate-sphere-single-draw 1.0 16)))
+
+(println sphere2)

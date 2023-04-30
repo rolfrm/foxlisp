@@ -28,9 +28,14 @@
 	  (depth t
 		
 		(rgb (1 0 0)
-			 (offset (0 0 -50)
+			 (offset (0 0 -10)
 						(ui:entity-root
 						 (scale 2.0
+								  (rotate ((bind (* 3 real-time)) (bind (* 4 real-time)) 0)
+											 (rgb (1 0 0)
+													(sphere2)))
+
+								  (scope:if nil
 								  (rotate ((bind real-time) (bind real-time) 0)
 											 (for x (range 0 10)
 													(ui:entity
@@ -41,4 +46,4 @@
 																(upcube))
 													  )
 
-											 ))))))))))))
+											 )))))))))))))

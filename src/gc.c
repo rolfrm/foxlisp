@@ -685,7 +685,7 @@ void gc_clear_weak(lisp_context *lisp) {
 }
 
 void gc_collect_garbage(lisp_context *lisp) {
-  
+  //printf("GC\n");
   var gc = lisp->gc;
   gc_clear(gc);
   gc_mark(lisp);
