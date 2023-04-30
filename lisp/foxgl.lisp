@@ -931,9 +931,10 @@
     ))
 
 
-(define foxgl:key-up 264)
+(define foxgl:key-up 265)
 (define foxgl:key-left 263)
 (define foxgl:key-right 262)
+(define foxgl:key-down 264)
 (define foxgl:key-w 87)
 (define foxgl:key-a 65)
 (define foxgl:key-s 83)

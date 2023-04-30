@@ -943,9 +943,15 @@ lisp_value foxgl_depth(lisp_value blend) {
   return nil;
 }
 
-lisp_value foxgl_key_down(lisp_value window, lisp_value keyid) {
-  if (gl_window_get_key_state(window.native_pointer, keyid.integer))
-    return t;
+lisp_value foxgl_key_down(lisp_value * args, size_t cnt) {
+  if(cnt == 0) return nil;
+  lisp_value window = args[0];
+  for(size_t i = 1; i < cnt; i++){
+	 lisp_value keyid = args[i];
+	 if (gl_window_get_key_state(window.native_pointer, keyid.integer))
+		return t;
+  }
+
   return nil;
 }
 
@@ -1276,7 +1282,7 @@ void foxgl_register() {
   lrn("foxgl:measure-text", 2, foxgl_measure_text);
   lrn("foxgl:blend", 1, foxgl_blend);
   lrn("foxgl:depth", 1, foxgl_depth);
-  lrn("foxgl:key-down?", 2, foxgl_key_down);
+  lrn("foxgl:key-down?", -1, foxgl_key_down);
   lrn("foxgl:mouse-down?", 2, foxgl_mouse_down);
   lrn("foxgl:blit-mode", 1, blit_set_mode);
   lrn("foxgl:sdf-poly", 4, sdf_poly);
