@@ -2660,7 +2660,7 @@ int main(int argc, char **argv) {
 #endif
 
 #ifdef WASM
-  lisp_eval_file("foxday2.lisp");
+  lisp_eval_file("demos/ld53.lisp");
 
   emscripten_set_main_loop(web_update, 0, 1);
 
