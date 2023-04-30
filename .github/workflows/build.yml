@@ -40,5 +40,7 @@ jobs:
       run: emcc -v
     - name: install packages
       run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libopenal-dev libglfw3-dev
+    - name: Make Iron
+      run: make -C iron wasm
     - name: make
-      run: make
+      run: make index.js
