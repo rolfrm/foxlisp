@@ -79,7 +79,7 @@ lisp_value foxal_sin(lisp_value buffer, lisp_value phase, lisp_value freq) {
     p += f;
   }
 
-  return rational_lisp_value(p);
+  return rational_lisp_value((f64)p);
 }
 
 lisp_value foxal_update() {

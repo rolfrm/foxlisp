@@ -1,4 +1,4 @@
-OPT = -Og -g3
+OPT = -O3 -g0
 LIB_SOURCES1 = main.c foxgl.c tcp.c foxal.c gc.c process.c parser.c test.c surface.c mc.c foxmath.c lisp_base.c hashtable.c vector.c table.c #awsm.c foxvm.c #model.c
 LIB_SOURCES = $(addprefix src/, $(LIB_SOURCES1))
 CC = gcc
@@ -11,7 +11,7 @@ BCLIBS = -s USE_GLFW=3 -s WASM=1 -s USE_WEBGL2=1 -lm -lglfw3 -lGL -lopenal
 BCFLAGS = -DWASM -emit-llvm
 BCLDFLAGS = -s ALLOW_MEMORY_GROWTH=1
 ALL = $(TARGET)
-CFLAGS = -Isrc/  -I. -Iinclude/ -Ilibmicroio/include -std=gnu11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -DDEBUG -Wextra -Wall -ffast-math -Werror -Wdouble-promotion
+CFLAGS = -Isrc/  -I. -Iinclude/ -Ilibmicroio/include -std=c11 -c $(OPT) -Werror=implicit-function-declaration -Wformat=0 -D_GNU_SOURCE -fdiagnostics-color  -Wwrite-strings -DDEBUG -Wextra -Wall -ffast-math -Werror -Wdouble-promotion
 
 all: libmicroio.a
 all: $(TARGET)
@@ -35,8 +35,8 @@ libmicroio.bc:
 libiron.bc: iron/libiron.bc
 	cp iron/libiron.bc .
 
-index.js: $(BCOBJECTS) libmicroio.bc ld50.lisp foxgl.lisp libiron.bc foxday2.lisp demo.lisp models.lisp ld51_game.lisp ld51.lisp demo3.lisp sdf.lisp
-	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -sEXPORTED_RUNTIME_METHODS=ccall -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./ld50.lisp@ld50.lisp  --embed-file ./lisp1.lisp@lisp1.lisp --embed-file ./vec2.lisp@vec2.lisp  --embed-file ./foxgl.lisp@foxgl.lisp --embed-file DejaVuSans.ttf --embed-file ./ld51.lisp --embed-file ./ld51_game.lisp --embed-file ./models.lisp --embed-file ./demo3.lisp --embed-file ./foxday2.lisp --embed-file ./sdf.lisp
+index.js: $(BCOBJECTS) libmicroio.bc libiron.bc 
+	emcc $(LDFLAGS) $(BCOBJECTS) $(BCLIBS) $(BCLDFLAGS) -sEXPORTED_RUNTIME_METHODS=ccall -s ALLOW_MEMORY_GROWTH=1  libiron.bc  -s ASYNCIFY -s libmicroio.bc -o $@  --embed-file ./lisp --embed-file ./demos
 
 libmicroio.a:libmicroio/libmicroio.a
 	cp libmicroio/libmicroio.a .

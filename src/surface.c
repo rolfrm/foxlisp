@@ -3,6 +3,11 @@
 #include <microio.h>
 #include "foxlisp.h"
 #include "foxgl.h"
+
+void qsort_r(void *base, size_t nmemb, size_t size,
+           int (*compar)(const void *, const void *, void *),
+           void *arg);
+
 typedef enum { DITHER_NONE, DITHER_FLOYD_STEINBERG } DITHERING;
 
 extern DITHERING dithering;
@@ -986,7 +991,7 @@ static void *get_physics_sdf2(lisp_value value) {
 
   if (lisp_value_eq(model_type, get_symbol("capsule"))) {
     f32 h = lisp_value_as_rational(cadr(model_type));
-    f32 r = lisp_value__as_rational(caddr(model_type));
+    f32 r = lisp_value_as_rational(caddr(model_type));
 
     sdf_vert_capsule *capsule = alloc(sizeof(*capsule));
 
@@ -1521,7 +1526,7 @@ void improve_mesh(mc_vertex_builder *bld) {
 
   edge_lookup = lisp_malloc(sizeof(*edge_lookup));
   ht_create3(edge_lookup, 1, sizeof(face_edge), sizeof(int));
-  printf("bld->count %i\n", bld->count);
+  printf("bld->count %i\n", (int)bld->count);
   int id = 0;
   for (size_t trg = 0; trg < bld->count / 3; trg++) {
 
@@ -2085,10 +2090,10 @@ lisp_value sdf_heightmap(lisp_value points, lisp_value resolution,
 		f32 uvy = y / ((f32) ry);
 		f32 ptx = uvx * px;
 		f32 pty = uvy * py;
-		i32 x1 = (i32)floor(ptx);
-		i32 x2 = (i32)ceil(ptx);
-		i32 y1 = (i32)floor(pty);
-		i32 y2 = (i32)ceil(pty);
+		i32 x1 = (i32)floor((f64)ptx);
+		i32 x2 = (i32)ceil((f64)ptx);
+		i32 y1 = (i32)floor((f64)pty);
+		i32 y2 = (i32)ceil((f64)pty);
 		
 		i32 i00 = (x1 + y1 * py) * 3;
 		vec3 v00 = vec3_new(points_ptr[i00],points_ptr[i00 + 1],points_ptr[i00 + 2]);

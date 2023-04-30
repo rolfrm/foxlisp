@@ -132,36 +132,6 @@ static void normalize_numericals(lisp_value *values, int count) {
     return integer(sum);                                                       \
   }
 
-static inline lisp_value lisp_procn(lisp_value *values, int count,
-                                    void (*ff)(f64 *l, f64 *r),
-                                    void (*lf)(i64 *l, i64 *r)) {
-  if (count == 2 && values[0].type == values[1].type) {
-    if (is_float_type(values[0].type)) {
-      double sum = values[0].rational;
-      ff(&sum, &(values[1]).rational);
-      return values[0].type == LISP_FLOAT32 ? float32(sum) : rational(sum);
-      ;
-    } else {
-      i64 sum = values[0].integer;
-      lf(&sum, &(values[1]).integer);
-      return integer(sum);
-    }
-  }
-  normalize_numericals(values, count);
-
-  if (is_float(values[0])) {
-    double sum = values[0].rational;
-    for (int i = 1; i < count; i++)
-      ff(&sum, &(values[i]).rational);
-    return values[0].type == LISP_FLOAT32 ? float32(sum) : rational(sum);
-  } else {
-    i64 sum = values[0].integer;
-    for (int i = 1; i < count; i++)
-      lf(&sum, &(values[i]).integer);
-    return integer(sum);
-  }
-}
-
 static inline lisp_value lisp_binn(lisp_value *values, int count,
                                    bool (*cmpf)(f64 l, f64 r),
                                    bool (*cmpi)(i64 l, i64 r)) {

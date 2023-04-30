@@ -909,10 +909,10 @@ lisp_value foxgl_measure_text(lisp_value text, lisp_value out_cons) {
 
   var s = blit_measure_text(text2);
   if (!is_cons(out_cons)) {
-    out_cons = new_cons(rational_lisp_value(s.x), rational_lisp_value(s.y));
+    out_cons = new_cons(rational_lisp_value((f64)s.x), rational_lisp_value((f64)s.y));
   } else {
-    set_car(out_cons, rational_lisp_value(s.x));
-    set_cdr(out_cons, rational_lisp_value(s.y));
+    set_car(out_cons, rational_lisp_value((f64)s.x));
+    set_cdr(out_cons, rational_lisp_value((f64)s.y));
   }
   return out_cons;
 }

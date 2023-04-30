@@ -348,7 +348,7 @@ void lisp_print_scope2(lisp_scope *s){
 	 var l = s->lookup[i];
 	 if(is_nil(l.car))
 		panic_on_scope_error();
-	 printf("%i:  ", i);print(l.car); printf(" "); print(l.cdr);printf("\n");
+	 printf("%i:  ", (int)i);print(l.car); printf(" "); print(l.cdr);printf("\n");
   }
 
 }
@@ -2075,7 +2075,7 @@ lisp_value lisp_eval_stream(io_reader *rd) {
 
     current_toplevel = cons_lisp_value(&toplevel);
     next_toplevel = code;
-    lisp_collect_garbage(current_context);
+    lisp_collect_garbage();
     result = lisp_eval(current_context->globals, code);
     current_toplevel = toplevel.car;
 
