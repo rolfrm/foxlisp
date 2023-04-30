@@ -431,15 +431,14 @@ void sdf_detect_collision(cdf_ctx *ctx, vec3 position, f32 size) {
     return;
   var d = ctx->sdf1(ctx->userdata1, position, NULL);
   var d2 = ctx->sdf2(ctx->userdata2, position, NULL);
-  //vec3_print(position);
-  //printf("%f %f %f\n", (f64)d, (f64)d2, (f64)size);
+  
   if (d < size * sqrt_3 && d2 < size * sqrt_3) {
     f32 s2 = size * 0.5f;
 	 
     if (size < ctx->threshold * sqrt_3) {
       // collison detected
       ctx->pt = position;
-      ctx->collision_detected = MAX(d, d2) < -ctx->threshold;
+      ctx->collision_detected = true;
       return;
     } else {
 		f32 d1[8];
@@ -927,7 +926,7 @@ static void *get_physics_sdf2(lisp_value value) {
     return aabb;
   }
   if (lisp_value_eq(model_type, get_symbol("sphere"))) {
-    f32 s = lisp_value_rational(cadr(value));
+    f32 s = lisp_value_as_rational(cadr(value));
 
     sdf_sphere *sphere = alloc(sizeof(*sphere));
 
@@ -1202,7 +1201,7 @@ lisp_value foxgl_detect_collision(lisp_value obj1, lisp_value obj2,
                  .threshold = 0.01,
                  .greatest_common_overlap = 100.0};
   cdf_ctx ctx2 = ctx;
-  sdf_detect_collision(&ctx, p2, 10.0);
+  sdf_detect_collision(&ctx, p2, 100.0);
   if (ctx.collision_detected && is_cons(out_cons)) {
     ctx2.threshold = 0.01;
 
@@ -1245,8 +1244,7 @@ lisp_value foxgl_detect_collision2(lisp_value obj1, lisp_value obj2,
 	 vec3 p3 = ctx2.pt;
 	 var itform = mat4_invert(tform);
 	 p3 = mat4_mul_vec3(itform, p3);
-	 //var p0 = mat4_mul_vec3(itform, vec3_new(0,0,0));
-	 //p3 = vec3_sub(p3, p0);
+
 	 set_car(out_cons, rational_lisp_value((f64)p3.x));
     set_cdr(out_cons, rational_lisp_value((f64)p3.z));
   }
@@ -1265,7 +1263,9 @@ lisp_value foxgl_detect_collision3(lisp_value obj1, lisp_value obj2,
   vec3 p2_2 = vec3_new(0.0, 0.0, 0.0);
   p2_2 = mat4_mul_vec3(tform2, vec3_new(0.0, 0.0, 0.0));
   p2 = vec3_scale(vec3_add(p2, p2_2), 0.5);
-  
+
+  tform1 = mat4_invert(tform1);
+  tform2 = mat4_invert(tform2);
   sdf_transform a_t = {.type = SDF_TYPE_TRANSFORM,
                        .inv_tform = tform1,
                        .models = &model1,
@@ -1280,13 +1280,13 @@ lisp_value foxgl_detect_collision3(lisp_value obj1, lisp_value obj2,
                  .sdf2 = generic_sdf,
                  .userdata1 = &b_t,
                  .userdata2 = &a_t,
-                 .threshold = 0.1,
-                 .greatest_common_overlap = 100.0};
+                 .threshold = 0.01,
+                 .greatest_common_overlap = 1000.0};
   cdf_ctx ctx2 = ctx;
 
   sdf_detect_collision(&ctx, p2, 100.0);
   if (ctx.collision_detected && is_vector(out_cons)) {
-    ctx2.threshold = 0.001;
+    ctx2.threshold = 0.0001;
 	 
     sdf_detect_max_overlap(&ctx2, p2, 100.0);
 	 vec3 p3 = ctx2.pt;

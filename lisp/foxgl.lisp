@@ -997,7 +997,7 @@
 							 (lisp:scope-set! (lisp:get-current-scope!!) var start)
 							 (eval-scoped (lisp:get-current-scope!!) rest)
 							 (set! start (+ start step))
-							 (if (> start end)
+							 (if (>= start end)
 								  (set! start nil))
 							 )))))
 		  

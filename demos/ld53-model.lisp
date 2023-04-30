@@ -80,6 +80,23 @@
 
   ))
 
+(defun move-circle2 (scope model)
+  (with-clist (ui:entity-data ui:entity-id)
+	 (let ((radius (car model))
+			 (speed (cadr model))
+			 (phase phase-offset)
+			 (v-x (* 0.025 (sin phase) radius))
+			 (v-z (* 0.025 (cos phase) radius)))
+		
+		(set! x (+ x (* 1.0 v-x) (math:random -0.002 0.002)))
+		(set! z (+ z (* 1.0 v-z) (math:random -0.002 0.002)))
+		(set! angle
+				(+ 180 (/ (math:atan (- v-x) v-z) dec-to-rad))
+				)
+		(incf phase-offset speed)
+		)
+  ))
+
 
 (defvar bee-wing-1
   '(rotate (15 0 0)
@@ -117,6 +134,127 @@
 		(scale (-1 1 1)
 				 (bee-wing-1))))
 	 )))
+(defvar butterfly-wing-1
+  '(bake2 (rotate (15 0 0)
+	 (offset (1.5 0 0)
+	  (scale (1.5 0.1 0.9)
+		
+		(upcube)
+		
+
+		)
+	  (offset (0 0 -0.5)
+	  (rotate (0 -35 0)
+	  (scale (2 0.1 0.9)
+		
+		(upcube)
+		
+
+		)
+	  ))))))
+
+(defvar butterfly-1
+  '(scale 0.4
+	 (rgb (0.3 0.3 0.5)
+	 
+	 ;; body
+	 (scale (0.2 1 0.7)
+	  (sphere1))
+
+	 ;;wings
+	  (rgb (0.7 0.1 1)
+	 (offset (-0.5 0 0)
+	  (rotate (0 0 (bind (+ 20 (* 40 (sin (* 5.0 real-time))))))
+		(butterfly-wing-1)))
+	 
+		(offset (0.5 0 0)
+	  (rotate (0 0 (bind (+ -20 (* 40 (sin (* -5.0 real-time))))))
+	
+		(scale (-1 1 1)
+				 (butterfly-wing-1))))
+		))))
+
+(defvar plane-wing-1
+  '(rotate (0 -5 0)
+	 (offset (0.5 0 0.2)
+	  
+	  (rotate (0 5 0)
+		(scale (1.0 0.1 3.0)
+		 (rgb (0.8 0.2 0.2)
+		 (upcube))))
+	  (rgb (0.7 0.7 1)
+
+		(offset (0.1 0 -2)
+		 (rotate (0 5 0)
+		  (for i (range 8)
+			(offset (0 0 (bind (- i)))
+					  (scale (0.5 0.1 0.5)
+								(upcube)))))))
+
+
+	  )
+	  
+	 (offset (0.5 0 0)
+	  (scale (4.0 0.1 2.0)
+		(upcube))
+	  (offset (2 0 0)
+		(scale (1.0 0.1 1.0)
+		 (sphere2)))
+
+  )))
+
+(defvar plane-tail-1
+  '(rotate (0 -30 0)
+	 (offset (0.5 0 0)
+	  (scale (1.2 0.1 1.0)
+		(upcube))
+	  (offset (0.2 0 0)
+		(scale (1.0 0.1 0.5)
+		 (sphere2)
+		 ))
+
+  )))
+
+(defvar plane-1
+  '(bake2 (scale 1.0
+
+			  (rgb (0 0 0)
+				(offset (-0.2 0.1 3)
+				 (scale (0.4 1.0 1.0)
+				  (sphere2))))
+
+			  (rgb (1 0 0)
+				(for i (-2 -2.5 -1.5 -1.0)
+				(offset (-0.0 0.1 (bind i))
+				 (scale (1.0 1.0 0.2)
+				  (sphere2)))))
+			  
+	 (rgb (1.0 0.7 0.3)
+	 ;; body
+	 (scale (1 1 5.0)
+	  (sphere2))
+
+	 ;;wings
+
+	  (offset (1.5 0.5 0.5)
+		(plane-wing-1)
+	  )
+	 
+	 (offset (-1.5 0.5 0.5)
+	  
+		(scale (-1 1 1)
+		 (plane-wing-1)))
+
+	  ;; tail
+	  (offset (0.2 0 -3.2)
+		(plane-tail-1))
+	  (offset (-0.2 0 -3.2)
+		(scale (-1 1 1)
+		 (plane-tail-1)))
+	  
+	 ))))
+
+
 
 (defvar wing-flap 0.0)
 (defvar wing-in -80.0)
@@ -211,6 +349,8 @@
 	  ))
 	  )))
 
+
+
 (defvar taken (make-hashtable))
 (defvar object-body (make-hashtable))
 ;(println object-body)
@@ -218,23 +358,59 @@
   (hashtable-set object-body ui:entity-id model)
   )
 
+(defvar butterfly-entity
+  '(ui:entity ((x (math:random -20.0 20.0))
+					  (y y0)
+					  (angle 0)
+					  (z (math:random -20.0 20.0))
+					  (phase-offset (math:random 0.0 3.0))
+					  (hidden nil))
+													 ;(body (takeable ui:entity-id)))
+		(scope:if (not hidden)
+					 ;(move-circle2 5.0 0.05)
+					 (ui:body (sphere 1.0))
+					 (offset ((bind x) (bind y) (bind z))
+													 ;(bake2
+								(rgb (0.4 0.8 0.4)
+									  (rotate (0 (bind angle) 0)
+												 (butterfly-1))))))
+  )
+
+(defvar plane-entity
+  '(ui:entity ((x (math:random -50.0 50.0))
+					(y y0)
+					(angle 0)
+					(z (math:random -50.0 50.0))
+					(phase-offset (math:random 0.0 180.0))
+					(hidden nil))
+													 
+	 (scope:if (not hidden)
+				  (move-circle2 15.0 0.01)
+				  (ui:body (sphere 3.0))
+				  
+				  (offset ((bind x) (bind y) (bind z))
+							 (rotate (0 (bind (+ 180 angle)) 0)
+										(plane-1)))))
+  )
 (defvar ground
   '(rgb (0.2 0.9 0.2)
-	 (scale (200 0 200)
-	  (tile-model-2))
 	 (for id (range 10)
 	  
 	  (ui:entity ((x (math:random -20.0 20.0))
 					  (y 0.0)
+					  (angle 0)
 					  (z (math:random -20.0 20.0))
+					  (phase-offset (math:random 0.0 3.0))
 					  (hidden nil))
 													 ;(body (takeable ui:entity-id)))
 		(scope:if (not hidden)
-		(ui:body (sphere 1.0))
-		(offset ((bind x) 1.0 (bind z))
-				  (bake2
-				  (rgb (0.4 0.8 0.4)
-						 (tile-model-2))))
+					 (move-circle2 5.0 0.05)
+					 (ui:body (sphere 1.0))
+					 (offset ((bind x) 1.0 (bind z))
+													 ;(bake2
+								(rgb (0.4 0.8 0.4)
+									  (rotate (0 (bind angle) 0)
+												 (butterfly-1))));)
 	  
 		)))))
 
@@ -265,7 +441,7 @@
 				(animation (cdr (clist-get player-stats 'animation)))
 				(energy (clist-get player-stats 'energy))
 				)
-
+		  
 		  (when (< (cdr y) 0.001)
 			 (set! animation :walk)
 			 (set-cdr! (clist-get player-stats 'animation) animation)
@@ -311,7 +487,8 @@
 				(set! v-x (- (sin (* (cdr angle) dec-to-rad))))
 				(set! v-z (cos (* (cdr angle) dec-to-rad)))
 				)
-			 (let ((absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
+			 (let ((speed (+ 0.2 )) ;(/ (cdr y) 500.0)
+					 (absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
 				(when (> absv 0)
 				  (when (eq animation :walk)
 					 (incf animation-time 0.04)
@@ -319,8 +496,8 @@
 		  			 )
 				  
 				  (let ((target-angle (/ (math:atan (- v-x) v-z) dec-to-rad)))
-					 (set-cdr! angle (interpolate-angle (cdr angle) target-angle 10))					 (set! v-x (* 0.2 (/ v-x absv)))
-					 (set! v-z (* 0.2 (/ v-z absv)))
+					 (set-cdr! angle (interpolate-angle (cdr angle) target-angle 10))					 (set! v-x (* speed (/ v-x absv)))
+					 (set! v-z (* speed (/ v-z absv)))
 					 (set-cdr! x (+ v-x (cdr x)))
 					 (set-cdr! z (+ v-z (cdr z)))
 					 )
@@ -344,10 +521,12 @@
 									 (let ((object-body (ui:entity-data key))
 											 (col-out (cons nil nil)))
 										(with-clist object-body
+										  
 										  (unless hidden
-										  (mat4:identity! mat2)
-										  (math:translate! mat2 x y z)
-										  (let ((col (sdf:detect-collision2 body value mat1 mat2 col-out)))
+											 (mat4:identity! mat2)
+											 (math:translate! mat2 x y z)
+											 (let ((col (sdf:detect-collision2 body value mat1 mat2 col-out)))
+												
 											 (when col
 												(set! hidden t)
 												(incf energy 1.0)
@@ -365,46 +544,51 @@
 		)))
 
 (defvar cloud-1
-  '(rgb (0.9 0.9 1)
+  '(bake2 (rgb (0.9 0.9 1)
 	 (sphere2)
 	 (offset (0.7 0 0.1)
 	  (scale 1.2
 	  (sphere2))
 	  (offset (1.5 0 -0.1)
 		(scale 1.5
-				 (sphere2))))))
-
+				 (sphere2)))))))
+(defvar skylevel-scaling 1.0)
 (defvar skylevel
   '((bake2 :key (bind y0)
 	  (for id (range 3)
-		(offset ((bind (println (math:random -30.0 30.0) "building clouds"))
+		(offset ((bind (math:random -30.0 30.0))
 					(bind (+ y0 (math:random -3.0 3.0)))
 					(bind (math:random -30.0 30.0)))
 		 (scale (bind (math:random 2.0 4.0))
 		  (cloud-1)
 		))))
 
+	 (scope:if (< player-y (+ y0 25.0))
+	
+	 (for id (range 5)
+	  (butterfly-entity)
+	  ))))
 
-	 (for id (range 10)
-	  
-	  (ui:entity ((x (math:random -20.0 20.0))
-					  (y y0)
-					  (z (math:random -20.0 20.0))
-					  (hidden nil))
-		
-		(scope:if (not hidden)
-					 (ui:body (sphere 1.0))
-					 (offset ((bind x) (bind y) (bind z))
-								(bake2
-								 (rgb (0.9 0.8 0.3)
-										(tile-model-2))))
-	  
-					 )))))
 (defvar skylevel-gen
   '(ui:entity  ((y0 (car args)))
 	 (scope:if (> player-y (- y0 5.0))
-				  (skylevel))
+	
+	 (skylevel))
 	 ))
+
+(defvar highsky-level
+
+  '(scope:if (< player-y (+ y0 40.0))
+	 (for id (range 10)
+	  (plane-entity)
+	  ))
+	 )
+
+(defvar highsky-level-gen
+  '(ui:entity ((y0 (car args)))
+	 (scope:if (> player-y (- y0 10.0))
+				  (highsky-level))))	 
+
 
 
 
@@ -424,24 +608,29 @@
 (set! model
   '((perspective (1.0 1.0 0.1 1000.0)
 	  (depth t
-		(vars ((player-y (or (get-data :player 'y) 0)))
+		(vars ((player-y (or (get-data :player 'y) 100)))
 		(rgb (1 0 0)
 			  (rotate (90 180 0)
 						 (ui:entity-root
-						  (offset (0 -20 0)
+						  (offset (0 (bind (- -20 (/ player-y 3))) 0)
+									 
 									 (offset ((bind (- (or (get-data :player 'x) 0)))
 												 (bind (- (or (get-data :player 'y) 0)))
 												 (bind (- (or (get-data :player 'z) 0))))
+												(rgb (0.2 0.9 0.2)
+													  (offset (0 -2 0)
+																 (scale (100 0.1 100)
+																		  (sphere2))))
 												
-												(offset (0 -2 0)
-														  (ui:entity :ground ((x 0))
-																		 (ground)))
+												(ui:entity :ground ((x 0))
+															  (scope:if (< player-y 20)
+																			(ground)))
 												
 												
 											 
 									
 												(ui:entity :player ((x 0)
-																		  (y 0) (z 0)
+																		  (y 100) (z 0)
 																		  (angle 0)
 																		  (animation :fly)
 																		  (animation-time 0.0)
@@ -489,6 +678,9 @@
 
 																				  ))))
 
+												(vars ((y0 5))
+														
+														)
 												;; todo: there is a bug if the same entity has a different number of arguments and then calls e.g move-circle.
 												;; probably due to the optimizer.
 												(ui:entity :bee ((x 10) (y 1.0) (z 10) (angle 10) (phase-offset 0))
@@ -513,32 +705,22 @@
 																		 (rotate (0 (bind angle) 0)
 																		 (bee-1)))
 															  )
+												(for i (range 10.0 10.0 60.0)
+													  (skylevel-gen (bind i)))
 
-												(ui:entity  ((y0 10))
-															  (scope:if (> player-y (- y0 5.0))
-															 				(skylevel))
-																)
-												(ui:entity  ((y0 20))
-															  (scope:if (> player-y (- y0 5.0))
-															 				(skylevel))
-																)
-												(ui:entity  ((y0 30))
-																(scope:if (> player-y (- y0 5.0))
-															 				 (skylevel))
-																)
-												(scope:if (> player-y 5.0)
-															 
-															 
-																								
+												(for i (70.0 90 120 140)
+													  (highsky-level-gen (bind i)))
 
-									
-																								
+												
+												;; blend step
+												
+												(for i (range 5.0 5.0 60.0)
 									 ;; draw blended stuff here
 									(blend t
-									 (offset (0 2 0)
-												(rgb (1 1 1 0.3)
-													  (scale (200 1 200)
-																(tile-model-2)
+									 (offset (0 (bind (- player-y 6 i)) 0)
+												(rgb (0.8 0.8 0.8 0.2)
+													  (scale (100 0.2  100)
+																(sphere2)
 																)))))
 
 												)
