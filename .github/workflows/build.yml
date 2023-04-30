@@ -18,7 +18,18 @@ jobs:
       run: sudo apt-get install -y --no-install-recommends libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libxext-dev libxfixes-dev libgl1-mesa-dev libopenal-dev libglfw3-dev
     - name: make
       run: make
+    - name: Archive production artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: wasmbuild
+        path: |
+          fox
+          demos/*
+          lisp/*
+          Readme.md
 
+
+      
   build-wasm:
     runs-on: ubuntu-latest
 
@@ -49,7 +60,7 @@ jobs:
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: dist-without-markdown
+        name: wasmbuild
         path: |
           index.js
           index.wasm
