@@ -845,7 +845,7 @@ Click G to start over.
 		 (bake2
 		 (scale (1 1 1.0)
 		  (for i (range 12)
-			(for j (range -5 9)
+			(for j (range -6 9)
 				  (offset ((bind i) (bind j) 0)
 							 (rgb ((bind (math:random 0.55 0.6))
 									 (bind (math:random 0.85 0.9))
@@ -883,10 +883,12 @@ To continue, hit H.
 	 ))))
 
 (set! model
-  '((perspective (1.0 1.0 0.1 1000.0)
+		'((perspective (1.0 1.0 0.1 1000.0)
+			
 	  (depth t
 		(vars ((player-y (or (get-data :player 'y) 100)))
-		(rgb (1 0 0)
+		 (rgb (1 0 0)
+		  (scale ((bind (/ 1.0 foxgl:aspect-ratio)) 1.0  1.0)
 			  (rotate (90 180 0)
 						 (ui:entity-root
 						  (offset (0 (bind (- -30 (/ (min player-y 100) 3))) 0)
@@ -935,11 +937,17 @@ To continue, hit H.
 															 (bird-model)
 															 )))
 															  
-												  )
-									(ui:entity :letter ((x 10) (y 0) (z -5))
+															  )
+												(scope:if nil
+												(ui:entity :letter ((x 10)
+																		  (y 0)
+																		  (z -5)
+																		  (angle 0)
+
+																					)
 												  (offset ((bind x) (bind y) (bind z))
 															 (letter-model)))
-
+												) 
 												
 												(vars ((y0 5))
 														
@@ -973,7 +981,7 @@ To continue, hit H.
 
 						  )
 				
-				)
+				))
 		 (depth t
 		  (game:ui))
 		 )
