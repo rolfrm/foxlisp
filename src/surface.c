@@ -794,8 +794,8 @@ static void *get_physics_sdf(lisp_value value) {
       a_t.model_count = 1;
     }
     if (lisp_value_eq(car(model_type), get_symbol("capsule"))) {
-      f32 h = lisp_value_rational(cadr(model_type));
-      f32 r = lisp_value_rational(caddr(model_type));
+      f32 h = lisp_value_as_rational(cadr(model_type));
+      f32 r = lisp_value_as_rational(caddr(model_type));
 
       sdf_vert_capsule *capsule = alloc(sizeof(*capsule));
 
@@ -985,8 +985,8 @@ static void *get_physics_sdf2(lisp_value value) {
   }
 
   if (lisp_value_eq(model_type, get_symbol("capsule"))) {
-    f32 h = lisp_value_rational(cadr(model_type));
-    f32 r = lisp_value_rational(caddr(model_type));
+    f32 h = lisp_value_as_rational(cadr(model_type));
+    f32 r = lisp_value__as_rational(caddr(model_type));
 
     sdf_vert_capsule *capsule = alloc(sizeof(*capsule));
 

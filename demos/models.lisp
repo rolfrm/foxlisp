@@ -166,6 +166,16 @@
 	 (rgb (1 1 1)
 	  (sphere 0.9))))
 
+
+(defvar moon
+  '(sdf2 (:size 1 :resolution 0.25)
+	 (rgb (1 1 1)
+	  (subtract 0.5
+		(sphere 0.9)
+		(capsule 2.0 1.0)
+		))))
+
+
 (defvar upsphere
   '(plane
 	 (height-sdf (4 4) (8 8)
@@ -174,7 +184,7 @@
 	  
 (defvar upsphere '(offset (0 1 0)
 						 (sphere1)))
-
-(defvar sphere2 (list 'polygon :3d-triangle-strip (generate-sphere-single-draw 1.0 16)))
+(lisp:collect-garbage)
+(defvar sphere2 (list 'polygon :3d-triangle-strip (generate-sphere-single-draw 1.0 12)))
 
 (println sphere2)

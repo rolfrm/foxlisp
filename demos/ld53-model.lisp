@@ -295,12 +295,12 @@
 (defvar show-feet t)
 (defvar bird-wing
   '(rgb (1 1 1)
-	 (rotate (0 (bind wing-in) (bind (* 15 (sin (* 1.5 pi wing-flap)))))
+	 (rotate (0 (bind wing-in) (bind (* 45 (sin (* 1 pi wing-flap)))))
 	  (offset (-0.25 0 0)
 		(scale (1.5 1.0 1.0)
 				 (right-tile))
 	  (offset (1.4 0 0)
-		(rotate (0 0 (bind (* 15 (sin (* 1.5 pi wing-flap)))))
+		(rotate (0 0 (bind (* 45 (sin (* 1 pi wing-flap)))))
 				  (offset (-0.25 0 0)
 							 (scale (1.5 1.0 1.0)
 									  (right-tile))
@@ -423,7 +423,7 @@
 													 
 	 (scope:if (not hidden)
 				  (move-circle2 15.0 0.01)
-				  (ui:body (sphere 3.0))
+				  (ui:body (sphere 4.0))
 				  
 				  (offset ((bind x) (bind y) (bind z))
 							 (rotate (0 (bind (+ 180 angle)) 0)
@@ -441,7 +441,7 @@
 													 
 	 (scope:if (not hidden)
 				  (move-circle2 15.0 0.01)
-				  (ui:body (sphere 3.0))
+				  (ui:body (aabb 3.0 2.0 6.0))
 				  
 				  (offset ((bind x) (bind y) (bind z))
 							 (rotate (0 (bind (+ 180 angle)) 0)
@@ -465,10 +465,36 @@
 		 (bee-1)))
 	 )))
 
+(defvar tree-2-model
+  '(vars ((x (math:random -50.0 50.0))
+			 (z (math:random -50.0 50.0)))
+	 (offset ((bind x) 0 (bind z))
+
+	  (scale 1.5
+		(rgb (0.6 0.5 0.2)
+		 (scale (0.5 1.0 0.5)
+		  (cylinder)))
+		
+		(rgb (0.3 0.6 0.2)
+		 (for i (range 5)
+		  (offset ((bind (math:random -2.0 2.0))
+					  (bind (math:random 0.5 1.0))
+					  (bind (math:random -2.0 2.0)))
+		  (scale (bind (math:random 1.5 2.5))
+			(upcube))))
+		
+		
+		)))))
+
 
 (defvar ground
   '(vars ((y0 0))
 	 (rgb (0.2 0.9 0.2)
+	  (bake2
+		(for i (range 10)
+		 (tree-2-model)
+
+		))
 	 (for id (range 3)
 	  (bee-entity))
 
@@ -501,18 +527,36 @@
 (defvar letter-model
   '(rgb (0.9 0.8 0.2)
 	 (tile-model-2)))
-
+(defvar hidden t)
 (defvar space-down-event '(key-down key 32))
-(defvar free-fly t)
+(defvar free-fly nil)
 (defvar paused nil)
+(defvar show-help t)
+(defvar target-height 220.0)
+(defvar won-game nil)
 (defun game-update (events)
   (let ((player-stats (ui:entity-data :player))
 		  (space-down (key-down? foxgl:key-space))
+		  (restart nil)
 		  )
-	 (unless paused
+	 (set! paused (or show-help won-game))
+	 (for-each evt events
+				  (when (equals? evt '(key-down key 72))
+					 
+					 (set! show-help (not show-help))
+					 )
+				  (when (equals? evt '(key-down key 71))
+					 (set! entity-data (make-hashtable))
+					 (set! restart t)
+					 (set! won-game nil)
+					 (set! show-help nil)
+					 )
+				  )
+	 (unless (or paused restart)
 	 (when player-stats
 		(with-clist player-stats
 		  (set! blink (if (< (abs (- 25 (mod real-time 50.0))) 0.25) 1.0 0.0 ))
+		  (set! won-game (> y target-height))
 		  ))
 	 
 	 (when player-stats
@@ -540,7 +584,7 @@
 
 			 (when (> animation-time 2.0)
 				(set! animation-time 0.0))
-			 (when (and (< animation-time 0.02) (not space-down))
+			 (when (and (< animation-time 0.02) (not (and (< energy 0.01) space-down)))
 				(set-cdr! y (- (cdr y) 0.04))
 			 
 				)
@@ -614,7 +658,7 @@
 												  
 												  (set! hidden t)
 												  
-												  (set! energy (max 0 (+ energy (if danger -10 1.0))))
+												  (set! energy (max 0.0 (+ energy (if danger -10.0 1.0))))
 										
 											 )
 										  ))
@@ -739,12 +783,104 @@
 
 (defvar game:ui
   '(ortho (10 10 10)
-  (offset (-9 8 -4)
+	 (offset (-9 8 -4)
 	(rgb (1 0 0)
-	 (scale ((bind (+ 0.1 (or (get-data :player 'energy) 0))) 1 1)
+	 (scale ((bind (+ 0.1 (or (get-data :player 'energy) 0.0))) 1 1)
 	  (offset (0.5 0 0)
 		(upcube))
-	 )))))
+	  )))
+
+	 (offset (-9 -8 -4)
+	  (rgb (0.8 0.8 0.8)
+		(scale (1 5 1)
+		 (offset (0.5 0 0)
+		  (upcube))
+		 )))
+	 
+	 
+	 (offset (-9 -8 -3.5)
+	  (rgb (0.3 0.3 0.3)
+	 (scale (1 (bind (+ 0.1 (/ (* 5.0 (or (get-data :player 'y) 0.0))  target-height))) 1)
+	  (offset (0.5 0 0)
+		(upcube))
+	  )))
+	 (scope:if won-game
+	 (rgb (0 0 0)
+	  (offset (-5 5.0 1)
+		(offset (0 -8 -1)
+		 (bake2
+		 (scale (1 1 1.0)
+		  (for i (range 14)
+			(for j (range -5 9)
+				  (offset ((bind i) (bind j) 0)
+							 (rgb ((bind (math:random 0.85 0.9))
+									 (bind (math:random 0.85 0.9))
+									 (bind (math:random 0.55 0.7)))
+									(upcube)
+									)
+
+							 )
+
+		  )))))
+	 (vars ((max-width 1450))
+	  (scale (3.0 -3 3.0)
+		(text "Egads! You reached higher than any highbird has flown before!
+
+All the legends noone dared believe were true.
+
+Soar highest of highbirds! Fly forth and let the
+worlds fly under your feet forever.
+
+Congratulations! 
+
+Click G to start over.
+"))
+	  
+	  ))))
+
+	 (scope:if show-help
+	 (rgb (0 0 0)
+	  (offset (-5 5 0)
+		(offset (0 -8 -1)
+		 (bake2
+		 (scale (1 1 1.0)
+		  (for i (range 12)
+			(for j (range -5 9)
+				  (offset ((bind i) (bind j) 0)
+							 (rgb ((bind (math:random 0.55 0.6))
+									 (bind (math:random 0.85 0.9))
+									 (bind (math:random 0.55 0.7)))
+									(upcube)
+									)
+
+							 )
+
+		  )))))
+	 (vars ((max-width 1200))
+	  (scale (3.0 -3 3.0)
+		(text "Welcome to HIGHBIRD
+I hope you'll have fun.
+
+Fly: SPACE when you have energy.
+Walk: WASD/Arrow keys
+
+Goal: Deliver the message at the moon.
+
+Eat these things to get more energy:
+- butterflies
+- planes
+- rockets
+
+Avoid hitting:
+- Bees
+- Planets
+
+To restart, hit G.
+To continue, hit H.
+
+"))))
+	 
+	 ))))
 
 (set! model
   '((perspective (1.0 1.0 0.1 1000.0)
@@ -753,18 +889,18 @@
 		(rgb (1 0 0)
 			  (rotate (90 180 0)
 						 (ui:entity-root
-						  (offset (0 (bind (- -30 (/ player-y 3))) 0)
+						  (offset (0 (bind (- -30 (/ (min player-y 100) 3))) 0)
 									 
 									 (offset ((bind (- (or (get-data :player 'x) 0)))
 												 (bind (- (or (get-data :player 'y) 0)))
 												 (bind (- (or (get-data :player 'z) 0))))
-												(rgb (0.2 0.9 0.2)
+												(rgb (0.3 0.8 0.3)
 													  (offset (0 -2 0)
 																 (scale (100 0.1 100)
 																		  (sphere2))))
 												
 												(ui:entity :ground ((x 0))
-															  (scope:if (< player-y 20)
+															  (scope:if (< player-y 30)
 																			(ground)))
 												
 												
@@ -776,7 +912,8 @@
 																		  (animation :fly)
 																		  (animation-time 0.0)
 																		  (blink 0.0)
-																		  (energy 0.0)
+																		  (energy 10.0)
+																		  
 																		  )
 												  (ui:body (sphere 3.0));(aabb 0.5 0.2 1.0))
 		
@@ -788,37 +925,22 @@
 															(walk-cycle (if (eq animation :walk) animation-time 0.0))
 															(show-feet (eq animation :walk))
 															
+															
 
 															)
 												  
 										(offset ((bind x) (bind y) (bind z))
 												  (rotate (0 (bind angle) 0)
-												  (bird-model))))
-
+															 
+															 (bird-model)
+															 )))
+															  
 												  )
 									(ui:entity :letter ((x 10) (y 0) (z -5))
 												  (offset ((bind x) (bind y) (bind z))
 															 (letter-model)))
 
-												(ui:entity ((x 0) (z 3))
-															  (offset ((bind x) 0 (bind z))
-
-																		 (scale 2.0
-																		 (rgb (0.6 0.5 0.2)
-																		 (cylinder))
-
-																				  (scope:if (> player-y 2)
-																				  (rgb (0.3 0.6 0.2)
-																				(offset (-0.6 0.5 0.3)
-																						  (scale 1.5
-																									(upcube)))
-																		 																				(offset (0.6 0.4 -0.2)
-																																								  (scale 1.4
-																																											(upcube))))
-
-
-																				  ))))
-
+												
 												(vars ((y0 5))
 														
 														)
@@ -829,7 +951,7 @@
 												(for i (70.0 90 120 140)
 													  (highsky-level-gen (bind i)))
 
-												(for i (140 170 200 230)
+												(for i (140 170 200)
 													  (space-level (bind i)))
 
 												;; blend step
@@ -852,7 +974,8 @@
 						  )
 				
 				)
-		 (game:ui)
+		 (depth t
+		  (game:ui))
 		 )
 						  
 						  )))))
