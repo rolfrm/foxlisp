@@ -1120,6 +1120,30 @@ lisp_value foxgl_unbind(lisp_value p, lisp_value scope) {
   return p;
 }
 
+lisp_value foxgl_unbind_recursive(lisp_value object, lisp_value scope){
+  get_symbol_cached(&bind_symbol, "bind");
+ 
+  if(is_cons(object)){
+	 var head = car(object);
+	 if(eq(head, bind_symbol)){
+		return lisp_eval(is_scope(scope)? scope.scope : lisp_get_root_scope(), cadr(object));
+	 }
+	 else{
+		var head2 = foxgl_unbind_recursive(head, scope);
+		var rest = cdr(object);
+		if(is_cons(rest))
+		  rest = foxgl_unbind_recursive(rest, scope);
+		if(eq(head, head2) && eq(rest, cdr(object))){
+		  return object;
+		}
+		var new = new_cons(head2, rest);
+		return new;
+	 }
+  }
+  return object;
+}
+
+
 lisp_value foxgl_eval_scoped0(lisp_value scope, lisp_value form);
 lisp_value foxgl_eval_scoped(lisp_value scope, lisp_value form) {
   while (!is_nil(form)) {
@@ -1264,7 +1288,7 @@ void foxgl_register() {
   lrn("foxgl:get-eigen-key", 1, foxgl_get_eigen_key);
 
   lrn("unbind", 2, foxgl_unbind);
-
+  lrn("unbind-rec", 2, foxgl_unbind_recursive);
   lrn("eval-scoped0", 2, foxgl_eval_scoped0);
   lrn("eval-scoped", 2, foxgl_eval_scoped);
 

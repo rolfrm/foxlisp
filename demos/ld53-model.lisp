@@ -69,6 +69,7 @@
 
 (defvar phase-offset 0.0)
 (defun move-circle (scope model)
+  (unless paused
   (with-clist (ui:entity-data ui:entity-id)
 	 (let ((radius (car model))
 			 (phase (+ phase-offset real-time)))
@@ -78,9 +79,10 @@
 		(set! angle (* -25.0 real-time))
 		)
 
-  ))
+  )))
 
 (defun move-circle2 (scope model)
+  (unless paused
   (with-clist (ui:entity-data ui:entity-id)
 	 (let ((radius (car model))
 			 (speed (cadr model))
@@ -95,7 +97,7 @@
 				)
 		(incf phase-offset speed)
 		)
-  ))
+  )))
 
 
 (defvar bee-wing-1
@@ -254,6 +256,36 @@
 	  
 	 ))))
 
+(defvar rocket-1
+  '(bake0 (scale 1.0
+			  (bake2 
+			  
+			  (rgb (0.6 0.6 0.6)
+				;; body
+				(scale (1 1 5.0)
+				 (sphere2))
+				
+				;; tail
+				(offset (0.2 0 -3.2)
+				 (plane-tail-1))
+				(offset (-0.2 0 -3.2)
+				 (scale (-1 1 1)
+				  (plane-tail-1)))))
+				
+				(offset (0 -0.5 -4.3)
+				 
+				 (rgb (1 1 0.3)
+				  (scale ((bind (math:random 0.7 0.8)) 0.75 2.0)
+					(sphere2)))
+				 (rgb (1 0.5 0.3)
+				  (scale ((bind (+ (math:random -0.1 0.1) 0.6)) 0.6 (bind (+ (math:random 2.4 2.7) 0.6)))
+					(sphere2)))
+
+				 )
+	  
+				)))
+
+
 
 
 (defvar wing-flap 0.0)
@@ -355,7 +387,12 @@
 (defvar object-body (make-hashtable))
 ;(println object-body)
 (defun ui:body (scope model)
-  (hashtable-set object-body ui:entity-id model)
+  
+  (hashtable-maybe-set object-body ui:entity-id
+							  (let ((r (unbind-rec model scope)))
+								 (when (not (eq r model))
+									(println r '<<new))
+								 r))
   )
 
 (defvar butterfly-entity
@@ -392,9 +429,50 @@
 							 (rotate (0 (bind (+ 180 angle)) 0)
 										(plane-1)))))
   )
+
+
+(defvar rocket-entity
+  '(ui:entity ((x (math:random -50.0 50.0))
+					(y y0)
+					(angle 0)
+					(z (math:random -50.0 50.0))
+					(phase-offset (math:random 0.0 180.0))
+					(hidden nil))
+													 
+	 (scope:if (not hidden)
+				  (move-circle2 15.0 0.01)
+				  (ui:body (sphere 3.0))
+				  
+				  (offset ((bind x) (bind y) (bind z))
+							 (rotate (0 (bind (+ 180 angle)) 0)
+										(rocket-1)))))
+  )
+
+
+(defvar bee-entity
+  '(ui:entity ((x (math:random -30 30)) (y y0)
+					(z (math:random -30 30))
+					(angle 0)
+					(phase-offset (math:random 0 180))
+					(hidden nil)
+					(danger t)
+					)
+	 (move-circle 10.0)
+	 (ui:body (sphere 1.0))
+	 (offset ((bind x) (bind y) (bind z))
+	  (rotate (0 (bind angle) 0)
+		(scale 2.0
+		 (bee-1)))
+	 )))
+
+
 (defvar ground
-  '(rgb (0.2 0.9 0.2)
-	 (for id (range 10)
+  '(vars ((y0 0))
+	 (rgb (0.2 0.9 0.2)
+	 (for id (range 3)
+	  (bee-entity))
+
+	 (for id (range 5)
 	  
 	  (ui:entity ((x (math:random -20.0 20.0))
 					  (y 0.0)
@@ -412,7 +490,10 @@
 									  (rotate (0 (bind angle) 0)
 												 (butterfly-1))));)
 	  
-		)))))
+					 )))
+
+
+	 )))
 
 (defvar ground-baked
   '(bake2 (ground)))
@@ -423,10 +504,12 @@
 
 (defvar space-down-event '(key-down key 32))
 (defvar free-fly t)
+(defvar paused nil)
 (defun game-update (events)
   (let ((player-stats (ui:entity-data :player))
 		  (space-down (key-down? foxgl:key-space))
 		  )
+	 (unless paused
 	 (when player-stats
 		(with-clist player-stats
 		  (set! blink (if (< (abs (- 25 (mod real-time 50.0))) 0.25) 1.0 0.0 ))
@@ -487,7 +570,7 @@
 				(set! v-x (- (sin (* (cdr angle) dec-to-rad))))
 				(set! v-z (cos (* (cdr angle) dec-to-rad)))
 				)
-			 (let ((speed (+ 0.2 )) ;(/ (cdr y) 500.0)
+			 (let ((speed (+ 0.2 (/ (cdr y) 500.0)))
 					 (absv (math:sqrt (+ (* v-z v-z) (* v-x v-x)))))
 				(when (> absv 0)
 				  (when (eq animation :walk)
@@ -527,9 +610,11 @@
 											 (math:translate! mat2 x y z)
 											 (let ((col (sdf:detect-collision2 body value mat1 mat2 col-out)))
 												
-											 (when col
-												(set! hidden t)
-												(incf energy 1.0)
+												(when col
+												  
+												  (set! hidden t)
+												  
+												  (set! energy (max 0 (+ energy (if danger -10 1.0))))
 										
 											 )
 										  ))
@@ -541,7 +626,7 @@
 		  
 		  )
 
-		)))
+		))))
 
 (defvar cloud-1
   '(bake2 (rgb (0.9 0.9 1)
@@ -552,10 +637,11 @@
 	  (offset (1.5 0 -0.1)
 		(scale 1.5
 				 (sphere2)))))))
+(defvar danger nil)
 (defvar skylevel-scaling 1.0)
 (defvar skylevel
   '((bake2 :key (bind y0)
-	  (for id (range 3)
+	  (for id (range 0)
 		(offset ((bind (math:random -30.0 30.0))
 					(bind (+ y0 (math:random -3.0 3.0)))
 					(bind (math:random -30.0 30.0)))
@@ -565,21 +651,24 @@
 
 	 (scope:if (< player-y (+ y0 25.0))
 	
-	 (for id (range 5)
-	  (butterfly-entity)
-	  ))))
+				  (for id (range 5)
+						 (butterfly-entity)
+						 )
+				  (for id (range 3)
+						 (bee-entity)
+
+						 ))))
 
 (defvar skylevel-gen
   '(ui:entity  ((y0 (car args)))
 	 (scope:if (> player-y (- y0 5.0))
-	
-	 (skylevel))
+				  (skylevel))
 	 ))
 
 (defvar highsky-level
 
   '(scope:if (< player-y (+ y0 40.0))
-	 (for id (range 10)
+	 (for id (range 5)
 	  (plane-entity)
 	  ))
 	 )
@@ -588,6 +677,58 @@
   '(ui:entity ((y0 (car args)))
 	 (scope:if (> player-y (- y0 10.0))
 				  (highsky-level))))	 
+
+
+(defvar space-level
+
+  '(ui:entity ((y0 (car args)))
+	 (scope:if (< player-y (+ y0 40.0))
+				  (for id (range 10)
+						 (rocket-entity)
+						 )
+
+	  (for id (range 2)
+
+		(ui:entity ((x (math:random -100.0 100.0))
+						(y y0)
+						(angle 0)
+						(z (math:random -100.0 100.0))
+						(size (math:random 7.0 10.0))
+						(hidden nil)
+						(danger t)
+
+						)
+		 (ui:body (sphere (bind size)))
+					  
+		 (scope:if (not hidden)
+					  			
+									  (offset ((bind x)
+												  (bind y0)
+												  (bind z))
+												 
+												 (bake2 :key (bind y0)
+														  (rgb ((bind (math:random 0.1 0.4)) (bind (math:random 0.1 0.4)) (bind (math:random 0.1 0.4)) )
+												 (scale (bind size)
+														  (sphere2))
+												 ))
+		 )))))
+	 (bake2 :key (bind y0)
+	  (for id (range 20)
+		(rgb ((bind (math:random 0.8 1.0))
+				(bind (math:random 0.8 1.0))
+				(bind (math:random 0.8 1.0)))
+		 (offset ((bind (math:random -100.0 100.0))
+					 (bind y0)
+					 (bind (math:random -100.0 100.0)))
+		  (tile-model-2)
+		  (rotate (0 45 0)
+			(tile-model-2)
+		  )))
+		))
+	  
+	  )
+	 
+	 )
 
 
 
@@ -612,7 +753,7 @@
 		(rgb (1 0 0)
 			  (rotate (90 180 0)
 						 (ui:entity-root
-						  (offset (0 (bind (- -20 (/ player-y 3))) 0)
+						  (offset (0 (bind (- -30 (/ player-y 3))) 0)
 									 
 									 (offset ((bind (- (or (get-data :player 'x) 0)))
 												 (bind (- (or (get-data :player 'y) 0)))
@@ -630,7 +771,7 @@
 											 
 									
 												(ui:entity :player ((x 0)
-																		  (y 100) (z 0)
+																		  (y 0) (z 0)
 																		  (angle 0)
 																		  (animation :fly)
 																		  (animation-time 0.0)
@@ -681,37 +822,16 @@
 												(vars ((y0 5))
 														
 														)
-												;; todo: there is a bug if the same entity has a different number of arguments and then calls e.g move-circle.
-												;; probably due to the optimizer.
-												(ui:entity :bee ((x 10) (y 1.0) (z 10) (angle 10) (phase-offset 0))
-															  (move-circle 10.0)
-															  (offset ((bind x) (bind y) (bind z))
-																		 (rotate (0 (bind angle) 0)
-																		 (bee-1)))
-															  )
 
-												(ui:entity :bee-2 ((x 7) (y 1.0) (z 7) (angle 10)
-																				 (phase-offset 5))
-															  (move-circle 10.0)
-															  (offset ((bind x) (bind y) (bind z))
-																		 (rotate (0 (bind angle) 0)
-																		 (bee-1)))
-															  )
-
-												(ui:entity :bee-3 ((x 7) (y 1.0) (z -7) (angle 10)
-																				 (phase-offset 14))
-															  (move-circle 10.0)
-															  (offset ((bind x) (bind y) (bind z))
-																		 (rotate (0 (bind angle) 0)
-																		 (bee-1)))
-															  )
 												(for i (range 10.0 10.0 60.0)
 													  (skylevel-gen (bind i)))
 
 												(for i (70.0 90 120 140)
 													  (highsky-level-gen (bind i)))
 
-												
+												(for i (140 170 200 230)
+													  (space-level (bind i)))
+
 												;; blend step
 												
 												(for i (range 5.0 5.0 60.0)

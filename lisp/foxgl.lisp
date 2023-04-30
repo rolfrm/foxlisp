@@ -990,6 +990,7 @@
 			 (let ((start (if b a 0))
 					 (end (or c b a 1))
 					 (step (if c b 1)))
+				(unless (eq start end)
 				(lisp:with-scope-variable
 				  scope (lisp:get-current-scope!!)
 				  '(start step end rest var) var
@@ -999,7 +1000,7 @@
 							 (set! start (+ start step))
 							 (if (>= start end)
 								  (set! start nil))
-							 )))))
+							 ))))))
 		  
 	 (lisp:with-scope-variable
 		  scope (lisp:get-current-scope!!)

@@ -92,6 +92,23 @@ lisp_value lisp_hashtable_set(lisp_value _ht, lisp_value key,
   ht_set(ht, &key, &value);
   return nil;
 }
+// lisp_value _ht, lisp_value key, lisp_value value
+lisp_value lisp_hashtable_maybe_set(lisp_scope * scope, lisp_value args) {
+  var _ht = lisp_eval(scope, car(args));
+  TYPE_ASSERT(_ht, LISP_HASHTABLE);
+  var ht = lisp_value_hashtable(_ht);
+  var key = lisp_eval(scope, cadr(args));
+  size_t hash = ht_calc_hash(ht, &key);
+
+  lisp_value cv = {0};
+  if(ht_get_precalc(ht, hash, &key, &cv))
+	 return nil;
+				
+  var value = lisp_eval(scope, caddr(args));
+  ht_set_precalc(ht, &key, &value, hash);
+  return t;
+}
+
 
 lisp_value lisp_hashtable_get(lisp_value _ht, lisp_value key) {
   TYPE_ASSERT(_ht, LISP_HASHTABLE);
@@ -231,6 +248,7 @@ void load_hashtable_module() {
   lisp_register_native("make-hashtable", -1, lisp_make_hashtable);
   lisp_register_native("hashtable-ref", 2, lisp_hashtable_get);
   lisp_register_native("hashtable-set", 3, lisp_hashtable_set);
+  lisp_register_native_macrolike("hashtable-maybe-set", lisp_hashtable_maybe_set);
   lisp_register_native("hashtable-refn", -1, lisp_hashtable_getn);
   lisp_register_native("hashtable-setn!", -1, lisp_hashtable_setn);
   lisp_register_native("hashtable-remove", 2, lisp_hashtable_remove);
