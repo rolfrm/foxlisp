@@ -1299,11 +1299,15 @@
 		(eval-scoped scope rest)
 		(set! current-transform prev))))
 
-
+(defvar scope:depth:state nil)
 (defun scope:depth (scope body)
-  (foxgl:depth 1)
-  (eval-scoped scope (cdr body))  
-  )
+  (let ((prev scope:depth:state))
+	 (foxgl:depth (car body))
+	 (set! scope:depth:state (car body))
+	 (eval-scoped scope (cdr body))  
+	 (foxgl:depth prev)
+	 (set! scope:depth:state prev)
+  ))
 
 (defun scope:blend (scope body)
   (foxgl:blend 1)
@@ -1316,9 +1320,9 @@
 (defvar paint-scope
   (eval
    '(let ((box scope:box)
-			 (bake (lambda (x y) (scope:bake x y)))
+			 (bake scope:bake x y)
 			 (rgb scope:rgb)
-			 (ortho scope:ortho)
+			 (ortho (lambda (x y)(scope:ortho x y )))
 			 (perspective scope:perspective)
 			 (depth scope:depth)
 			 (blend scope:blend)

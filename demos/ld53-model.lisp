@@ -39,7 +39,6 @@
 	 (set! ui:entity-id (or id ui:next-id))
  	 (let ((data (ui:entity-data ui:entity-id))) 
 		(unless data
-		  (println 'generate! ui:entity-id)
 		
 		  (for-each arg scope-args
 						(set! data (cons (cons (car arg) (eval (cadr arg) scope)) data))
@@ -214,13 +213,13 @@
 
 (defvar taken (make-hashtable))
 (defvar object-body (make-hashtable))
-(println object-body)
+;(println object-body)
 (defun ui:body (scope model)
   (hashtable-set object-body ui:entity-id model)
   )
 
 (defvar ground
-  '(rgb (0 1 0)
+  '(rgb (0.2 0.9 0.2)
 	 (scale (200 0 200)
 	  (tile-model-2))
 	 (for id (range 10)
@@ -247,7 +246,7 @@
 	 (tile-model-2)))
 
 (defvar space-down-event '(key-down key 32))
-
+(defvar free-fly t)
 (defun game-update (events)
   (let ((player-stats (ui:entity-data :player))
 		  (space-down (key-down? foxgl:key-space))
@@ -264,6 +263,7 @@
 				(angle (clist-get player-stats 'angle))
 				(animation-time (cdr (clist-get player-stats 'animation-time)))
 				(animation (cdr (clist-get player-stats 'animation)))
+				(energy (clist-get player-stats 'energy))
 				)
 
 		  (when (< (cdr y) 0.001)
@@ -273,8 +273,11 @@
 			 )
 		  (when (eq animation :fly)
 			 (when (> animation-time 0.0)
-				(set-cdr! y (+ (cdr y) 0.04))
-			 	(incf animation-time 0.04))
+				(when (or (> (cdr energy) 0.04) free-fly)
+				  (set-cdr! y (+ (cdr y) 0.04)))
+			 	(incf animation-time 0.04)
+				(set-cdr! energy (max 0.0 (- (cdr energy) 0.01)))
+				)
 
 			 (when (> animation-time 2.0)
 				(set! animation-time 0.0))
@@ -284,11 +287,13 @@
 				)
 			 )
 		  (when space-down
+			 (when (or (> (cdr energy) 0.04) free-fly)
+				
 			 	 (set! animation :fly)
 				 (set-cdr! (clist-get player-stats 'animation) animation)
 				 
 				(set-cdr! y (+ (cdr y) 0.01))
-			 (set! animation-time (+ 0.01 animation-time)))
+			 (set! animation-time (+ 0.01 animation-time))))
 		  (set-cdr! (clist-get player-stats 'animation-time) animation-time)
 		  (let ((v-x 0.0)
 				  (v-y 0.0)
@@ -328,6 +333,7 @@
 				(body (hashtable-ref object-body :player))
 
 				)
+
 		  (with-clist player-body
 			 (let ((px x)
 					 (py y)
@@ -338,17 +344,18 @@
 									 (let ((object-body (ui:entity-data key))
 											 (col-out (cons nil nil)))
 										(with-clist object-body
+										  (unless hidden
 										  (mat4:identity! mat2)
 										  (math:translate! mat2 x y z)
 										  (let ((col (sdf:detect-collision2 body value mat1 mat2 col-out)))
 											 (when col
 												(set! hidden t)
+												(incf energy 1.0)
 										
 											 )
 										  ))
-										)))
+										))))
 				)
-			 
 			 )
 		  (release-matrix mat1)
 		  (release-matrix mat2)
@@ -367,10 +374,37 @@
 		(scale 1.5
 				 (sphere1))))))
 
+(defvar skylevel
+  '(for id (range 10)
+	  
+	  (ui:entity ((x (math:random -20.0 20.0))
+					  (y y0)
+					  (z (math:random -20.0 20.0))
+					  (hidden nil))
+		
+		(scope:if (not hidden)
+					 (ui:body (sphere 1.0))
+					 (offset ((bind x) (bind y) (bind z))
+								(bake2
+								 (rgb (0.9 0.8 0.3)
+										(tile-model-2))))
+	  
+		))))
+
+
 
 (defun get-data (id sym)
   (cdr (clist-get (ui:entity-data id) sym))
   )
+
+(defvar game:ui
+  '(ortho (10 10 10)
+  (offset (-9 8 -4)
+	(rgb (1 0 0)
+	 (scale ((bind (+ 0.1 (or (get-data :player 'energy) 0))) 1 1)
+	  (offset (0.5 0 0)
+		(upcube))
+	 )))))
 
 (set! model
   '((perspective (1.0 1.0 0.1 1000.0)
@@ -397,6 +431,7 @@
 																		  (animation :fly)
 																		  (animation-time 0.0)
 																		  (blink 0.0)
+																		  (energy 0.0)
 																		  )
 												  (ui:body (sphere 3.0));(aabb 0.5 0.2 1.0))
 		
@@ -464,15 +499,26 @@
 																		 (bee-1)))
 															  )
 
-												
+												(ui:entity  ((y0 10))
+															  (scope:if (> player-y (- y0 5.0))
+															 				(skylevel))
+																)
+												(ui:entity  ((y0 20))
+															  (scope:if (> player-y (- y0 5.0))
+															 				(skylevel))
+																)
+												(ui:entity  ((y0 30))
+																(scope:if (> player-y (- y0 5.0))
+															 				 (skylevel))
+																)
 												(scope:if (> player-y 5.0)
-															 (ui:entity 123213
-															  ((x 0 ) (z 0))
+															 
+															 (ui:entity ((x 0 ) (z 0))
 												  (offset ((bind x) 8 (bind z))
 															 (scale 2.0
 															 (cloud-1))))
 
-												(ui:entity 1234
+												(ui:entity
 															  ((x -53 ) (z 5))
 															  (offset ((bind x) 10 (bind z))
 																		 (rotate (0 13 0)
@@ -480,7 +526,7 @@
 																					(cloud-1))
 
 																					)))
-																								(ui:entity 1232134
+																								(ui:entity
 															  ((x 15 ) (z -23))
 															  (offset ((bind x) 10 (bind z))
 																		 (rotate (0 -13 0)
@@ -488,15 +534,26 @@
 																							 (cloud-1)))))
 																								
 
+									
+																								
+									 ;; draw blended stuff here
 									(blend t
 									 (offset (0 2 0)
 												(rgb (1 1 1 0.3)
 													  (scale (200 1 200)
 																(tile-model-2)
 																)))))
-						 
 
-									))
-						  )
+												)
+									 
+
+									 )
 						  
-						  )))))))
+
+						  )
+				
+				)
+		 (game:ui)
+		 )
+						  
+						  )))))
