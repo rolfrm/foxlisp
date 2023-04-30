@@ -21,7 +21,7 @@ jobs:
     - name: Archive production artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: wasmbuild
+        name: linux-x64
         path: |
           fox
           demos/*
