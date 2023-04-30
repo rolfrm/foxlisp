@@ -2591,7 +2591,7 @@ void load_modules() {
   foxgl_register();
   lisp_process_module_init();
   // awsm_register();
-  table_register();
+  //table_register();
 }
 
 void web_update() {
