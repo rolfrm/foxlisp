@@ -2501,6 +2501,15 @@ const char *lisp_type_to_string(lisp_type t) {
 lisp_value lisp_type_of(lisp_value v) {
   return get_symbol(lisp_type_to_string(lisp_value_type(v)));
 }
+static int str_index_of_last2(const char * str, char symbol){
+  int idx = -1;
+  
+  for(int i = 0; str[i] != 0; i++){
+    if(str[i] == symbol)
+      idx = i;
+  }
+  return idx;
+}
 
 lisp_value lisp_load(lisp_value v) {
   static const char *current_loading;
@@ -2517,7 +2526,7 @@ lisp_value lisp_load(lisp_value v) {
   }
 
   if (!file_exists(str) && current_loading != NULL) {
-    int idx = str_index_of_last(current_loading, '/');
+    int idx = str_index_of_last2(current_loading, '/');
     if (idx != -1) {
       memcpy(buf, current_loading, idx + 1);
       memcpy(buf + idx + 1, str, strlen(str) + 1);
