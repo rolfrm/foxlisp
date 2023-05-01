@@ -2670,7 +2670,20 @@ int main(int argc, char **argv) {
 
 #ifdef WASM
   lisp_load(string_lisp_value("demos/ld53.lisp"));
+  if (lisp_is_in_error()) {
+	 printf("Exiting due to unhandled exception\n");
+    var stk = current_error_stack;
+
+    while (!is_nil(stk)) {
+      println(car(stk));
+      stk = cdr(stk);
+    }
+    println(current_error);
+	 return 0;
+
+  }
   printf("done loading\n");
+  
   emscripten_set_main_loop(web_update, 0, 1);
 
 #endif
