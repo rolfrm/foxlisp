@@ -525,6 +525,7 @@ lisp_value lisp_macro_expand(lisp_scope *scope, lisp_value value) {
     return value;
   if (lisp_value_eq(car(value), quote_sym))
     return value;
+  printf(">>");println(value);
   var value_new = lisp_sub_macro_expand(scope, value);
   if (!lisp_value_eq(value_new, value)) {
     return value_new;
