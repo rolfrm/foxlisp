@@ -2066,12 +2066,16 @@ lisp_value lisp_eval_stream(io_reader *rd) {
       var p = gc_unsafe_stack;
       gc_unsafe_stack = true;
       next_toplevel = code;
+		printf("expand macro..\n");
       var next_code = lisp_macro_expand(current_context->globals, code);
 
       gc_unsafe_stack = p;
 
       if (lisp_value_eq(next_code, code))
         break;
+		printf("expanded: ");
+		println(code);
+
       code = next_code;
     }
 
