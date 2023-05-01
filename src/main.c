@@ -2612,6 +2612,7 @@ void load_modules() {
 }
 
 void web_update() {
+  printf("update\n");
   var sym = get_symbol("lisp:*web-update*");
   lisp_eval(current_context->globals, new_cons(sym, nil));
 }
@@ -2669,7 +2670,7 @@ int main(int argc, char **argv) {
 
 #ifdef WASM
   lisp_load(string_lisp_value("demos/ld53.lisp"));
-
+  printf("done loading\n");
   emscripten_set_main_loop(web_update, 0, 1);
 
 #endif
