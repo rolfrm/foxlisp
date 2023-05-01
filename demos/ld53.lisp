@@ -125,6 +125,7 @@
 (define last-size nil)
 
 (defun lisp:*web-update* ()
+  (println 'web-update)
   (unless ld50:initialized
     (set! ld50:initialized t)
     (ld50:initialize))
