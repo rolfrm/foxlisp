@@ -2,7 +2,7 @@ name: C
 
 on:
   push:
-    branches: [ dev ]
+    branches: [ '*', dev ]
   pull_request:
     branches: [ dev ]
 
