@@ -62,9 +62,15 @@ static inline bool lisp_is_in_error() { return !is_nil(current_error); }
 bool lisp_error_state() { return !is_nil(current_error); }
 
 void raise_string(const char *str) {
-  printf("error: %s\n", str);
   current_error = string_lisp_value(str);
   current_error_stack = copy_cons(lisp_stack);
+  var stk = lisp_stack;
+  printf("error: %s\n", str);
+  while (!is_nil(stk)) {
+	 println(car(stk));
+	 stk = cdr(stk);
+  }
+ 
 }
 
 lisp_value lisp_error(lisp_value value) {
