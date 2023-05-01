@@ -2051,6 +2051,8 @@ lisp_value lisp_eval_stream(io_reader *rd) {
     gc_unsafe_stack = true;
 
     var code = lisp_read_stream(rd);
+	 printf("read: ");
+	 println(code);
 
     gc_unsafe_stack = p;
 
@@ -2076,7 +2078,8 @@ lisp_value lisp_eval_stream(io_reader *rd) {
     current_toplevel = cons_lisp_value(&toplevel);
     next_toplevel = code;
     lisp_collect_garbage();
-    result = lisp_eval(current_context->globals, code);
+	 printf("eval: ");println(code);
+	 result = lisp_eval(current_context->globals, code);
     current_toplevel = toplevel.car;
 
     if (lisp_is_in_error())
