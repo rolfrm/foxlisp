@@ -687,7 +687,13 @@ void gc_clear_weak(lisp_context *lisp) {
   iterate_scope(lisp->gc, lisp->globals, true);
 }
 
+bool gc_unsafe_stack = false;
+
 void gc_collect_garbage(lisp_context *lisp) {
+  if(gc_unsafe_stack){
+	 return;
+	 printf("ERROR COLLECTING GARBAGE FROM UNSAFE STACK\n");
+  }
   //printf("GC\n");
   var gc = lisp->gc;
   gc_clear(gc);
@@ -704,7 +710,6 @@ void gc_collect_garbage(lisp_context *lisp) {
   gc_recover_unmarked(gc);
 }
 
-bool gc_unsafe_stack = false;
 void maybe_gc(lisp_context * ctx){
   static bool is_gcing = false;
   if(gc_unsafe_stack == false && ctx->gc->request_gc && !is_gcing){
