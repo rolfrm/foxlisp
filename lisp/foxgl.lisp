@@ -856,7 +856,7 @@
     (plist-rest (cdr model) foxgl:build-physics))  
   )
 
-(load "sdf.lisp")
+;(load "sdf.lisp")
 
 (let ((m1 (mat4-translation 4 0 0))
       (m2 (mat4-translation 3 2 1)))

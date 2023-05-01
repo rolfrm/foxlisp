@@ -63,12 +63,16 @@
 
 (define ld50:initialized nil)
 (define win nil)
-(defun key-down?(key1 key2)
-  (when win
-	 (if key2
-		  (foxgl:key-down? win key1 key2)
-		  (foxgl:key-down? win key1)
-		  )))
+(defun key-down?(&rest keys)
+  (let ((r nil))
+	 (when win
+	 (loop keys
+			(when (foxgl:key-down? win (car keys))
+			  (set! keys nil)
+			  (set r t)
+			  )
+			(set! keys (cdr keys))))
+	 r))
 (define swnk nil)
 (defun ld50:initialize()
   (set! win (foxgl:create-window (integer 800) (integer 800)))
