@@ -75,6 +75,12 @@ void raise_string(const char *str) {
 
 lisp_value lisp_error(lisp_value value) {
   printf("error: ");println(value);
+  var stk = lisp_stack;
+  while (!is_nil(stk)) {
+	 println(car(stk));
+	 stk = cdr(stk);
+  }
+
   current_error = value;
   current_error_stack = copy_cons(lisp_stack);
   return nil;

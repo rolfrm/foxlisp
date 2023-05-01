@@ -117,67 +117,6 @@
 			(< (abs (- (cadr now-clip) (cadr prev-clip))) (/ size 2))
 			(< (abs (- (caddr now-clip) (caddr prev-clip))) (/ size 2)))))
 
-(defun calc-clip (now-clip size)
-  (let ((s2 size))
-    (list (* (math:floor (/ (car now-clip) s2)) s2)
-          (* (math:floor (/ (cadr now-clip) s2)) s2)
-          (* (math:floor (/ (caddr now-clip) s2)) s2))))
-
-(defvar sdf-chunk-lookup (make-hashtable :deep-equality))
-(defvar sdf-chunk-lookup-model-id (make-hashtable))
-(defvar sdf-chunk-model-id-c 0)
-(defun render-sdf-clip (model size resolution clip)
-  (let ((model-id (hashtable-ref sdf-chunk-lookup-model-id model))
-        (sdf-model nil))
-    (unless model-id
-													 ;(println 'recalc-chunk-id)
-      (incf sdf-chunk-model-id-c)
-      (set! model-id sdf-chunk-model-id-c)
-      (hashtable-set sdf-chunk-lookup-model-id model model-id))
-    (dotimes! o 2
-				  (let* ((s2 (integer (* (math:pow 2.0 (rational o)) size)))
-							(p (calc-clip clip s2 ))
-							)
-					 (dotimes! i 6
-								  (dotimes! j 6
-												(dotimes! k 6
-															 (when (and (< o 2) (< o 3) (or (eq 0 o) (not (and (or (= j 2) (= j 3))
-																																(or (= i 2) (= i 3))
-																																(or (= k 2) (= k 3))))))
-																(let ((x (+ (* s2 (- i 2)) (* s2 1 (math:round (/ (car p) (* s2 1))))))
-																		(y (+ (* s2 (- j 1)) (cadr p)))
-																		(z (+ (* s2 (- k 2)) (* s2 1 (math:round (/ (caddr p) (* s2 1))))))
-																		(key (list model-id o x y z)))
-													 ;(println (list o x y z))
-																  (let ((r (hashtable-ref sdf-chunk-lookup key)))
-																	 (unless r
-																		(println (list 'eeeh_ x y z s2))
-																		(unless sdf-model
-																		  (set! sdf-model (foxgl:build-sdf (cdr model) foxgl:current-scope)))
-																		(let
-																			 ((poly (foxgl:sdf-marching-cubes (* 0.5 s2) (* (math:pow 2.0 (rational o)) resolution) sdf-model (list x y z))
-																				 ))
-																		  (set! r (cons 'poly (list (foxgl:load-polygon (car poly) 3 nil nil :triangles-color)
-																											 (foxgl:load-polygon (cdr poly) 3 nil nil :triangles-color)
-																											 )))
-																		  (println (list 'recalc sdf-chunk-lookup))
-																		  (hashtable-set sdf-chunk-lookup key r)
-																		  ))
-																	 
-																	 (foxgl:color foxgl:current-color)
-																	 (foxgl:transform foxgl:current-transform)
-																	 
-																	 (foxgl:blit-mode :triangles-color)
-																	 (foxgl:blit-polygon (cdr r))
-																	 (foxgl:blit-mode nil)
-																	 )
-																  )
-																)
-															 )
-												)
-								  )))))
-
-
 (defun foxgl:render-sub-models (model)
   (plist-rest model foxgl:render-model2))
 (define foxgl:test-tex nil)
