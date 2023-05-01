@@ -1063,7 +1063,6 @@ lisp_value foxgl_bake_polygons(lisp_value polygons, lisp_value base_tform) {
   return new_cons(vec, vec2);
 }
 
-void lrn(const char *l, int args, void *f) { lisp_register_native(l, args, f); }
 
 lisp_value foxgl_web_canvas_size() {
   int w = 0, h = 0;

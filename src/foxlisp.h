@@ -445,7 +445,11 @@ void lisp_register_native_noeval(const char *name, int nargs, void *fptr);
 void lisp_register_native_macrolike(const char *name, lisp_value (*fptr)(lisp_scope*,lisp_value));
 
 lisp_value lisp_read_string(const char *str);
-//lisp_value lisp_eval_stream2(lisp_scope * scope, lisp_value (* next)(void * data), void * data);
+
+void lrn(const char *l, int args, void *f);
+
+
+//lisp_value lisp_eval_stream2(lisp_scope * scope, lisp_value (* next)(void *data), void * data);
 // macros
 
 #define cdddr(x) cdr(cddr(x))

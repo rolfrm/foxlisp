@@ -189,7 +189,7 @@
     ))
 (defun list->vector (list map)
   (let ((i 0)
-        (v (make-vector (length list))))
+        (v (make-vector (length list) (car list))))
     
     (while list
       (vector-set! v i (car list))
@@ -197,8 +197,6 @@
       (set! i (+ i 1)))
     v
     ))
-
-
 
 (defmacro incf (var value)
   `(set! ,var (+ ,var ,value)))

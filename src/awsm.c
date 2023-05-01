@@ -1,13 +1,13 @@
 #include <iron/full.h>
 #include "microio.h"
 #include "foxlisp.h"
-#include "../awsm/include/awsm.h"
-lisp_value awsm_new_module() {
+//#include "../awsm/include/awsm.h"
+//lisp_value awsm_new_module() {
 
-  var pointer = awsm_load_dynamic_module();
-  return new_cons(get_symbol("awsm-module"),
-                  native_pointer_lisp_value(pointer));
-}
+  //var pointer = awsm_load_dynamic_module();
+  //return new_cons(get_symbol("awsm-module"),
+  //                native_pointer_lisp_value(pointer));
+//}
 
 lisp_value awsm_load_function_code(lisp_value fname, lisp_value buffer) {
   UNUSED(fname);
@@ -114,12 +114,8 @@ lisp_value byte_buffer_write(lisp_value *values, int count) {
   return nil;
 }
 
-static void lrn(const char *l, int args, void *f) {
-  lisp_register_native(l, args, f);
-}
-
 void awsm_register() {
-  lrn("awsm:new-module", 0, awsm_new_module);
+  //lrn("awsm:new-module", 0, awsm_new_module);
   lrn("awsm:load-code", 2, awsm_load_function_code);
   lrn("byte-buffer-new", 0, byte_buffer_new);
   lrn("byte-buffer-write", -1, byte_buffer_write);

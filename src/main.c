@@ -17,6 +17,7 @@
 #include "foxlisp_internal.h"
 #include "lisp_value2.c"
 
+
 bool debug_enabled = false;
 
 bool tracing = false;
@@ -2332,6 +2333,11 @@ void lisp_register_native_noeval(const char *name, int nargs, void *fptr) {
   lisp_register_value(name, v);
 }
 
+void lrn(const char *l, int args, void *f) {
+  lisp_register_native(l, args, f);
+}
+
+
 void lisp_register_macro(const char *name, lisp_builtin builtin) {
   lisp_value v = {.type = LISP_MACRO_BUILTIN, .builtin = builtin};
 
@@ -2595,12 +2601,14 @@ lisp_value lisp_trace(lisp_value v) {
 
 void awsm_register();
 void table_register();
+void fs_module_register();
 void load_modules() {
   gc_register();
   foxgl_register();
   lisp_process_module_init();
-  // awsm_register();
-  //table_register();
+  awsm_register();
+  table_register();
+  fs_module_register();
 }
 
 void web_update() {

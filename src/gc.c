@@ -917,7 +917,6 @@ lisp_value lisp_count_allocated_cons(){
   return integer(allocated);
 
 }
-static void lrn(const char *l, int args, void *f) { lisp_register_native(l, args, f); };
 
 void gc_register() {
   lisp_pinned_set = lisp_set_new();

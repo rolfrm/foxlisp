@@ -48,6 +48,11 @@
 (assert (= 4 (1+ 3)))
 (assert (= 4.0 (1+ 3.0)))
 
+(assert (= 4 #x4))
+(assert (= 16 #x10))
+(assert (= 15 #xF))
+
+
 (assert (= 10 (funcall + 1 9)))
 (assert (eq 1 '1)) ; '1 is the number 1.
 (define x 4)

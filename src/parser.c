@@ -67,7 +67,7 @@ lisp_value read_token_string(io_reader *rd) {
 lisp_value parse_token(const char *x, int count) {
 
   char *tp = NULL;
-
+    
   {
     int64_t o = strtoll(x, &tp, 10);
     if (tp == x + count)
@@ -78,6 +78,17 @@ lisp_value parse_token(const char *x, int count) {
     double o = strtold(x, &tp);
     if (tp == x + count)
       return rational_lisp_value(o);
+  }
+  { // parse hex e.g #x1234
+	 if(count > 2){
+		if(x[0] == '#' && x[1] == 'x'){
+		  
+		  int64_t o = strtoll(x + 2, &tp, 16);
+		  if (tp == x + count)
+			 return byte(o);
+
+		}
+	 }
   }
 
   // otherwise it is a symbol
@@ -99,6 +110,7 @@ lisp_value read_token_data(io_reader *rd) {
     io_write_u8(&wd, c);
   }
   io_write_u8(&wd, 0);
+  
   lisp_value vv = parse_token(gc_clone(wd.data, wd.offset), wd.offset - 1);
   io_writer_clear(&wd);
   return vv;
