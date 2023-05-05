@@ -140,6 +140,9 @@
 
 (defun cdddr (l)
   (cdr (cddr l)))
+
+(defun cddddr (l)
+  (cddr (cddr l)))
 (defun caaar (l)
   (car (caar l)))
 (defun cadar (l)
